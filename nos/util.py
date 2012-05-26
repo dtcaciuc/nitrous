@@ -1,32 +1,3 @@
-#include <Python.h>
-
-MODULE = """
-
-static PyMethodDef Methods[] = {
-{% for item in seq %}
-    {"{{item.name}}
-
-/*
-    {"system",  spam_system, METH_VARARGS,
-     "Execute a shell command."},
-     */
-    {NULL, NULL, 0, NULL}        /* Sentinel */
-
-};
-
-PyMODINIT_FUNC
-init{{module}}(void)
-{
-    PyObject *m;
-
-    m = Py_InitModule("{{module}}", Methods);
-    if (m == NULL) {
-        return;
-    }
-
-}
-"""
-
 
 def dump_ast(node, annotate_fields=True, include_attributes=False):
     import ast
