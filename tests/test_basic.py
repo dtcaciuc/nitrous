@@ -2,6 +2,42 @@ import unittest2 as unittest
 import nos
 
 
+class AnnotationTests(unittest.TestCase):
+
+    def setUp(self):
+        self.m = nos.Module(__name__)
+        self.addCleanup(self.m.clean)
+
+    def test_missing_result(self):
+        @self.m.args(y=nos.Double())
+        def x(y):
+            pass
+
+        error = "Forgot to annotate x result type"
+        with self.assertRaisesRegexp(nos.CompilationError, error):
+            self.m.compiled()(x)
+
+    def test_missing_args(self):
+        @self.m.result(nos.Double())
+        def x(y):
+            pass
+
+        error = "Forgot to annotate x arguments"
+        with self.assertRaisesRegexp(nos.CompilationError, error):
+            self.m.compiled()(x)
+
+    def test_args_mismatch(self):
+
+        @self.m.args(z=nos.Double())
+        @self.m.result(nos.Double())
+        def x(y):
+            pass
+
+        error = "Argument type annotations don't match function arguments"
+        with self.assertRaisesRegexp(nos.CompilationError, error):
+            self.m.compiled()(x)
+
+
 class TestA(unittest.TestCase):
 
     def setUp(self):

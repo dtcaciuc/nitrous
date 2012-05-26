@@ -17,7 +17,6 @@ class Visitor(ast.NodeVisitor):
         self.builder = builder
         self.vars = vars
         self.stack = []
-        self.__indent = ''
 
     def visit_Num(self, node):
         if isinstance(node.n, float):

@@ -11,6 +11,10 @@ import tempfile
 __all__ = ["Double", "result", "args", "compiled"]
 
 
+class CompilationError(Exception):
+    pass
+
+
 class Module(object):
 
     def __init__(self, name):
@@ -45,17 +49,23 @@ class Module(object):
 
             # Sanity checks
             if not hasattr(func, "__nos_argtypes__"):
-                raise ValueError("Forgot to annotate {0} arguments".format(func.func_name))
+                raise CompilationError("Forgot to annotate {0} arguments"
+                                       .format(func.func_name))
             if not hasattr(func, "__nos_restype__"):
-                raise ValueError("Forgot to annotate {0} result type".format(func.func_name))
+                raise CompilationError("Forgot to annotate {0} result type"
+                                       .format(func.func_name))
 
             # Function parameters, return type and other glue
+            spec = inspect.getargspec(func)
+            if spec.varargs or spec.keywords:
+                raise CompilationError("Variable and/or keyword arguments are not allowed")
 
-            # TODO assert len(argtypes) == len(args)
-            # TODO assert only positional args are allowed
-            argnames = inspect.getargspec(func).args
-            argtypes = (llvm.TypeRef * len(argnames))()
-            for i, arg in enumerate(argnames):
+            argtypes = (llvm.TypeRef * len(spec.args))()
+            if spec.args != list(func.__nos_argtypes__):
+                raise CompilationError("Argument type annotations don't "
+                                       "match function arguments.")
+
+            for i, arg in enumerate(spec.args):
                 argtypes[i] = func.__nos_argtypes__[arg].generate()
 
             restype = func.__nos_restype__.generate()
@@ -70,7 +80,7 @@ class Module(object):
             # Collecting available symbols; start with function parameters
             vars = {}
 
-            for i, name in enumerate(argnames):
+            for i, name in enumerate(spec.args):
                 p = llvm.GetParam(func_, i)
                 llvm.SetValueName(p, name)
                 vars[name] = p
@@ -84,6 +94,8 @@ class Module(object):
             v = Visitor(self.builder, vars)
             for node in t.body[0].body:
                 v.visit(node)
+
+            # TODO if stack is not empty, return last value
 
             if llvm.VerifyFunction(func_, llvm.AbortProcessAction):
                 raise RuntimeError("Could not produce a valid function for " + func.func_name)
