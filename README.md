@@ -11,4 +11,4 @@ Requirements
 * Python 2.7
 * LLVM, compiled with `--enable-shared` option. (tested with 3.1)
 * Clang (tested with 3.1)
-* `nose` and `unittest2` for running tests
+* `nose`, `unittest2` and `coverage` for running tests
