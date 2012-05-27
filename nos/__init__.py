@@ -7,8 +7,8 @@ import ast
 import os
 import tempfile
 
-LLC = os.environ.get("NOS_LLC_BIN", "llc")
-CLANG = os.environ.get("NOS_CLANG_BIN", "clang")
+LLC = os.environ.get("NOS_LLC", "llc")
+CLANG = os.environ.get("NOS_CLANG", "clang")
 
 __all__ = ["Double", "result", "args", "compiled"]
 
@@ -121,6 +121,8 @@ class Module(object):
         with tempfile.NamedTemporaryFile(suffix=".bc") as tmp_bc:
             with tempfile.NamedTemporaryFile(suffix=".s") as tmp_s:
                 llvm.WriteBitcodeToFile(self.module, tmp_bc.name)
+
+                print " * Running llc: ", (LLC, "-o={0}".format(tmp_s.name), tmp_bc.name)
 
                 if call((LLC, "-o={0}".format(tmp_s.name), tmp_bc.name)):
                     raise RuntimeError("Could not assemble IR")
