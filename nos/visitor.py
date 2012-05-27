@@ -26,7 +26,15 @@ class Visitor(ast.NodeVisitor):
 
     def visit_Name(self, node):
         if isinstance(node.ctx, ast.Load):
-            self.stack.append(self.vars[node.id])
+            try:
+                self.stack.append(self.vars[node.id])
+            except KeyError:
+                # `vars` would contain all local/global symbols
+                # that were available during decoration, so last thing
+                # is to try importing the symbol by its name.
+                modulename, attrname = node.id.rsplit(".", 1)
+                attr = getattr(__import__(modulename), attrname)
+                self.stack.append(attr)
         elif isinstance(node.ctx, ast.Store):
             if node.id in self.vars:
                 # Cannot reassign variables
@@ -54,5 +62,38 @@ class Visitor(ast.NodeVisitor):
         v = float_ops[type(node.op)](self.builder, lhs, rhs, "tmp")
         self.stack.append(v)
 
-    def generic_visit(self, node):
+    def visit_Call(self, node):
         ast.NodeVisitor.generic_visit(self, node)
+        args = [self.stack.pop() for _ in range(len(node.args))][::-1]
+        func = self.stack.pop()
+        result = func(*args)
+
+        # Function returned something that can be LLVM-ed
+        if getattr(result, "__nos_emitter__", False):
+            result = result.emit(self.builder)
+
+        self.stack.append(result)
+
+
+class FlattenAttributes(ast.NodeTransformer):
+    """Flattens attributes into name nodes.
+
+    Eg. Attribute(value=Attribute("a"), attr="b") -> Name(id="a.b")
+
+    """
+
+    def __init__(self, builder, vars):
+        self.builder = builder
+        self.vars = vars
+        self.stack = []
+
+    def visit_Attribute(self, node):
+        from . import CompilationError
+
+        if not isinstance(node.ctx, ast.Load):
+            raise CompilationError("Setting attributes not supported")
+
+        node = ast.NodeTransformer.generic_visit(self, node)
+        assert isinstance(node.value, ast.Name)
+
+        return ast.Name(id=node.value.id + "." + node.attr, ctx=ast.Load())

@@ -47,3 +47,32 @@ class TestA(unittest.TestCase):
 
         out = self.m.compile()
         self.assertEqual(out.axpy(2.0, 3.0, 5.0), 11.0)
+
+    def test_emitter(self):
+        """Simple function call."""
+        import nos.types
+
+        @self.m.function(nos.types.Double, y=nos.types.Int64)
+        def x(y):
+            return nos.cast(y, nos.types.Double)
+
+        out = self.m.compile()
+        rv = out.x(int(5))
+
+        self.assertEqual(rv, 5.0)
+        self.assertEqual(type(rv), float)
+
+    def test_emitter_locals(self):
+        """Simple function call; check if symbols are imported in outer scope."""
+        from nos.types import Double, Int64
+        from nos import cast
+
+        @self.m.function(Double, y=Int64)
+        def x(y):
+            return cast(y, Double)
+
+        out = self.m.compile()
+        rv = out.x(int(5))
+
+        self.assertEqual(rv, 5.0)
+        self.assertEqual(type(rv), float)

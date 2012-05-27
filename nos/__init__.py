@@ -33,6 +33,7 @@ class Module(object):
 
     def function(self, result, **kwargs):
         def wrapper(func):
+            from .util import remove_indent
             import inspect
 
             func.__nos_restype__ = result
@@ -63,12 +64,23 @@ class Module(object):
             # Collecting available symbols; start with function parameters
             vars = {}
 
+            parent_frame = inspect.currentframe().f_back
+            vars.update(parent_frame.f_globals)
+            vars.update(parent_frame.f_locals)
+            del parent_frame
+
             for i, name in enumerate(spec.args):
                 p = llvm.GetParam(func_, i)
                 llvm.SetValueName(p, name)
                 vars[name] = p
 
-            t = ast.parse(_remove_indent(inspect.getsourcelines(func)))
+            t = ast.parse(remove_indent(inspect.getsourcelines(func)))
+            func_body = list(t.body[0].body)
+
+            from .visitor import FlattenAttributes
+            v = FlattenAttributes(self.builder, vars)
+            for i, node in enumerate(func_body):
+                func_body[i] = v.visit(node)
 
             # Debugging
             # for tt in t.body[0].body:
@@ -142,9 +154,30 @@ class Module(object):
         return "__".join((self.name, symbol))
 
 
-def _remove_indent(source_lines):
-    """Removes base indent for a set of source lines."""
-    lines, _ = source_lines
-    line_0 = lines[0].lstrip()
-    indent = len(lines[0]) - len(line_0)
-    return "".join(line[indent:] for line in lines)
+class ValueEmitter(object):
+
+    __nos_emitter__ = True
+
+    def __init__(self, func, args, kwargs):
+        self.func = func
+        self.args = args
+        self.kwargs = kwargs
+
+    def emit(self, builder):
+        return self.func(builder, *self.args, **self.kwargs)
+
+
+def value_emitter(func):
+    def wrapper(*args, **kwargs):
+        return ValueEmitter(func, args, kwargs)
+    return wrapper
+
+
+@value_emitter
+def cast(builder, value, target_type):
+    """Casts expression to specified type."""
+    return llvm.BuildCast(
+        # TODO figure out cast opcode based on types
+        builder, llvm.LLVMSIToFP,
+        value, target_type.llvm_type,
+        "tmp")

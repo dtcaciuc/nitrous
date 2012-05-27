@@ -62,6 +62,7 @@ _func("SetValueName", None, [ValueRef, ctypes.c_char_p])
 _func("ConstInt", ValueRef, [TypeRef, ctypes.c_ulonglong, Bool])
 _func("ConstReal", ValueRef, [TypeRef, ctypes.c_double])
 
+Opcode = ctypes.c_int
 
 # Functions
 _func("FunctionType", TypeRef, [TypeRef, ctypes.POINTER(TypeRef), ctypes.c_uint, ctypes.c_int])
@@ -111,6 +112,16 @@ for name in ("BuildFAdd", "BuildFSub", "BuildFMul", "BuildFDiv"):
 for name in ("BuildAdd", "BuildSub", "BuildMul", "BuildUDiv", "BuildSDiv"):
     _func(name, ValueRef, [BuilderRef, ValueRef, ValueRef, ctypes.c_char_p])
 
+# Casting
+# TODO add the rest of LLVMOpcode
+LLVMSIToFP = 36
+
+_func("BuildCast", ValueRef, [BuilderRef, Opcode, ValueRef, TypeRef, ctypes.c_char_p])
+
+# Misc
+_func("BuildCall", ValueRef, [BuilderRef, ValueRef,
+                              ctypes.POINTER(ValueRef), ctypes.c_uint,
+                              ctypes.c_char_p])
 
 # Analysis
 VerifierFailureAction = ctypes.c_int
