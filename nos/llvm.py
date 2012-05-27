@@ -8,6 +8,7 @@ def _load_llvm():
     extensions = dict(Darwin="dylib", Linux="so", Windows="dll")
     ext = os.environ.get("NOS_LLVM_EXT", extensions[platform.system()])
     name = "libLLVM-{0}.{1}".format(os.environ["NOS_LLVM_VERSION"], ext)
+    print " * Using", name
     return ctypes.cdll.LoadLibrary(name)
 
 
