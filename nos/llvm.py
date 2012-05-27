@@ -5,8 +5,7 @@ import os
 
 def _load_llvm():
     # TODO is there a standard way to get the extension?
-    extensions = dict(Darwin="dylib", Linux="so", Windows="dll")
-    ext = os.environ.get("NOS_LLVM_EXT", extensions[platform.system()])
+    ext = dict(Darwin="dylib", Linux="so", Windows="dll")[platform.system()]
     name = "libLLVM-{0}.{1}".format(os.environ["NOS_LLVM_VERSION"], ext)
     print " * Using", name
     return ctypes.cdll.LoadLibrary(name)
