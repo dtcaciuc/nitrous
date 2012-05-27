@@ -2,7 +2,7 @@ language: python
 
 before_script:
     - sudo apt-get update
-    - sudo apt-get install llvm-2.9-dev clang-2.9
+    - sudo apt-get install llvm-2.9-dev clang
 
 python:
     - 2.7
