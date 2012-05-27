@@ -3,10 +3,15 @@ import platform
 import os
 
 
-# TODO is there a standard way to get the extension?
-_libext = dict(Darwin="dylib", Linux="so", Windows="dll")[platform.system()]
-_libname = "libLLVM-{0}.{1}".format(os.environ["NOS_LLVM_VERSION"], _libext)
-_llvm = ctypes.cdll.LoadLibrary(_libname)
+def _load_llvm():
+    # TODO is there a standard way to get the extension?
+    extensions = dict(Darwin="dylib", Linux="so", Windows="dll")
+    ext = os.environ.get("NOS_LLVM_EXT", extensions[platform.system()])
+    name = "libLLVM-{0}.{1}".format(os.environ["NOS_LLVM_VERSION"], ext)
+    return ctypes.cdll.LoadLibrary(name)
+
+
+_llvm = _load_llvm()
 
 
 def _func(func_name, restype, argtypes=[]):

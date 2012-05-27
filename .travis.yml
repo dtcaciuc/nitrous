@@ -8,5 +8,6 @@ install:
     - pip install .
 
 script:
-    - find /usr -name '*LLVM*'
+    - export NOS_LLVM_VERSION=2.9
+    - export NOS_LLVM_EXT=so.1
     - python setup.py nosetests

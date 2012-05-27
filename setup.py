@@ -3,6 +3,7 @@ import os
 
 os.environ.setdefault("NOS_LLVM_VERSION", "3.1")
 
+
 setup(name="nos",
       version="0.1.0",
       description="Run-time LLVM-based compiler for CPython functions",
