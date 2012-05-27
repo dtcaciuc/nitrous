@@ -1,5 +1,8 @@
 language: python
 
+before_script:
+    - sudo aptitude -y -q install llvm-dev clang
+
 python:
     - 2.7
 
@@ -12,6 +15,7 @@ script:
     - export LD_LIBRARY_PATH=/usr/lib/i386-linux-gnu
     - export NOS_LLVM_VERSION=2.9
     - export NOS_LLVM_EXT=so.1
+    - find /usr -name '*LLVM*'
     - find /usr -name '*llc*'
     - find /usr -name '*clang*'
     - python setup.py nosetests -s
