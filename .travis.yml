@@ -5,10 +5,11 @@ python:
 
 install:
     - pip install nose
+    - pip install coverage
     - pip install .
 
 script:
     - export LD_LIBRARY_PATH=/usr/lib/i386-linux-gnu
     - export NOS_LLVM_VERSION=2.9
     - export NOS_LLVM_EXT=so.1
-    - python setup.py nosetests
+    - python setup.py nosetests -s
