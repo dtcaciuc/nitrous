@@ -14,7 +14,5 @@ install:
 
 script:
     - export NOS_LLVM_VERSION=2.9
-    - find /usr -name '*LLVM*'
-    - find /usr -name '*llc*'
-    - find /usr -name '*clang*'
+    - export NOS_LLC=llc-2.9
     - python setup.py nosetests -s
