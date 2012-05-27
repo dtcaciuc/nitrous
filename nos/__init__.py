@@ -31,29 +31,12 @@ class Module(object):
         llvm.DisposeModule(self.module)
         self.clean()
 
-    def args(self, **kwargs):
-        def wrapper(func):
-            func.__nos_argtypes__ = kwargs
-            return func
-        return wrapper
-
-    def result(self, type_):
-        def wrapper(func):
-            func.__nos_restype__ = type_
-            return func
-        return wrapper
-
-    def compiled(self):
+    def function(self, result, **kwargs):
         def wrapper(func):
             import inspect
 
-            # Sanity checks
-            if not hasattr(func, "__nos_argtypes__"):
-                raise CompilationError("Forgot to annotate {0} arguments"
-                                       .format(func.func_name))
-            if not hasattr(func, "__nos_restype__"):
-                raise CompilationError("Forgot to annotate {0} result type"
-                                       .format(func.func_name))
+            func.__nos_restype__ = result
+            func.__nos_argtypes__ = kwargs
 
             # Function parameters, return type and other glue
             spec = inspect.getargspec(func)
@@ -66,9 +49,9 @@ class Module(object):
                                        "match function arguments.")
 
             for i, arg in enumerate(spec.args):
-                argtypes[i] = func.__nos_argtypes__[arg].generate()
+                argtypes[i] = func.__nos_argtypes__[arg].llvm_type
 
-            restype = func.__nos_restype__.generate()
+            restype = func.__nos_restype__.llvm_type
 
             functype = llvm.FunctionType(restype, argtypes, len(argtypes), 0)
             func_ = llvm.AddFunction(self.module, self._qualify(func.func_name), functype)

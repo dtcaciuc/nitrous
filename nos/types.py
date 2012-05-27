@@ -1,10 +1,10 @@
 import ctypes
+from collections import namedtuple
+from . import llvm
 
 
-class Double(object):
+Type = namedtuple("Type", "c_type, llvm_type")
+"""Base for NOS data types."""
 
-    c_type = ctypes.c_double
 
-    def generate(self):
-        from .llvm import DoubleType
-        return DoubleType()
+Double = Type(ctypes.c_double, llvm.DoubleType())
