@@ -1,6 +1,8 @@
 NOS
 ===
 
+[![Build Status](https://secure.travis-ci.org/dtcaciuc/nos.png)](http://travis-ci.org/dtcaciuc/nos)
+
 NOS provides a run-time LLVM-based compiler for CPython functions.
 
 Currently, the project is in early development so not much documentation is available.
