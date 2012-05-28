@@ -3,6 +3,18 @@ import platform
 import os
 
 
+VERSION = os.environ["NOS_LLVM_VERSION"]
+
+if VERSION == "2.9":
+    from .v29 import *
+elif VERSION == "3.0":
+    from .v30 import *
+elif VERSION == "3.1":
+    from .v31 import *
+else:
+    raise RuntimeError("Incompatible LLVM version {0}".format(VERSION))
+
+
 def _load_llvm():
     # TODO is there a standard way to get the extension?
     ext = dict(Darwin="dylib", Linux="so", Windows="dll")[platform.system()]
@@ -48,26 +60,6 @@ class OpaqueType(ctypes.Structure):
     pass
 
 TypeRef = ctypes.POINTER(OpaqueType)
-
-(
-    VoidTypeKind,
-    HalfTypeKind,
-    FloatTypeKind,
-    DoubleTypeKind,
-    X86_FP80TypeKind,
-    FP128TypeKind,
-    PPC_FP128TypeKind,
-    LabelTypeKind,
-    IntegerTypeKind,
-    FunctionTypeKind,
-    StructTypeKind,
-    ArrayTypeKind,
-    PointerTypeKind,
-    VectorTypeKind,
-    MetadataTypeKind,
-    X86_MMXTypeKind
-
-) = range(16)
 
 TypeKind = ctypes.c_int
 
