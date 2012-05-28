@@ -2,7 +2,14 @@ import unittest2 as unittest
 import nos
 
 
-class AnnotationTests(unittest.TestCase):
+class ModuleTest(object):
+
+    def setUp(self):
+        self.m = nos.Module(__name__)
+        self.addCleanup(self.m.clean)
+
+
+class AnnotationTests(ModuleTest, unittest.TestCase):
 
     def setUp(self):
         self.m = nos.Module(__name__)
@@ -18,11 +25,7 @@ class AnnotationTests(unittest.TestCase):
             self.m.function(nos.Double, z=nos.Double)(x)
 
 
-class TestA(unittest.TestCase):
-
-    def setUp(self):
-        self.m = nos.Module(__name__)
-        self.addCleanup(self.m.clean)
+class TestA(ModuleTest, unittest.TestCase):
 
     def test_add_sub(self):
         """Basic add/subtract; two functions per module."""
@@ -76,3 +79,31 @@ class TestA(unittest.TestCase):
 
         self.assertEqual(rv, 5.0)
         self.assertEqual(type(rv), float)
+
+
+class LongTest(ModuleTest, unittest.TestCase):
+
+    def test_const_num(self):
+        """Constant declaration."""
+
+        @self.m.function(nos.types.Long)
+        def x():
+            a = 5
+            return a
+
+        out = self.m.compile()
+        self.assertEqual(out.x(), 5)
+
+
+class DoubleTest(ModuleTest, unittest.TestCase):
+
+    def test_const_num(self):
+        """Constant declaration."""
+
+        @self.m.function(nos.types.Double)
+        def x():
+            a = 5.0
+            return a
+
+        out = self.m.compile()
+        self.assertEqual(out.x(), 5.0)

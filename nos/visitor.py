@@ -19,9 +19,12 @@ class Visitor(ast.NodeVisitor):
         self.stack = []
 
     def visit_Num(self, node):
+        from .types import Long, Double
+
         if isinstance(node.n, float):
-            # TODO use .types to
-            self.stack.append(llvm.ConstReal(llvm.DoubleType(), node.n))
+            self.stack.append(llvm.ConstReal(Double.llvm_type, node.n))
+        elif isinstance(node.n, int):
+            self.stack.append(llvm.ConstInt(Long.llvm_type, node.n, True))
         else:
             raise TypeError("Uknown Number type {0!s}".format(type(node.n)))
 
