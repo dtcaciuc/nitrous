@@ -2,12 +2,19 @@ import ast
 
 from . import llvm
 
-
-float_ops = {
-    ast.Add: llvm.BuildFAdd,
-    ast.Sub: llvm.BuildFSub,
-    ast.Mult: llvm.BuildFMul,
-    ast.Div: llvm.BuildFDiv,
+OPS = {
+    llvm.DoubleTypeKind: {
+        ast.Add: llvm.BuildFAdd,
+        ast.Sub: llvm.BuildFSub,
+        ast.Mult: llvm.BuildFMul,
+        ast.Div: llvm.BuildFDiv,
+    },
+    llvm.IntegerTypeKind: {
+        ast.Add: llvm.BuildAdd,
+        ast.Sub: llvm.BuildSub,
+        ast.Mult: llvm.BuildMul,
+        ast.Div: llvm.BuildSDiv,
+    }
 }
 
 
@@ -58,12 +65,22 @@ class Visitor(ast.NodeVisitor):
         llvm.BuildRet(self.builder, self.stack.pop())
 
     def visit_BinOp(self, node):
+        from . import CompilationError
+
         ast.NodeVisitor.generic_visit(self, node)
         rhs = self.stack.pop()
         lhs = self.stack.pop()
 
-        # FIXME hardcoded float type
-        v = float_ops[type(node.op)](self.builder, lhs, rhs, "tmp")
+        # Operands must be of the same type kind
+        # TODO if integer, also verify the bit width?
+        type_kind = llvm.GetTypeKind(llvm.TypeOf(lhs))
+        if (type_kind != llvm.GetTypeKind(llvm.TypeOf(rhs))):
+            raise CompilationError(
+                "Cannot apply {0} to {1} and {2}; type kind doesn't match"
+                .format(node.op, lhs, rhs)
+            )
+
+        v = OPS[type_kind][type(node.op)](self.builder, lhs, rhs, "tmp")
         self.stack.append(v)
 
     def visit_Call(self, node):

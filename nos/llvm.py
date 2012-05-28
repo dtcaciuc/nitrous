@@ -49,9 +49,33 @@ class OpaqueType(ctypes.Structure):
 
 TypeRef = ctypes.POINTER(OpaqueType)
 
+(
+    VoidTypeKind,
+    HalfTypeKind,
+    FloatTypeKind,
+    DoubleTypeKind,
+    X86_FP80TypeKind,
+    FP128TypeKind,
+    PPC_FP128TypeKind,
+    LabelTypeKind,
+    IntegerTypeKind,
+    FunctionTypeKind,
+    StructTypeKind,
+    ArrayTypeKind,
+    PointerTypeKind,
+    VectorTypeKind,
+    MetadataTypeKind,
+    X86_MMXTypeKind
+
+) = range(16)
+
+TypeKind = ctypes.c_int
+
 _func("FloatType", TypeRef)
 _func("DoubleType", TypeRef)
 _func("IntType", TypeRef, [ctypes.c_uint])
+
+_func("GetTypeKind", TypeKind, [TypeRef])
 
 
 # Value
@@ -60,6 +84,7 @@ class OpaqueValue(ctypes.Structure):
 
 ValueRef = ctypes.POINTER(OpaqueValue)
 
+_func("TypeOf", TypeRef, [ValueRef])
 _func("SetValueName", None, [ValueRef, ctypes.c_char_p])
 
 # Operations on scalar constants

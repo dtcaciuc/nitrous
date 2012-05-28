@@ -27,21 +27,6 @@ class AnnotationTests(ModuleTest, unittest.TestCase):
 
 class TestA(ModuleTest, unittest.TestCase):
 
-    def test_add_sub(self):
-        """Basic add/subtract; two functions per module."""
-
-        @self.m.function(nos.Double, a=nos.Double, b=nos.Double)
-        def add(a, b):
-            return a + b
-
-        @self.m.function(nos.Double, a=nos.Double, b=nos.Double)
-        def sub(a, b):
-            return a - b
-
-        out = self.m.compile()
-        self.assertEqual(out.add(3.0, 2.0), 5.0)
-        self.assertEqual(out.sub(3.0, 2.0), 1.0)
-
     def test_axpy(self):
 
         @self.m.function(nos.Double, a=nos.Double, x=nos.Double, y=nos.Double)
@@ -83,7 +68,7 @@ class TestA(ModuleTest, unittest.TestCase):
 
 class LongTest(ModuleTest, unittest.TestCase):
 
-    def test_const_num(self):
+    def test_const(self):
         """Constant declaration."""
 
         @self.m.function(nos.types.Long)
@@ -94,10 +79,37 @@ class LongTest(ModuleTest, unittest.TestCase):
         out = self.m.compile()
         self.assertEqual(out.x(), 5)
 
+    def test_add(self):
+
+        @self.m.function(nos.Double, a=nos.Double, b=nos.Double)
+        def add(a, b):
+            return a + b
+
+        out = self.m.compile()
+        self.assertEqual(out.add(3.0, 2.0), 5.0)
+
+    def test_sub(self):
+
+        @self.m.function(nos.Double, a=nos.Double, b=nos.Double)
+        def sub(a, b):
+            return a - b
+
+        out = self.m.compile()
+        self.assertEqual(out.sub(3.0, 2.0), 1.0)
+
+    def test_div(self):
+
+        @self.m.function(nos.Double, a=nos.Double, b=nos.Double)
+        def div(a, b):
+            return a / b
+
+        out = self.m.compile()
+        self.assertEqual(out.div(3.0, 2.0), 1.5)
+
 
 class DoubleTest(ModuleTest, unittest.TestCase):
 
-    def test_const_num(self):
+    def test_const(self):
         """Constant declaration."""
 
         @self.m.function(nos.types.Double)
@@ -107,3 +119,41 @@ class DoubleTest(ModuleTest, unittest.TestCase):
 
         out = self.m.compile()
         self.assertEqual(out.x(), 5.0)
+
+    def test_add(self):
+        from nos.types import Long
+
+        @self.m.function(Long, a=Long, b=Long)
+        def add(a, b):
+            return a + b
+
+        out = self.m.compile()
+        self.assertEqual(out.add(3, 2), 5)
+
+    def test_sub(self):
+        from nos.types import Long
+
+        @self.m.function(Long, a=Long, b=Long)
+        def sub(a, b):
+            return a - b
+
+        out = self.m.compile()
+        self.assertEqual(out.sub(3, 2), 1)
+        self.assertEqual(out.sub(3, 5), -2)
+
+    def test_div(self):
+        from nos.types import Long
+
+        @self.m.function(Long, a=Long, b=Long)
+        def div(a, b):
+            return a / b
+
+        out = self.m.compile()
+        self.assertEqual(out.div(3, 2), 1)
+        self.assertEqual(out.div(3, -2), -1)
+
+
+class OpTest(ModuleTest, unittest.TestCase):
+    pass
+
+    # TODO def test_mismatch_operand_type(self):
