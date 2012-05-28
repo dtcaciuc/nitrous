@@ -20,6 +20,7 @@ class Visitor(ast.NodeVisitor):
 
     def visit_Num(self, node):
         if isinstance(node.n, float):
+            # TODO use .types to
             self.stack.append(llvm.ConstReal(llvm.DoubleType(), node.n))
         else:
             raise TypeError("Uknown Number type {0!s}".format(type(node.n)))

@@ -122,8 +122,6 @@ class Module(object):
             with tempfile.NamedTemporaryFile(suffix=".s") as tmp_s:
                 llvm.WriteBitcodeToFile(self.module, tmp_bc.name)
 
-                print " * Running llc: ", (LLC, "-o={0}".format(tmp_s.name), tmp_bc.name)
-
                 if call((LLC, "-o={0}".format(tmp_s.name), tmp_bc.name)):
                     raise RuntimeError("Could not assemble IR")
 

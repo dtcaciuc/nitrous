@@ -52,7 +52,7 @@ class TestA(unittest.TestCase):
         """Simple function call."""
         import nos.types
 
-        @self.m.function(nos.types.Double, y=nos.types.Int64)
+        @self.m.function(nos.types.Double, y=nos.types.Long)
         def x(y):
             return nos.cast(y, nos.types.Double)
 
@@ -64,10 +64,10 @@ class TestA(unittest.TestCase):
 
     def test_emitter_locals(self):
         """Simple function call; check if symbols are imported in outer scope."""
-        from nos.types import Double, Int64
+        from nos.types import Double, Long
         from nos import cast
 
-        @self.m.function(Double, y=Int64)
+        @self.m.function(Double, y=Long)
         def x(y):
             return cast(y, Double)
 
