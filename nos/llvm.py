@@ -143,7 +143,8 @@ for name in ("BuildAdd", "BuildSub", "BuildMul", "BuildUDiv", "BuildSDiv"):
 
 # Casting
 # TODO add the rest of LLVMOpcode
-LLVMSIToFP = 36
+FPToSI = 34
+SIToFP = 36
 
 _func("BuildCast", ValueRef, [BuilderRef, Opcode, ValueRef, TypeRef, ctypes.c_char_p])
 

@@ -66,18 +66,18 @@ class TestA(ModuleTest, unittest.TestCase):
         self.assertEqual(type(rv), float)
 
 
-class LongTest(ModuleTest, unittest.TestCase):
+class LongTests(ModuleTest, unittest.TestCase):
 
     def test_const(self):
         """Constant declaration."""
 
-        @self.m.function(nos.types.Long)
+        @self.m.function(nos.types.Double)
         def x():
-            a = 5
+            a = 5.0
             return a
 
         out = self.m.compile()
-        self.assertEqual(out.x(), 5)
+        self.assertEqual(out.x(), 5.0)
 
     def test_add(self):
 
@@ -107,18 +107,18 @@ class LongTest(ModuleTest, unittest.TestCase):
         self.assertEqual(out.div(3.0, 2.0), 1.5)
 
 
-class DoubleTest(ModuleTest, unittest.TestCase):
+class DoubleTests(ModuleTest, unittest.TestCase):
 
     def test_const(self):
         """Constant declaration."""
 
-        @self.m.function(nos.types.Double)
+        @self.m.function(nos.types.Long)
         def x():
-            a = 5.0
+            a = 5
             return a
 
         out = self.m.compile()
-        self.assertEqual(out.x(), 5.0)
+        self.assertEqual(out.x(), 5)
 
     def test_add(self):
         from nos.types import Long
@@ -153,7 +153,32 @@ class DoubleTest(ModuleTest, unittest.TestCase):
         self.assertEqual(out.div(3, -2), -1)
 
 
-class OpTest(ModuleTest, unittest.TestCase):
-    pass
+class CastTests(ModuleTest, unittest.TestCase):
 
-    # TODO def test_mismatch_operand_type(self):
+    def test_cast(self):
+        from nos.types import Long, Double
+        from nos import cast
+
+        @self.m.function(Long, a=Long, b=Double)
+        def div_long(a, b):
+            return a / cast(b, Long)
+
+        @self.m.function(Double, a=Long, b=Double)
+        def div_double(a, b):
+            return cast(a, Double) / b
+
+        out = self.m.compile()
+
+        self.assertEqual(out.div_long(3, 2), 1)
+        self.assertEqual(out.div_double(3, 2), 1.5)
+
+    def test_cast_noop(self):
+        from nos.types import Double
+        from nos import cast
+
+        @self.m.function(Double, a=Double, b=Double)
+        def div_double(a, b):
+            return cast(a, Double) / b
+
+        out = self.m.compile()
+        self.assertEqual(out.div_double(3, 2), 1.5)

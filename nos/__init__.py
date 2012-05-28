@@ -175,11 +175,28 @@ def value_emitter(func):
     return wrapper
 
 
+_CASTS = {
+    (llvm.DoubleTypeKind, llvm.IntegerTypeKind): llvm.FPToSI,
+    (llvm.IntegerTypeKind, llvm.DoubleTypeKind): llvm.SIToFP,
+}
+
+
 @value_emitter
 def cast(builder, value, target_type):
     """Casts expression to specified type."""
-    return llvm.BuildCast(
-        # TODO figure out cast opcode based on types
-        builder, llvm.LLVMSIToFP,
-        value, target_type.llvm_type,
-        "tmp")
+    value_kind = llvm.GetTypeKind(llvm.TypeOf(value))
+    target_kind = llvm.GetTypeKind(target_type.llvm_type)
+
+    # TODO support
+    # * unsigned integers
+    # * floats and integers of different width
+
+    if value_kind == target_kind:
+        return value
+
+    try:
+        op = _CASTS[(value_kind, target_kind)]
+    except KeyError:
+        raise CompilationError("Cannot cast {0} to {1}".format(value, target_type))
+
+    return llvm.BuildCast(builder, op, value, target_type.llvm_type, "tmp")
