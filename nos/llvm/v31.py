@@ -1,0 +1,17 @@
+(VoidTypeKind,
+ HalfTypeKind,
+ FloatTypeKind,
+ DoubleTypeKind,
+ X86_FP80TypeKind,
+ FP128TypeKind,
+ PPC_FP128TypeKind,
+ LabelTypeKind,
+ IntegerTypeKind,
+ FunctionTypeKind,
+ StructTypeKind,
+ ArrayTypeKind,
+ PointerTypeKind,
+ VectorTypeKind,
+ MetadataTypeKind,
+ X86_MMXTypeKind
+) = range(16)
