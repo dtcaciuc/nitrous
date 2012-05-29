@@ -41,11 +41,11 @@ def _func(func_name, restype, argtypes=[], shlib=None):
     g[func_name].argtypes = argtypes
 
 
-def owned_c_char_p(achar_p):
-    """Return type wrapping a char_p which needs to be freed after string is created."""
-    s = ctypes.string_at(achar_p)
-    _libc.free(achar_p)
-    return s
+class owned_c_char_p(ctypes.c_char_p):
+    """Char pointer which collects the memory of the return value."""
+
+    def __del__(self):
+        _libc.free(self)
 
 
 Bool = ctypes.c_int

@@ -1,38 +1,24 @@
-from setuptools import setup, find_packages
+from setuptools import setup, find_packages, Extension
 import os
 
-os.environ.setdefault("NOS_LLVM_VERSION", "3.1")
+llvm_version = os.environ.setdefault("NOS_LLVM_VERSION", "3.1")
+llvm_prefix = os.environ.setdefault("NOS_LLVM_PREFIX", "/usr")
 
 
-def build_llvm_addons():
-    from subprocess import call
-    from distutils.errors import DistutilsExecError
+# HACK this isn't really a Python extension, however it's
+# a valid shared library so we'll use the available facilities.
+llvm_addons = Extension(
+    "nos.llvm.addons",
+    ["src/llvm-addons.cc"],
+    include_dirs=[os.path.join(llvm_prefix, "include")],
+    library_dirs=[d for d in [os.path.join(llvm_prefix, "lib"),
+                              os.path.join(llvm_prefix, "lib64")]
+                  if os.path.isdir(d)],
+    libraries=["LLVM-{0}".format(llvm_version)],
+    define_macros=[("__STDC_LIMIT_MACROS", 1),
+                   ("__STDC_CONSTANT_MACROS", 1)]
+)
 
-    MAKEFILE = """
-LDFLAGS=$(python-config --ldflags)
-CFLAGS=$(python-config --cflags)
-
-all: {root}/nos/llvm/addons.so
-
-{root}/nos/llvm/addons.so: {root}/src/llvm-addons.cc
-\tclang -shared -fPIC -D__STDC_LIMIT_MACROS=1 -D__STDC_CONSTANT_MACROS=1 \
-\t-o {root}/nos/llvm/addons.so ${{CFLAGS}} ${{LDFLAGS}} -lLLVM-{version} -L/usr/lib64/llvm \
-\t{root}/src/llvm-addons.cc
-
-"""
-    if not os.path.isdir("build"):
-        os.makedirs("build")
-
-    with open("build/Makefile", "w") as makefile:
-        makefile.write(MAKEFILE.format(root=os.path.realpath(os.getcwd()),
-                                       version=os.environ["NOS_LLVM_VERSION"]))
-
-    status = call(("make", "-f", "build/Makefile"))
-    if status != 0:
-        raise DistutilsExecError("Make returned {0}".format(status))
-
-
-build_llvm_addons()
 
 setup(name="nos",
       version="0.1.0",
@@ -47,4 +33,6 @@ setup(name="nos",
                    "Programming Language :: Python :: 2.7",
                    "Topic :: Software Development :: Libraries"],
       install_requires=["nose", "unittest2"],
-      packages=find_packages())
+      ext_modules=[llvm_addons],
+      packages=find_packages(),
+     )

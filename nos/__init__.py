@@ -105,10 +105,10 @@ class Module(object):
         return wrapper
 
     def dumps(self):
-        return llvm.DumpModuleToString(self.module)
+        return llvm.DumpModuleToString(self.module).value
 
     def dump(self):
-        llvm.DumpModule(self.module)
+        return llvm.DumpModule(self.module)
 
     def compile(self):
         import tempfile
