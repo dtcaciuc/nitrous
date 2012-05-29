@@ -1,12 +1,10 @@
 language: python
 
-before_script:
-    - sudo apt-get install llvm-2.9-dev clang
-
 python:
     - 2.7
 
 install:
+    - sudo apt-get install llvm-2.9-dev clang
     - pip install nose
     - pip install coverage
     - pip install .
