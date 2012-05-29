@@ -173,3 +173,34 @@ class CastTests(ModuleTest, unittest.TestCase):
 
         out = self.m.compile()
         self.assertEqual(out.div_double(3, 2), 1.5)
+
+
+class BoolTests(ModuleTest, unittest.TestCase):
+
+    def test_and(self):
+        from nos.types import Bool
+
+        @self.m.function(Bool, a=Bool, b=Bool)
+        def and_(a, b):
+            return a and b
+
+        out = self.m.compile()
+
+        self.assertEqual(out.and_(True, True), True)
+        self.assertEqual(out.and_(True, False), False)
+        self.assertEqual(out.and_(False, True), False)
+        self.assertEqual(out.and_(False, False), False)
+
+    def test_or(self):
+        from nos.types import Bool
+
+        @self.m.function(Bool, a=Bool, b=Bool)
+        def or_(a, b):
+            return a or b
+
+        out = self.m.compile()
+
+        self.assertEqual(out.or_(True, True), True)
+        self.assertEqual(out.or_(True, False), True)
+        self.assertEqual(out.or_(False, True), True)
+        self.assertEqual(out.or_(False, False), False)

@@ -112,6 +112,13 @@ class OpaqueBasicBlock(ctypes.Structure):
 BasicBlockRef = ctypes.POINTER(OpaqueBasicBlock)
 
 _func("AppendBasicBlock", BasicBlockRef, [ValueRef, ctypes.c_char_p])
+_func("GetBasicBlockParent", ValueRef, [BasicBlockRef])
+
+
+# Phi expressions
+_func("AddIncoming", None, [ValueRef, ctypes.POINTER(ValueRef),
+                            ctypes.POINTER(BasicBlockRef),
+                            ctypes.c_uint])
 
 
 # Execution engine
@@ -132,7 +139,12 @@ BuilderRef = ctypes.POINTER(OpaqueBuilder)
 _func("CreateBuilder", BuilderRef)
 _func("DisposeBuilder", None, [BuilderRef])
 _func("PositionBuilderAtEnd", None, [BuilderRef, BasicBlockRef])
+_func("GetInsertBlock", BasicBlockRef, [BuilderRef])
+
 _func("BuildRet", ValueRef, [BuilderRef, ValueRef])
+_func("BuildBr", ValueRef, [BuilderRef, BasicBlockRef])
+_func("BuildCondBr", ValueRef, [BuilderRef, ValueRef,
+                                BasicBlockRef, BasicBlockRef])
 
 
 # Float Expressions
@@ -144,6 +156,12 @@ for name in ("BuildFAdd", "BuildFSub", "BuildFMul", "BuildFDiv"):
 for name in ("BuildAdd", "BuildSub", "BuildMul", "BuildUDiv", "BuildSDiv"):
     _func(name, ValueRef, [BuilderRef, ValueRef, ValueRef, ctypes.c_char_p])
 
+
+# Boolean expressions
+for name in ("BuildAnd", "BuildOr"):
+    _func(name, ValueRef, [BuilderRef, ValueRef, ValueRef, ctypes.c_char_p])
+
+
 # Casting
 # TODO add the rest of LLVMOpcode
 FPToSI = 34
@@ -152,6 +170,7 @@ SIToFP = 36
 _func("BuildCast", ValueRef, [BuilderRef, Opcode, ValueRef, TypeRef, ctypes.c_char_p])
 
 # Misc
+_func("BuildPhi", ValueRef, [BuilderRef, TypeRef, ctypes.c_char_p])
 _func("BuildCall", ValueRef, [BuilderRef, ValueRef,
                               ctypes.POINTER(ValueRef), ctypes.c_uint,
                               ctypes.c_char_p])

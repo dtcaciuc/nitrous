@@ -9,3 +9,4 @@ Type = namedtuple("Type", "c_type, llvm_type")
 
 Double = Type(ctypes.c_double, llvm.DoubleType())
 Long = Type(ctypes.c_long, llvm.IntType(ctypes.sizeof(ctypes.c_long) * 8))
+Bool = Type(ctypes.c_bool, llvm.IntType(8))

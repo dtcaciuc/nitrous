@@ -2,6 +2,7 @@ import ast
 
 from . import llvm
 
+
 OPS = {
     llvm.DoubleTypeKind: {
         ast.Add: llvm.BuildFAdd,
@@ -15,6 +16,12 @@ OPS = {
         ast.Mult: llvm.BuildMul,
         ast.Div: llvm.BuildSDiv,
     }
+}
+
+
+BOOL_OPS = {
+    ast.And: llvm.BuildAnd,
+    ast.Or: llvm.BuildOr
 }
 
 
@@ -82,6 +89,15 @@ class Visitor(ast.NodeVisitor):
 
         v = OPS[type_kind][type(node.op)](self.builder, lhs, rhs, "tmp")
         self.stack.append(v)
+
+    def visit_BoolOp(self, node):
+        ast.NodeVisitor.generic_visit(self, node)
+        rhs = self.stack.pop()
+        lhs = self.stack.pop()
+
+        v = BOOL_OPS[type(node.op)](self.builder, lhs, rhs, "tmp")
+        self.stack.append(v)
+
 
     def visit_Call(self, node):
         ast.NodeVisitor.generic_visit(self, node)

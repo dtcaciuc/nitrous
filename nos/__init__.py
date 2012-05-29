@@ -47,7 +47,7 @@ class Module(object):
                 raise CompilationError("Variable and/or keyword arguments are not allowed")
 
             argtypes = (llvm.TypeRef * len(spec.args))()
-            if spec.args != list(func.__nos_argtypes__):
+            if set(spec.args) != set(func.__nos_argtypes__):
                 raise CompilationError("Argument type annotations don't "
                                        "match function arguments.")
 
@@ -85,6 +85,7 @@ class Module(object):
                 func_body[i] = v.visit(node)
 
             # Debugging
+            # from.util import dump_ast
             # for tt in t.body[0].body:
             #     print dump_ast(tt)
 
