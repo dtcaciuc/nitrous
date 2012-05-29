@@ -3,6 +3,9 @@ language: python
 python:
     - 2.7
 
+env:
+    - NOS_LLVM_VERSION=2.9 NOS_LLVM_PREFIX=/usr/lib/llvm-2.9 NOS_LLC=llc-2.9
+
 install:
     - sudo apt-get install llvm-2.9-dev clang
     - pip install nose
@@ -10,8 +13,5 @@ install:
     - pip install .
 
 script:
-    - export NOS_LLVM_VERSION=2.9
-    - export NOS_LLVM_PREFIX=/usr/lib/llvm-2.9
-    - export NOS_LLC=llc-2.9
     - find /usr -name $NOS_LLC
     - python setup.py nosetests -s
