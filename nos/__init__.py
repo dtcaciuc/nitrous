@@ -104,6 +104,9 @@ class Module(object):
 
         return wrapper
 
+    def dumps(self):
+        return llvm.DumpModuleToString(self.module)
+
     def dump(self):
         llvm.DumpModule(self.module)
 

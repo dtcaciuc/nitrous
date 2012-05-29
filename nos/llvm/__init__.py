@@ -1,4 +1,5 @@
 import ctypes
+import ctypes.util
 import platform
 import os
 
@@ -23,9 +24,11 @@ def _load_llvm():
 
 
 _llvm = _load_llvm()
+_llvm_addons = ctypes.cdll.LoadLibrary(os.path.join(os.path.dirname(__file__), "addons.so"))
+_libc = ctypes.cdll.LoadLibrary(ctypes.util.find_library("c"))
 
 
-def _func(func_name, restype, argtypes=[]):
+def _func(func_name, restype, argtypes=[], shlib=None):
     """Creates ctypes wrapper for an LLVM API function.
 
     LLVM{name} -> llvm.{name}
@@ -33,9 +36,16 @@ def _func(func_name, restype, argtypes=[]):
     """
     g = globals()
 
-    g[func_name] = getattr(_llvm, "LLVM" + func_name)
+    g[func_name] = getattr((shlib or _llvm), "LLVM" + func_name)
     g[func_name].restype = restype
     g[func_name].argtypes = argtypes
+
+
+def owned_c_char_p(achar_p):
+    """Return type wrapping a char_p which needs to be freed after string is created."""
+    s = ctypes.string_at(achar_p)
+    _libc.free(achar_p)
+    return s
 
 
 Bool = ctypes.c_int
@@ -49,6 +59,7 @@ ModuleRef = ctypes.POINTER(OpaqueModule)
 
 _func("ModuleCreateWithName", ModuleRef)
 _func("DumpModule", None, [ModuleRef])
+_func("DumpModuleToString", owned_c_char_p, [ModuleRef], _llvm_addons)
 _func("WriteBitcodeToFile", Bool, [ModuleRef, ctypes.c_char_p])
 _func("DisposeModule", None, [ModuleRef])
 
