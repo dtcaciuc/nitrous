@@ -25,16 +25,7 @@ class AnnotationTests(ModuleTest, unittest.TestCase):
             self.m.function(nos.Double, z=nos.Double)(x)
 
 
-class TestA(ModuleTest, unittest.TestCase):
-
-    def test_axpy(self):
-
-        @self.m.function(nos.Double, a=nos.Double, x=nos.Double, y=nos.Double)
-        def axpy(a, x, y):
-            return (a * x) + y
-
-        out = self.m.compile()
-        self.assertEqual(out.axpy(2.0, 3.0, 5.0), 11.0)
+class EmitterTests(ModuleTest, unittest.TestCase):
 
     def test_emitter(self):
         """Simple function call."""
