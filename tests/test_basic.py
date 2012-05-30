@@ -230,8 +230,33 @@ class BoolTests(ModuleTest, unittest.TestCase):
         self.assertEqual(out.or_(False, False), False)
 
 
+class IfTests(ModuleTest, unittest.TestCase):
+
+    def test_if_expr(self):
+        from nos.types import Long
+
+        # Simple expression
+        @self.m.function(Long, a=Long, b=Long)
+        def max2(a, b):
+            return a if a > b else b
+
+        # Nested expressions
+        @self.m.function(Long, a=Long, b=Long, c=Long)
+        def max3(a, b, c):
+            return (a if (a > b and a > c) else
+                    (b if (b > a and b > c) else
+                     (c)))
+
+        out = self.m.compile()
+
+        self.assertEqual(out.max2(2, 3), 3)
+        self.assertEqual(out.max2(4, 1), 4)
+
+        self.assertEqual(out.max3(2, 3, 1), 3)
+        self.assertEqual(out.max3(4, 1, 5), 5)
+
+
 def create_compare_funcs():
-    from nos import cast
 
     def lte(a, b):
         return a <= b

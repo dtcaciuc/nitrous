@@ -157,6 +157,49 @@ class Visitor(ast.NodeVisitor):
 
         self.stack.append(v)
 
+    def visit_IfExp(self, node):
+        from . import CompilationError
+        import ctypes
+
+        self.visit(node.test)
+        test_expr = self.stack.pop()
+
+        func = llvm.GetBasicBlockParent(llvm.GetInsertBlock(self.builder));
+        if_branch_bb = llvm.AppendBasicBlock(func, "if")
+        else_branch_bb = llvm.AppendBasicBlock(func, "else")
+        merge_bb = llvm.AppendBasicBlock(func, "merge")
+
+        llvm.BuildCondBr(self.builder, test_expr, if_branch_bb, else_branch_bb)
+
+        llvm.PositionBuilderAtEnd(self.builder, if_branch_bb)
+        ast.NodeVisitor.visit(self, node.body)
+        if_expr = self.stack.pop()
+        llvm.BuildBr(self.builder, merge_bb)
+
+        # Getting updated insertion block in case of nested conditionals
+        if_branch_bb = llvm.GetInsertBlock(self.builder)
+
+        llvm.PositionBuilderAtEnd(self.builder, else_branch_bb)
+        ast.NodeVisitor.visit(self, node.orelse)
+        else_expr = self.stack.pop()
+        llvm.BuildBr(self.builder, merge_bb)
+
+        # Getting updated insertion block in case of nested conditionals
+        else_branch_bb = llvm.GetInsertBlock(self.builder)
+
+        expr_type = llvm.TypeOf(if_expr)
+        if llvm.GetTypeKind(expr_type) != llvm.GetTypeKind(llvm.TypeOf(else_expr)):
+            raise CompilationError(
+                "`if` expression clause return types don't match"
+            )
+
+        llvm.PositionBuilderAtEnd(self.builder, merge_bb)
+        phi = llvm.BuildPhi(self.builder, expr_type, "phi")
+        llvm.AddIncoming(phi, ctypes.byref(if_expr), ctypes.byref(if_branch_bb), 1)
+        llvm.AddIncoming(phi, ctypes.byref(else_expr), ctypes.byref(else_branch_bb), 1)
+
+        self.stack.append(phi)
+
     def visit_Call(self, node):
         ast.NodeVisitor.generic_visit(self, node)
         args = [self.stack.pop() for _ in range(len(node.args))][::-1]
