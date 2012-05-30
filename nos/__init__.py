@@ -1,20 +1,14 @@
 from __future__ import absolute_import
-from .visitor import Visitor
-from .types import Double
 from . import llvm
 
-import ast
 import os
 import tempfile
+
 
 LLC = os.environ.get("NOS_LLC", "llc")
 CLANG = os.environ.get("NOS_CLANG", "clang")
 
-__all__ = ["Double", "result", "args", "compiled"]
-
-
-class CompilationError(Exception):
-    pass
+__all__ = ["Module", "ValueEmitter", "value_emitter", "cast"]
 
 
 class Module(object):
@@ -34,7 +28,11 @@ class Module(object):
         self.clean()
 
     def function(self, result, **kwargs):
+        from .visitor import Visitor
+        import ast
+
         def wrapper(func):
+            from .exceptions import CompilationError
             from .util import remove_indent
             import inspect
 
@@ -188,6 +186,8 @@ _CASTS = {
 @value_emitter
 def cast(builder, value, target_type):
     """Casts expression to specified type."""
+    from .exceptions import CompilationError
+
     value_kind = llvm.GetTypeKind(llvm.TypeOf(value))
     target_kind = llvm.GetTypeKind(target_type.llvm_type)
 

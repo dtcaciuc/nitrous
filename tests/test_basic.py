@@ -16,13 +16,15 @@ class AnnotationTests(ModuleTest, unittest.TestCase):
         self.addCleanup(self.m.clean)
 
     def test_args_mismatch(self):
+        from nos.exceptions import CompilationError
+        from nos.types import Double
 
         def x(y):
             pass
 
         error = "Argument type annotations don't match function arguments"
-        with self.assertRaisesRegexp(nos.CompilationError, error):
-            self.m.function(nos.Double, z=nos.Double)(x)
+        with self.assertRaisesRegexp(CompilationError, error):
+            self.m.function(Double, z=Double)(x)
 
 
 class EmitterTests(ModuleTest, unittest.TestCase):
@@ -61,8 +63,9 @@ class LongTests(ModuleTest, unittest.TestCase):
 
     def test_const(self):
         """Constant declaration."""
+        from nos.types import Double
 
-        @self.m.function(nos.types.Double)
+        @self.m.function(Double)
         def x():
             a = 5.0
             return a
@@ -71,8 +74,9 @@ class LongTests(ModuleTest, unittest.TestCase):
         self.assertEqual(out.x(), 5.0)
 
     def test_add(self):
+        from nos.types import Double
 
-        @self.m.function(nos.Double, a=nos.Double, b=nos.Double)
+        @self.m.function(Double, a=Double, b=Double)
         def add(a, b):
             return a + b
 
@@ -80,8 +84,9 @@ class LongTests(ModuleTest, unittest.TestCase):
         self.assertEqual(out.add(3.0, 2.0), 5.0)
 
     def test_sub(self):
+        from nos.types import Double
 
-        @self.m.function(nos.Double, a=nos.Double, b=nos.Double)
+        @self.m.function(Double, a=Double, b=Double)
         def sub(a, b):
             return a - b
 
@@ -89,8 +94,9 @@ class LongTests(ModuleTest, unittest.TestCase):
         self.assertEqual(out.sub(3.0, 2.0), 1.0)
 
     def test_div(self):
+        from nos.types import Double
 
-        @self.m.function(nos.Double, a=nos.Double, b=nos.Double)
+        @self.m.function(Double, a=Double, b=Double)
         def div(a, b):
             return a / b
 
@@ -99,6 +105,7 @@ class LongTests(ModuleTest, unittest.TestCase):
 
     def test_cmp(self):
         from nos.types import Bool, Long
+
         annotate = self.m.function(Bool, a=Long, b=Long)
         funcs = [annotate(f) for f in create_compare_funcs()]
         out = self.m.compile()

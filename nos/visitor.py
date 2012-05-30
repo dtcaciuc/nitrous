@@ -1,5 +1,6 @@
 import ast
 
+from .exceptions import CompilationError
 from . import llvm
 
 
@@ -76,7 +77,7 @@ class Visitor(ast.NodeVisitor):
                 # that were available during decoration, so last thing
                 # is to try importing the symbol by its name.
                 modulename, attrname = node.id.rsplit(".", 1)
-                attr = getattr(__import__(modulename), attrname)
+                attr = getattr(__import__(modulename, {}, {}, [attrname]), attrname)
                 self.stack.append(attr)
         elif isinstance(node.ctx, ast.Store):
             self.stack.append(node.id)
@@ -91,7 +92,6 @@ class Visitor(ast.NodeVisitor):
         about the source data will complete the instruction.
 
         """
-        from . import CompilationError
         import ctypes
 
         ast.NodeVisitor.generic_visit(self, node)
@@ -107,8 +107,6 @@ class Visitor(ast.NodeVisitor):
             raise CompilationError("Unsupported subscript context {0}".format(node.ctx))
 
     def visit_Assign(self, node):
-        from . import CompilationError
-
         target = node.targets[0]
         if len(node.targets) > 1:
             raise CompilationError("Unpacking assignment is not supported")
@@ -144,8 +142,6 @@ class Visitor(ast.NodeVisitor):
         llvm.BuildRet(self.builder, v)
 
     def visit_BinOp(self, node):
-        from . import CompilationError
-
         ast.NodeVisitor.generic_visit(self, node)
         rhs = self.stack.pop()
         lhs = self.stack.pop()
@@ -171,8 +167,6 @@ class Visitor(ast.NodeVisitor):
         self.stack.append(v)
 
     def visit_Compare(self, node):
-        from . import CompilationError
-
         if len(node.ops) > 1 or len(node.comparators) > 1:
             raise CompilationError("Only simple `if` expressions are supported")
 
@@ -194,7 +188,6 @@ class Visitor(ast.NodeVisitor):
         self.stack.append(v)
 
     def visit_IfExp(self, node):
-        from . import CompilationError
         import ctypes
 
         self.visit(node.test)
@@ -262,8 +255,6 @@ class FlattenAttributes(ast.NodeTransformer):
         self.stack = []
 
     def visit_Attribute(self, node):
-        from . import CompilationError
-
         if not isinstance(node.ctx, ast.Load):
             raise CompilationError("Setting attributes not supported")
 
