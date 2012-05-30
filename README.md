@@ -5,7 +5,7 @@ NOS
 
 NOS provides a run-time LLVM-based compiler for CPython functions.
 
-Currently, the project is in early development so not much documentation is available.
+Currently, the project is in very early stages of development. Please consult the [wiki](https://github.com/dtcaciuc/nos/wiki) for available documentation bits.
 
 Requirements
 ------------
