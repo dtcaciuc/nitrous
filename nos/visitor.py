@@ -79,18 +79,54 @@ class Visitor(ast.NodeVisitor):
                 attr = getattr(__import__(modulename), attrname)
                 self.stack.append(attr)
         elif isinstance(node.ctx, ast.Store):
-            if node.id in self.vars:
-                # Cannot reassign variables
-                raise ValueError("{0!s} is reassigned".format(node.id))
             self.stack.append(node.id)
         else:
             raise ValueError("Uknown Name context {0!s}".format(type(node.ctx)))
 
-    def visit_Assign(self, node):
+    def visit_Subscript(self, node):
+        """Label subscript of form `var_expr[index_expr]`.
+
+        If in Load() context, return the value; if in Store()
+        context, return the prepared GEP; parent node which knows
+        about the source data will complete the instruction.
+
+        """
+        from . import CompilationError
+        import ctypes
+
         ast.NodeVisitor.generic_visit(self, node)
+        i = self.stack.pop()
         v = self.stack.pop()
-        name = self.stack.pop()
-        self.vars[name] = v
+
+        addr = llvm.BuildGEP(self.builder, v, ctypes.byref(i), 1, "addr")
+        if isinstance(node.ctx, ast.Load):
+            self.stack.append(llvm.BuildLoad(self.builder, addr, "element"))
+        elif isinstance(node.ctx, ast.Store):
+            self.stack.append(addr)
+        else:
+            raise CompilationError("Unsupported subscript context {0}".format(node.ctx))
+
+    def visit_Assign(self, node):
+        from . import CompilationError
+
+        target = node.targets[0]
+        if len(node.targets) > 1:
+            raise CompilationError("Unpacking assignment is not supported")
+
+        ast.NodeVisitor.generic_visit(self, node)
+        rhs = self.stack.pop()
+
+        if isinstance(target, ast.Name):
+            # foo = rhs
+            name = self.stack.pop()
+            if name in self.vars:
+                # Cannot reassign variables
+                raise ValueError("{0!s} is reassigned".format(name))
+            self.vars[name] = rhs
+
+        elif isinstance(target, ast.Subscript):
+            # foo[i] = rhs; foo[i] is the GEP, previous pushed by visit_Subscript
+            llvm.BuildStore(self.builder, rhs, self.stack.pop())
 
     def visit_Return(self, node):
         from .types import Bool
@@ -164,7 +200,7 @@ class Visitor(ast.NodeVisitor):
         self.visit(node.test)
         test_expr = self.stack.pop()
 
-        func = llvm.GetBasicBlockParent(llvm.GetInsertBlock(self.builder));
+        func = llvm.GetBasicBlockParent(llvm.GetInsertBlock(self.builder))
         if_branch_bb = llvm.AppendBasicBlock(func, "if")
         else_branch_bb = llvm.AppendBasicBlock(func, "else")
         merge_bb = llvm.AppendBasicBlock(func, "merge")

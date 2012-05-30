@@ -82,6 +82,10 @@ _func("GetTypeKind", TypeKind, [TypeRef])
 _func("GetIntTypeWidth", ctypes.c_uint, [TypeRef])
 
 
+# Sequential types
+_func("PointerType", TypeRef, [TypeRef, ctypes.c_uint])
+
+
 # Value
 class OpaqueValue(ctypes.Structure):
     pass
@@ -167,6 +171,14 @@ for name in ("BuildAnd", "BuildOr"):
     _func(name, ValueRef, [BuilderRef, ValueRef, ValueRef, ctypes.c_char_p])
 
 
+# Memory
+
+_func("BuildLoad", ValueRef, [BuilderRef, ValueRef, ctypes.c_char_p])
+_func("BuildStore", ValueRef, [BuilderRef, ValueRef, ValueRef])
+_func("BuildGEP", ValueRef, [BuilderRef, ValueRef,
+                             ctypes.POINTER(ValueRef), ctypes.c_uint,
+                             ctypes.c_char_p])
+
 # Casting
 ZExt = 31
 FPToSI = 34
@@ -179,6 +191,7 @@ _func("BuildPhi", ValueRef, [BuilderRef, TypeRef, ctypes.c_char_p])
 _func("BuildCall", ValueRef, [BuilderRef, ValueRef,
                               ctypes.POINTER(ValueRef), ctypes.c_uint,
                               ctypes.c_char_p])
+
 
 # Analysis
 VerifierFailureAction = ctypes.c_int

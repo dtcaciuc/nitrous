@@ -256,6 +256,49 @@ class IfTests(ModuleTest, unittest.TestCase):
         self.assertEqual(out.max3(4, 1, 5), 5)
 
 
+class MemoryTests(ModuleTest, unittest.TestCase):
+
+    def test_load_pointer(self):
+        from nos.types import Pointer, Long
+        import ctypes
+
+        @self.m.function(Long, data=Pointer(Long), i=Long)
+        def get_i(data, i):
+            e = data[i]
+            return e
+
+        out = self.m.compile()
+
+        dtype = (ctypes.c_long * 5)
+        data = dtype(0, 10, 20, 30, 40)
+
+        for i in range(5):
+            self.assertEqual(out.get_i(data, i), data[i])
+
+    def test_store(self):
+        from nos.types import Pointer, Long
+        import ctypes
+
+        @self.m.function(Long, data=Pointer(Long), i=Long, e=Long)
+        def set_i(data, i, e):
+            data[i] = e
+            return 0
+
+        out = self.m.compile()
+
+        dtype = (ctypes.c_long * 5)
+        data = dtype(0, 0, 0, 0, 0)
+
+        out.set_i(data, 1, 2)
+        out.set_i(data, 2, 5)
+        out.set_i(data, 4, 10)
+
+        expected = (0, 2, 5, 0, 10)
+
+        for i in range(5):
+            self.assertEqual(data[i], expected[i])
+
+
 def create_compare_funcs():
 
     def lte(a, b):
