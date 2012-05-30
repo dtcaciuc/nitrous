@@ -18,6 +18,31 @@ OPS = {
     }
 }
 
+ICMP = {
+    llvm.IntegerTypeKind: llvm.BuildICmp,
+    llvm.DoubleTypeKind: llvm.BuildFCmp,
+}
+
+ICMP_OPS = {
+    llvm.IntegerTypeKind: {
+        ast.Eq: llvm.IntEQ,
+        ast.Gt: llvm.IntSGT,
+        ast.GtE: llvm.IntSGE,
+        ast.Lt: llvm.IntSLT,
+        ast.LtE: llvm.IntSLE,
+        ast.NotEq: llvm.IntNE
+    },
+    llvm.DoubleTypeKind: {
+        # TODO Currently allow unordered floats; possible
+        # optimization to introduce ordered-only mode?
+        ast.Eq: llvm.RealUEQ,
+        ast.Gt: llvm.RealUGT,
+        ast.GtE: llvm.RealUGE,
+        ast.Lt: llvm.RealULT,
+        ast.LtE: llvm.RealULE,
+        ast.NotEq: llvm.RealUNE,
+    }
+}
 
 BOOL_OPS = {
     ast.And: llvm.BuildAnd,
@@ -68,8 +93,19 @@ class Visitor(ast.NodeVisitor):
         self.vars[name] = v
 
     def visit_Return(self, node):
+        from .types import Bool
+
         ast.NodeVisitor.generic_visit(self, node)
-        llvm.BuildRet(self.builder, self.stack.pop())
+        v = self.stack.pop()
+
+        # Special case; if we're returning boolean, cast to i8
+        # FIXME Move this to Bool.emit_cast_to or similar?
+        t = llvm.TypeOf(v)
+        if (llvm.GetTypeKind(t) == llvm.IntegerTypeKind
+            and llvm.GetIntTypeWidth(t) == 1):
+            v = llvm.BuildCast(self.builder, llvm.ZExt, v, Bool.llvm_type, "tmp")
+
+        llvm.BuildRet(self.builder, v)
 
     def visit_BinOp(self, node):
         from . import CompilationError
@@ -98,6 +134,28 @@ class Visitor(ast.NodeVisitor):
         v = BOOL_OPS[type(node.op)](self.builder, lhs, rhs, "tmp")
         self.stack.append(v)
 
+    def visit_Compare(self, node):
+        from . import CompilationError
+
+        if len(node.ops) > 1 or len(node.comparators) > 1:
+            raise CompilationError("Only simple `if` expressions are supported")
+
+        ast.NodeVisitor.generic_visit(self, node)
+        rhs = self.stack.pop()
+        lhs = self.stack.pop()
+
+        # TODO for now support simple comparisons only
+        type_kind = llvm.GetTypeKind(llvm.TypeOf(lhs))
+        if type_kind != llvm.GetTypeKind(llvm.TypeOf(rhs)):
+            raise CompilationError(
+                "Cannot apply {0} to {1} and {2}; type kind doesn't match"
+                .format(node.op, lhs, rhs)
+            )
+
+        op = ICMP_OPS[type_kind][type(node.ops[0])]
+        v = ICMP[type_kind](self.builder, op, lhs, rhs, "tmp")
+
+        self.stack.append(v)
 
     def visit_Call(self, node):
         ast.NodeVisitor.generic_visit(self, node)

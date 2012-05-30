@@ -79,6 +79,7 @@ _func("DoubleType", TypeRef)
 _func("IntType", TypeRef, [ctypes.c_uint])
 
 _func("GetTypeKind", TypeKind, [TypeRef])
+_func("GetIntTypeWidth", ctypes.c_uint, [TypeRef])
 
 
 # Value
@@ -151,10 +152,14 @@ _func("BuildCondBr", ValueRef, [BuilderRef, ValueRef,
 for name in ("BuildFAdd", "BuildFSub", "BuildFMul", "BuildFDiv"):
     _func(name, ValueRef, [BuilderRef, ValueRef, ValueRef, ctypes.c_char_p])
 
+_func("BuildFCmp", ValueRef, [BuilderRef, ctypes.c_int, ValueRef, ValueRef, ctypes.c_char_p])
+
 
 # Int expressions
 for name in ("BuildAdd", "BuildSub", "BuildMul", "BuildUDiv", "BuildSDiv"):
     _func(name, ValueRef, [BuilderRef, ValueRef, ValueRef, ctypes.c_char_p])
+
+_func("BuildICmp", ValueRef, [BuilderRef, ctypes.c_int, ValueRef, ValueRef, ctypes.c_char_p])
 
 
 # Boolean expressions
@@ -163,7 +168,7 @@ for name in ("BuildAnd", "BuildOr"):
 
 
 # Casting
-# TODO add the rest of LLVMOpcode
+ZExt = 31
 FPToSI = 34
 SIToFP = 36
 

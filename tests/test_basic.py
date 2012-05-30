@@ -97,6 +97,18 @@ class LongTests(ModuleTest, unittest.TestCase):
         out = self.m.compile()
         self.assertEqual(out.div(3.0, 2.0), 1.5)
 
+    def test_cmp(self):
+        from nos.types import Bool, Long
+        annotate = self.m.function(Bool, a=Long, b=Long)
+        funcs = [annotate(f) for f in create_compare_funcs()]
+        out = self.m.compile()
+
+        for f in funcs:
+            cf = getattr(out, f.func_name)
+            self.assertEqual(cf(6, 5), f(6, 5))
+            self.assertEqual(cf(5, 5), f(5, 5))
+            self.assertEqual(cf(5, 6), f(5, 6))
+
 
 class DoubleTests(ModuleTest, unittest.TestCase):
 
@@ -142,6 +154,18 @@ class DoubleTests(ModuleTest, unittest.TestCase):
         out = self.m.compile()
         self.assertEqual(out.div(3, 2), 1)
         self.assertEqual(out.div(3, -2), -1)
+
+    def test_cmp(self):
+        from nos.types import Bool, Double
+        annotate = self.m.function(Bool, a=Double, b=Double)
+        funcs = [annotate(f) for f in create_compare_funcs()]
+        out = self.m.compile()
+
+        for f in funcs:
+            cf = getattr(out, f.func_name)
+            self.assertEqual(cf(6.0, 5.0), f(6.0, 5.0))
+            self.assertEqual(cf(5.0, 5.0), f(5.0, 5.0))
+            self.assertEqual(cf(5.0, 6.0), f(5.0, 6.0))
 
 
 class CastTests(ModuleTest, unittest.TestCase):
@@ -204,3 +228,27 @@ class BoolTests(ModuleTest, unittest.TestCase):
         self.assertEqual(out.or_(True, False), True)
         self.assertEqual(out.or_(False, True), True)
         self.assertEqual(out.or_(False, False), False)
+
+
+def create_compare_funcs():
+    from nos import cast
+
+    def lte(a, b):
+        return a <= b
+
+    def lt(a, b):
+        return a < b
+
+    def eq(a, b):
+        return a == b
+
+    def neq(a, b):
+        return a != b
+
+    def gt(a, b):
+        return a > b
+
+    def gte(a, b):
+        return a >= b
+
+    return [lte, lt, eq, neq, gt, gte]
