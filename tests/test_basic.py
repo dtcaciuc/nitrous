@@ -397,7 +397,7 @@ class IntrinsicTests(ModuleTest, unittest.TestCase):
 
         ir = self.m.dumps()
         self.assertRegexpMatches(ir, "%v = alloca double")
-        self.assertRegexpMatches(ir, "%addr = getelementptr double\* %v, i64 0")
+        self.assertRegexpMatches(ir, "%addr = getelementptr double\* %v, i(32|64) 0")
 
     def test_sqrt(self):
         from nos.types import Double
