@@ -16,7 +16,8 @@ llvm_addons = Extension(
                   if os.path.isdir(d)],
     libraries=["LLVM-{0}".format(llvm_version)],
     define_macros=[("__STDC_LIMIT_MACROS", 1),
-                   ("__STDC_CONSTANT_MACROS", 1)]
+                   ("__STDC_CONSTANT_MACROS", 1),
+                   ("NOS_LLVM_VERSION", int(llvm_version.replace(".", "")))]
 )
 
 

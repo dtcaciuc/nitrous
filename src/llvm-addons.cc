@@ -22,14 +22,27 @@ extern "C" {
     LLVMValueRef
     LLVMGetIntrinsicDeclaration(LLVMModuleRef M, unsigned ID, LLVMTypeRef *ParamTypes, unsigned ParamCount) {
 
+#if NOS_LLVM_VERSION == 29
         std::vector<const llvm::Type*> Tys;
         for (LLVMTypeRef *I = ParamTypes, *E = ParamTypes + ParamCount; I != E; ++I) {
             Tys.push_back(llvm::unwrap(*I));
         }
-
         return llvm::wrap(llvm::Intrinsic::getDeclaration
                           (llvm::unwrap(M), llvm::Intrinsic::ID(ID),
                            &Tys[0], ParamCount));
+#elif NOS_LLVM_VERSION == 31
+        /* In 3.1, Tys argument has different constness */
+        std::vector<llvm::Type*> Tys;
+        for (LLVMTypeRef *I = ParamTypes, *E = ParamTypes + ParamCount; I != E; ++I) {
+            Tys.push_back(llvm::unwrap(*I));
+        }
+        return llvm::wrap(llvm::Intrinsic::getDeclaration
+                          (llvm::unwrap(M), llvm::Intrinsic::ID(ID),
+                           llvm::ArrayRef<llvm::Type*>(Tys)));
+#else
+#error "Current NOS_LLVM_VERSION is not supported"
+#endif
+
     }
 
     unsigned int

@@ -8,8 +8,6 @@ VERSION = os.environ["NOS_LLVM_VERSION"]
 
 if VERSION == "2.9":
     from .v29 import *
-elif VERSION == "3.0":
-    from .v30 import *
 elif VERSION == "3.1":
     from .v31 import *
 else:
