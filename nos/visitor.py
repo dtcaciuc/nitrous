@@ -76,7 +76,13 @@ class Visitor(ast.NodeVisitor):
                 # `vars` would contain all local/global symbols
                 # that were available during decoration, so last thing
                 # is to try importing the symbol by its name.
-                modulename, attrname = node.id.rsplit(".", 1)
+                try:
+                    modulename, attrname = node.id.rsplit(".", 1)
+                except ValueError:
+                    raise CompilationError(
+                        "Line {0}: {1} is not defined or available at this point"
+                        .format(node.lineno, node.id)
+                    )
                 attr = getattr(__import__(modulename, {}, {}, [attrname]), attrname)
                 self.stack.append(attr)
         elif isinstance(node.ctx, ast.Store):
@@ -228,6 +234,69 @@ class Visitor(ast.NodeVisitor):
         llvm.AddIncoming(phi, ctypes.byref(else_expr), ctypes.byref(else_branch_bb), 1)
 
         self.stack.append(phi)
+
+
+    def visit_For(self, node):
+        from .types import Long
+        import ctypes
+
+        if len(node.orelse) != 0:
+            raise CompilationError("`else` in a `for` statement is not supported")
+
+        func = llvm.GetBasicBlockParent(llvm.GetInsertBlock(self.builder))
+
+        top_bb = llvm.GetInsertBlock(self.builder)
+
+        loop_bb = llvm.AppendBasicBlock(func, "loop_start")
+        body_bb = llvm.AppendBasicBlock(func, "loop_body")
+        exit_bb = llvm.AppendBasicBlock(func, "loop_exit")
+
+        # Reorder blocks for better flowing IR listing; not strictly necessary
+        llvm.MoveBasicBlockAfter(loop_bb, top_bb)
+        llvm.MoveBasicBlockAfter(body_bb, loop_bb)
+        llvm.MoveBasicBlockAfter(exit_bb, body_bb)
+
+        llvm.BuildBr(self.builder, loop_bb)
+
+        # Loop header; get loop variable, iteration limits.
+        llvm.PositionBuilderAtEnd(self.builder, loop_bb)
+
+        self.visit(node.target)
+        target = self.stack.pop()
+
+        self.visit(node.iter)
+        start, stop, step = self.stack.pop()
+
+        # TODO Duplicated in assign; refactor
+        if target in self.vars:
+            # Cannot reassign variables
+            raise ValueError("{0!s} is reassigned".format(target))
+
+        i = llvm.BuildPhi(self.builder, Long.llvm_type, "loop_{0}".format(target))
+        llvm.AddIncoming(i, ctypes.byref(start), ctypes.byref(top_bb), 1)
+
+        t = llvm.BuildICmp(self.builder, llvm.IntSLT, i, stop, "loop_{0}_cmp".format(target))
+        llvm.BuildCondBr(self.builder, t, body_bb, exit_bb)
+
+        # Loop body; adding loop variable for the local scope
+        self.vars[target] = i
+
+        llvm.PositionBuilderAtEnd(self.builder, body_bb)
+        for b in node.body:
+            self.visit(b)
+
+        # TODO loop variables in CPython functions are available from
+        # the point of declaration to end of the function scope, so this
+        # doesn't conform.
+        del self.vars[target]
+
+        body_bb = llvm.GetInsertBlock(self.builder)
+        i_next = llvm.BuildAdd(self.builder, i, step, "{0}_next".format(target))
+        llvm.AddIncoming(i, ctypes.byref(i_next), ctypes.byref(body_bb), 1)
+        llvm.BuildBr(self.builder, loop_bb)
+
+        # Loop exit
+        llvm.PositionBuilderAtEnd(self.builder, exit_bb)
 
     def visit_Call(self, node):
         ast.NodeVisitor.generic_visit(self, node)

@@ -63,6 +63,7 @@ class Module(object):
 
             # Collecting available symbols; start with function parameters
             vars = {}
+            vars["range"] = range_
 
             parent_frame = inspect.currentframe().f_back
             vars.update(parent_frame.f_globals)
@@ -93,7 +94,8 @@ class Module(object):
 
             # TODO if stack is not empty, return last value
 
-            if llvm.VerifyFunction(func_, llvm.AbortProcessAction):
+            if llvm.VerifyFunction(func_, llvm.PrintMessageAction):
+                print self.dumps()
                 raise RuntimeError("Could not produce a valid function for " + func.func_name)
 
             # Remember original function object
@@ -204,3 +206,36 @@ def cast(builder, value, target_type):
         raise CompilationError("Cannot cast {0} to {1}".format(value, target_type))
 
     return llvm.BuildCast(builder, op, value, target_type.llvm_type, "tmp")
+
+
+@value_emitter
+def range_(builder, *args):
+    """range() intrinsic implementation.
+
+    Returns (start, stop, step) LLVM value tuple.
+
+    """
+    from .types import Long
+
+    # TODO add checks
+    #  start > stop & step > 0;
+    #  start < stop & step < 0;
+    #  step < stop - start
+
+    data = [llvm.ConstInt(Long.llvm_type, 0, True),
+            llvm.ConstInt(Long.llvm_type, 0, True),
+            llvm.ConstInt(Long.llvm_type, 1, True)]
+
+    if len(args) == 0:
+        raise TypeError("Range accepts at least 1 argument")
+    elif len(args) > 3:
+        raise TypeError("Range accepts at most 3 arguments")
+    elif len(args) == 1:
+        data[1] = args[0]
+    else:
+        data[0] = args[0]
+        data[1] = args[1]
+        if len(args) == 3:
+            data[2] = args[2]
+
+    return data

@@ -306,6 +306,82 @@ class MemoryTests(ModuleTest, unittest.TestCase):
             self.assertEqual(data[i], expected[i])
 
 
+class LoopTests(ModuleTest, unittest.TestCase):
+
+    def test_for(self):
+        """Simple for loop given range stop value."""
+        from nos.types import Pointer, Long
+        import ctypes
+
+        @self.m.function(Long, data=Pointer(Long), n=Long)
+        def loop_1(data, n):
+            for i in range(n):
+                data[i] = (i if i < 3 else 99)
+
+            return 0
+
+        out = self.m.compile()
+        # 5 + 1 elements to check stop correctness
+        data = (ctypes.c_long * 6)()
+
+        out.loop_1(data, 5)
+        self.assertEqual(list(data), [0, 1, 2, 99, 99, 0])
+
+    def test_for_range(self):
+        """More advanced loop ranges."""
+        from nos.types import Pointer, Long
+        import ctypes
+
+        @self.m.function(Long, data=Pointer(Long), start=Long, end=Long)
+        def loop_1(data, start, end):
+            for i in range(start, end):
+                data[i] = i
+
+            return 0
+
+        @self.m.function(Long, data=Pointer(Long), start=Long, end=Long, step=Long)
+        def loop_2(data, start, end, step):
+            for i in range(start, end, step):
+                data[i] = i
+
+            return 0
+
+        out = self.m.compile()
+
+        data = (ctypes.c_long * 8)()
+        out.loop_1(data, 2, 7)
+        self.assertEqual(list(data), [0, 0, 2, 3, 4, 5, 6, 0])
+
+        data = (ctypes.c_long * 8)()
+        out.loop_2(data, 2, 7, 2)
+        self.assertEqual(list(data), [0, 0, 2, 0, 4, 0, 6, 0])
+
+
+    def test_double_for(self):
+        from nos.types import Pointer, Long
+        import ctypes
+
+        @self.m.function(Long, data=Pointer(Long), n=Long)
+        def loop_1(data, n):
+            for i in range(n):
+                for j in range(n):
+                    data[i * n + j] = i + j
+
+            return 0
+
+        out = self.m.compile()
+        data = (ctypes.c_long * 9)()
+        expected = [0, 1, 2,
+                    1, 2, 3,
+                    2, 3, 4]
+
+        loop_1(data, 3)
+        self.assertEqual(list(data), expected)
+
+        out.loop_1(data, 3)
+        self.assertEqual(list(data), expected)
+
+
 def create_compare_funcs():
 
     def lte(a, b):

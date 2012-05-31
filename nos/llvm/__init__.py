@@ -117,6 +117,7 @@ class OpaqueBasicBlock(ctypes.Structure):
 BasicBlockRef = ctypes.POINTER(OpaqueBasicBlock)
 
 _func("AppendBasicBlock", BasicBlockRef, [ValueRef, ctypes.c_char_p])
+_func("MoveBasicBlockAfter", None, [BasicBlockRef, BasicBlockRef])
 _func("GetBasicBlockParent", ValueRef, [BasicBlockRef])
 
 
