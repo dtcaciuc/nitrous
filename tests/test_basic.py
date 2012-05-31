@@ -382,6 +382,38 @@ class LoopTests(ModuleTest, unittest.TestCase):
         self.assertEqual(list(data), expected)
 
 
+class IntrinsicTests(ModuleTest, unittest.TestCase):
+
+    def test_alloca(self):
+        from nos.types import Double
+
+        @self.m.function(Double)
+        def f():
+            y = nos.alloca(Double)
+            return y[0]
+
+        out = self.m.compile()
+        self.assertAlmostEqual(out.f(), 0.0)
+
+        ir = self.m.dumps()
+        self.assertRegexpMatches(ir, "%v = alloca double")
+        self.assertRegexpMatches(ir, "%addr = getelementptr double\* %v, i64 0")
+
+    def test_sqrt(self):
+        from nos.types import Double
+        import math
+
+        @self.m.function(Double, x=Double)
+        def sqrt(x):
+            return nos.sqrt(x)
+
+        out = self.m.compile()
+        self.assertAlmostEqual(math.sqrt(10.0), out.sqrt(10.0))
+
+        ir = self.m.dumps()
+        self.assertRegexpMatches(ir, "%sqrt = call double @llvm.sqrt.f64\(double %x\)")
+
+
 def create_compare_funcs():
 
     def lte(a, b):

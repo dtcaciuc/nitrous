@@ -107,6 +107,18 @@ _func("AddFunction", ValueRef, [ModuleRef, ctypes.c_char_p, TypeRef])
 _func("SetLinkage", None, [ValueRef, ctypes.c_int])
 _func("GetParam", ValueRef, [ValueRef, ctypes.c_uint])
 
+_func("GetIntrinsicDeclaration", ValueRef,
+      [ModuleRef, ctypes.c_uint, ctypes.POINTER(TypeRef), ctypes.c_uint],
+      _llvm_addons)
+
+_func("GetIntrinsicCount__", ctypes.c_uint, [], _llvm_addons)
+_func("GetIntrinsicName__", owned_c_char_p, [ctypes.c_uint], _llvm_addons)
+
+
+INTRINSICS = dict((GetIntrinsicName__(i).value, i) for i in range(GetIntrinsicCount__()))
+"""Intrinsic map; from name to intrinsic ID to use with GetIntrinsicDeclaration."""
+
+
 (ExternalLinkage,) = range(1)
 
 
@@ -179,6 +191,8 @@ _func("BuildStore", ValueRef, [BuilderRef, ValueRef, ValueRef])
 _func("BuildGEP", ValueRef, [BuilderRef, ValueRef,
                              ctypes.POINTER(ValueRef), ctypes.c_uint,
                              ctypes.c_char_p])
+_func("BuildAlloca", ValueRef, [BuilderRef, TypeRef, ctypes.c_char_p])
+_func("BuildArrayAlloca", ValueRef, [BuilderRef, TypeRef, ValueRef, ctypes.c_char_p])
 
 # Casting
 ZExt = 31

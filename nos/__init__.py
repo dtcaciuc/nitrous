@@ -1,7 +1,9 @@
 from __future__ import absolute_import
 from . import llvm
 
+import ctypes
 import os
+import shutil
 import tempfile
 
 
@@ -88,7 +90,7 @@ class Module(object):
             # for tt in t.body[0].body:
             #     print dump_ast(tt)
 
-            v = Visitor(self.builder, vars)
+            v = Visitor(self.module, self.builder, vars)
             for node in t.body[0].body:
                 v.visit(node)
 
@@ -113,7 +115,6 @@ class Module(object):
 
     def compile(self):
         import tempfile
-        import ctypes
         import os
         import inspect
         import types
@@ -151,7 +152,6 @@ class Module(object):
                 return out_module
 
     def clean(self):
-        import shutil
         if os.path.isdir(self.build_dir):
             shutil.rmtree(self.build_dir)
 
@@ -169,8 +169,8 @@ class ValueEmitter(object):
         self.args = args
         self.kwargs = kwargs
 
-    def emit(self, builder):
-        return self.func(builder, *self.args, **self.kwargs)
+    def emit(self, module, builder):
+        return self.func(module, builder, *self.args, **self.kwargs)
 
 
 def value_emitter(func):
@@ -186,7 +186,7 @@ _CASTS = {
 
 
 @value_emitter
-def cast(builder, value, target_type):
+def cast(_, builder, value, target_type):
     """Casts expression to specified type."""
     from .exceptions import CompilationError
 
@@ -209,7 +209,7 @@ def cast(builder, value, target_type):
 
 
 @value_emitter
-def range_(builder, *args):
+def range_(_, builder, *args):
     """range() intrinsic implementation.
 
     Returns (start, stop, step) LLVM value tuple.
@@ -239,3 +239,30 @@ def range_(builder, *args):
             data[2] = args[2]
 
     return data
+
+
+@value_emitter
+def alloca(_, builder, element_type, n=1):
+    """Reserves stack memory for *n* elements of *element_type*.
+
+    Returns pointer to newly reserved block.
+
+    """
+    from .types import Long
+
+    if n <= 0:
+        raise ValueError("Number of elements must be positive")
+
+    if n == 1:
+        return llvm.BuildAlloca(builder, element_type.llvm_type, "v")
+    else:
+        return llvm.BuildArrayAlloca(builder, element_type.llvm_type,
+                                     llvm.ConstInt(Long.llvm_type, n, True))
+
+
+@value_emitter
+def sqrt(module, builder, value):
+    func = llvm.GetIntrinsicDeclaration(module,
+                                        llvm.INTRINSICS["llvm.sqrt"],
+                                        ctypes.byref(llvm.TypeOf(value)), 1)
+    return llvm.BuildCall(builder, func, ctypes.byref(value), 1, "sqrt")

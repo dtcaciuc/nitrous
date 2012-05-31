@@ -4,6 +4,9 @@
 
 #include <llvm-c/Core.h>
 #include <llvm/Support/raw_ostream.h>
+#include <llvm/Intrinsics.h>
+
+#include <vector>
 
 
 extern "C" {
@@ -15,5 +18,30 @@ extern "C" {
         llvm::unwrap(M)->print(stream, 0);
         return strdup(out.c_str());
     }
+
+    LLVMValueRef
+    LLVMGetIntrinsicDeclaration(LLVMModuleRef M, unsigned ID, LLVMTypeRef *ParamTypes, unsigned ParamCount) {
+
+        std::vector<const llvm::Type*> Tys;
+        for (LLVMTypeRef *I = ParamTypes, *E = ParamTypes + ParamCount; I != E; ++I) {
+            Tys.push_back(llvm::unwrap(*I));
+        }
+
+        return llvm::wrap(llvm::Intrinsic::getDeclaration
+                          (llvm::unwrap(M), llvm::Intrinsic::ID(ID),
+                           &Tys[0], ParamCount));
+    }
+
+    unsigned int
+    LLVMGetIntrinsicCount__() {
+        return llvm::Intrinsic::num_intrinsics;
+    }
+
+    char *
+    LLVMGetIntrinsicName__(unsigned ID) {
+        std::string name = llvm::Intrinsic::getName(llvm::Intrinsic::ID(ID));
+        return strdup(name.c_str());
+    }
+
 
 }

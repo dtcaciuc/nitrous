@@ -1,4 +1,5 @@
 import ast
+import ctypes
 
 from .exceptions import CompilationError
 from . import llvm
@@ -53,7 +54,8 @@ BOOL_OPS = {
 
 class Visitor(ast.NodeVisitor):
 
-    def __init__(self, builder, vars):
+    def __init__(self, module, builder, vars):
+        self.module = module
         self.builder = builder
         self.vars = vars
         self.stack = []
@@ -98,8 +100,6 @@ class Visitor(ast.NodeVisitor):
         about the source data will complete the instruction.
 
         """
-        import ctypes
-
         ast.NodeVisitor.generic_visit(self, node)
         i = self.stack.pop()
         v = self.stack.pop()
@@ -194,8 +194,6 @@ class Visitor(ast.NodeVisitor):
         self.stack.append(v)
 
     def visit_IfExp(self, node):
-        import ctypes
-
         self.visit(node.test)
         test_expr = self.stack.pop()
 
@@ -238,7 +236,6 @@ class Visitor(ast.NodeVisitor):
 
     def visit_For(self, node):
         from .types import Long
-        import ctypes
 
         if len(node.orelse) != 0:
             raise CompilationError("`else` in a `for` statement is not supported")
@@ -306,7 +303,7 @@ class Visitor(ast.NodeVisitor):
 
         # Function returned something that can be LLVM-ed
         if getattr(result, "__nos_emitter__", False):
-            result = result.emit(self.builder)
+            result = result.emit(self.module, self.builder)
 
         self.stack.append(result)
 
