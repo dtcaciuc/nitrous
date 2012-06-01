@@ -1,3 +1,13 @@
+
+class ModuleTest(object):
+    """Test mixin to provide an empty NOS module as `self.m`."""
+
+    def setUp(self):
+        import nos
+        self.m = nos.Module(__name__)
+        self.addCleanup(self.m.clean)
+
+
 def remove_indent(source_lines):
     """Removes base indent for a set of source lines."""
     lines, _ = source_lines
