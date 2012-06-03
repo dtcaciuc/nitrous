@@ -94,6 +94,7 @@ _func("TypeOf", TypeRef, [ValueRef])
 _func("SetValueName", None, [ValueRef, ctypes.c_char_p])
 
 # Operations on scalar constants
+_func("ConstNull", ValueRef, [TypeRef])
 _func("ConstInt", ValueRef, [TypeRef, ctypes.c_ulonglong, Bool])
 _func("ConstReal", ValueRef, [TypeRef, ctypes.c_double])
 
@@ -178,7 +179,7 @@ _func("BuildICmp", ValueRef, [BuilderRef, ctypes.c_int, ValueRef, ValueRef, ctyp
 
 
 # Boolean expressions
-for name in ("BuildAnd", "BuildOr"):
+for name in ("BuildAnd", "BuildOr", "BuildXor"):
     _func(name, ValueRef, [BuilderRef, ValueRef, ValueRef, ctypes.c_char_p])
 
 
@@ -211,3 +212,32 @@ VerifierFailureAction = ctypes.c_int
 (AbortProcessAction, PrintMessageAction, ReturnStatusAction) = range(3)
 
 _func("VerifyFunction", Bool, [ValueRef, VerifierFailureAction])
+
+
+def build_pydiv(builder, a, b):
+    """Build expression for floor integer division.
+
+    As seen in Cython:
+
+        long q = a / b;
+        long r = a - q*b;
+        q -= ((r != 0) & ((r ^ b) < 0));
+        return q;
+
+    """
+
+    q = BuildSDiv(builder, a, b, "pydiv_q")
+    r = BuildSub(builder, a, BuildMul(builder, q, b, "pydiv_r"), "pydiv_sub")
+
+    # TODO Assumes signed integers
+    zero = ConstNull(TypeOf(r))
+    q_sub = BuildAnd(builder,
+                     BuildICmp(builder, IntNE, r, zero, "pydiv_cmp_1"),
+                     BuildICmp(builder, IntSLT,
+                               BuildXor(builder, r, b, "pydiv_xor"),
+                               zero, "pydiv_cmp_2"),
+                     "pydiv_q_and")
+
+    return BuildSub(builder, q,
+                    BuildCast(builder, ZExt, q_sub, TypeOf(a), "pydiv_cast"),
+                    "pydiv_sub")

@@ -161,7 +161,12 @@ class Visitor(ast.NodeVisitor):
                 .format(node.op, lhs, rhs)
             )
 
-        v = OPS[type_kind][type(node.op)](self.builder, lhs, rhs, "tmp")
+        # Python uses floor integer division; make it so by default
+        # TODO add a decorator to revert back to C behaviour
+        if type_kind == llvm.IntegerTypeKind and type(node.op) == ast.Div:
+            v = llvm.build_pydiv(self.builder, lhs, rhs)
+        else:
+            v = OPS[type_kind][type(node.op)](self.builder, lhs, rhs, "tmp")
         self.stack.append(v)
 
     def visit_BoolOp(self, node):

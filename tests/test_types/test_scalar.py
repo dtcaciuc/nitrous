@@ -49,41 +49,25 @@ class LongTests(ModuleTest, unittest.TestCase):
         out = self.m.compile()
         self.assertEqual(out.x(), 5.0)
 
-    def test_add(self):
-        from nos.types import Double
-
-        @self.m.function(Double, a=Double, b=Double)
-        def add(a, b):
-            return a + b
-
+    def test_binary(self):
+        from nos.types import Long
+        annotate = self.m.function(Long, a=Long, b=Long)
+        funcs = [annotate(f) for f in binary_funcs()]
         out = self.m.compile()
-        self.assertEqual(out.add(3.0, 2.0), 5.0)
 
-    def test_sub(self):
-        from nos.types import Double
+        values = [(0, 1), (3, 2), (2, 3), (-3, 2), (3, -2)]
 
-        @self.m.function(Double, a=Double, b=Double)
-        def sub(a, b):
-            return a - b
-
-        out = self.m.compile()
-        self.assertEqual(out.sub(3.0, 2.0), 1.0)
-
-    def test_div(self):
-        from nos.types import Double
-
-        @self.m.function(Double, a=Double, b=Double)
-        def div(a, b):
-            return a / b
-
-        out = self.m.compile()
-        self.assertEqual(out.div(3.0, 2.0), 1.5)
+        for f in funcs:
+            cf = getattr(out, f.func_name)
+            for a, b in values:
+                self.assertEqual(cf(a, b), f(a, b),
+                                 "{0}({1}, {2})".format(f.func_name, a, b))
 
     def test_cmp(self):
         from nos.types import Bool, Long
 
         annotate = self.m.function(Bool, a=Long, b=Long)
-        funcs = [annotate(f) for f in create_compare_funcs()]
+        funcs = [annotate(f) for f in cmp_funcs()]
         out = self.m.compile()
 
         for f in funcs:
@@ -103,45 +87,24 @@ class DoubleTests(ModuleTest, unittest.TestCase):
             a = 5
             return a
 
+    def test_binary(self):
+        from nos.types import Double
+        annotate = self.m.function(Double, a=Double, b=Double)
+        funcs = [annotate(f) for f in binary_funcs()]
         out = self.m.compile()
-        self.assertEqual(out.x(), 5)
 
-    def test_add(self):
-        from nos.types import Long
+        values = [(0.0, 1.0), (3.0, 2.0), (2.0, 3.0), (-3.0, 2.0), (3.0, -2.0)]
 
-        @self.m.function(Long, a=Long, b=Long)
-        def add(a, b):
-            return a + b
-
-        out = self.m.compile()
-        self.assertEqual(out.add(3, 2), 5)
-
-    def test_sub(self):
-        from nos.types import Long
-
-        @self.m.function(Long, a=Long, b=Long)
-        def sub(a, b):
-            return a - b
-
-        out = self.m.compile()
-        self.assertEqual(out.sub(3, 2), 1)
-        self.assertEqual(out.sub(3, 5), -2)
-
-    def test_div(self):
-        from nos.types import Long
-
-        @self.m.function(Long, a=Long, b=Long)
-        def div(a, b):
-            return a / b
-
-        out = self.m.compile()
-        self.assertEqual(out.div(3, 2), 1)
-        self.assertEqual(out.div(3, -2), -1)
+        for f in funcs:
+            cf = getattr(out, f.func_name)
+            for a, b in values:
+                self.assertAlmostEqual(cf(a, b), f(a, b), 9,
+                                       "{0}({1}, {2})".format(f.func_name, a, b))
 
     def test_cmp(self):
         from nos.types import Bool, Double
         annotate = self.m.function(Bool, a=Double, b=Double)
-        funcs = [annotate(f) for f in create_compare_funcs()]
+        funcs = [annotate(f) for f in cmp_funcs()]
         out = self.m.compile()
 
         for f in funcs:
@@ -151,8 +114,24 @@ class DoubleTests(ModuleTest, unittest.TestCase):
             self.assertEqual(cf(5.0, 6.0), f(5.0, 6.0))
 
 
+def binary_funcs():
 
-def create_compare_funcs():
+    def add(a, b):
+        return a + b
+
+    def sub(a, b):
+        return a - b
+
+    def mul(a, b):
+        return a * b
+
+    def div(a, b):
+        return a / b
+
+    return [add, sub, mul, div]
+
+
+def cmp_funcs():
 
     def lte(a, b):
         return a <= b
