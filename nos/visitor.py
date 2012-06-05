@@ -73,7 +73,14 @@ class Visitor(ast.NodeVisitor):
     def visit_Name(self, node):
         if isinstance(node.ctx, ast.Load):
             try:
-                self.stack.append(self.vars[node.id])
+                v = self.vars[node.id]
+                if isinstance(v, llvm.ValueRef):
+                    name = node.id.rstrip("_ptr")
+                    self.stack.append(llvm.BuildLoad(self.builder, v, name))
+                else:
+                    # Can be an emitter function
+                    self.stack.append(v)
+
             except KeyError:
                 # `vars` would contain all local/global symbols
                 # that were available during decoration, so last thing
@@ -87,8 +94,10 @@ class Visitor(ast.NodeVisitor):
                     )
                 attr = getattr(__import__(modulename, {}, {}, [attrname]), attrname)
                 self.stack.append(attr)
+
         elif isinstance(node.ctx, ast.Store):
             self.stack.append(node.id)
+
         else:
             raise ValueError("Uknown Name context {0!s}".format(type(node.ctx)))
 
@@ -126,7 +135,10 @@ class Visitor(ast.NodeVisitor):
             if name in self.vars:
                 # Cannot reassign variables
                 raise ValueError("{0!s} is reassigned".format(name))
-            self.vars[name] = rhs
+
+            func = llvm.GetBasicBlockParent(llvm.GetInsertBlock(self.builder))
+            self.vars[name] = entry_alloca(func, llvm.TypeOf(rhs), name)
+            llvm.BuildStore(self.builder, rhs, self.vars[name])
 
         elif isinstance(target, ast.Subscript):
             # foo[i] = rhs; foo[i] is the GEP, previous pushed by visit_Subscript
@@ -238,7 +250,6 @@ class Visitor(ast.NodeVisitor):
 
         self.stack.append(phi)
 
-
     def visit_For(self, node):
         from .types import Long
 
@@ -249,19 +260,21 @@ class Visitor(ast.NodeVisitor):
 
         top_bb = llvm.GetInsertBlock(self.builder)
 
-        loop_bb = llvm.AppendBasicBlock(func, "loop_start")
+        start_bb = llvm.AppendBasicBlock(func, "loop_start")
+        test_bb = llvm.AppendBasicBlock(func, "loop_test")
         body_bb = llvm.AppendBasicBlock(func, "loop_body")
         exit_bb = llvm.AppendBasicBlock(func, "loop_exit")
 
         # Reorder blocks for better flowing IR listing; not strictly necessary
-        llvm.MoveBasicBlockAfter(loop_bb, top_bb)
-        llvm.MoveBasicBlockAfter(body_bb, loop_bb)
+        llvm.MoveBasicBlockAfter(start_bb, top_bb)
+        llvm.MoveBasicBlockAfter(test_bb, start_bb)
+        llvm.MoveBasicBlockAfter(body_bb, test_bb)
         llvm.MoveBasicBlockAfter(exit_bb, body_bb)
 
-        llvm.BuildBr(self.builder, loop_bb)
+        llvm.BuildBr(self.builder, start_bb)
 
         # Loop header; get loop variable, iteration limits.
-        llvm.PositionBuilderAtEnd(self.builder, loop_bb)
+        llvm.PositionBuilderAtEnd(self.builder, start_bb)
 
         self.visit(node.target)
         target = self.stack.pop()
@@ -274,14 +287,18 @@ class Visitor(ast.NodeVisitor):
             # Cannot reassign variables
             raise ValueError("{0!s} is reassigned".format(target))
 
-        i = llvm.BuildPhi(self.builder, Long.llvm_type, "loop_{0}".format(target))
-        llvm.AddIncoming(i, ctypes.byref(start), ctypes.byref(top_bb), 1)
+        # FIXME hardcoded Long type for loop variable
+        i_ptr = entry_alloca(func, Long.llvm_type, "loop_{0}_ptr".format(target))
+        llvm.BuildStore(self.builder, start, i_ptr)
+        llvm.BuildBr(self.builder, test_bb)
 
+        llvm.PositionBuilderAtEnd(self.builder, test_bb)
+        i = llvm.BuildLoad(self.builder, i_ptr, "loop_i")
         t = llvm.BuildICmp(self.builder, llvm.IntSLT, i, stop, "loop_{0}_cmp".format(target))
         llvm.BuildCondBr(self.builder, t, body_bb, exit_bb)
 
         # Loop body; adding loop variable for the local scope
-        self.vars[target] = i
+        self.vars[target] = i_ptr
 
         llvm.PositionBuilderAtEnd(self.builder, body_bb)
         for b in node.body:
@@ -292,10 +309,10 @@ class Visitor(ast.NodeVisitor):
         # doesn't conform.
         del self.vars[target]
 
-        body_bb = llvm.GetInsertBlock(self.builder)
-        i_next = llvm.BuildAdd(self.builder, i, step, "{0}_next".format(target))
-        llvm.AddIncoming(i, ctypes.byref(i_next), ctypes.byref(body_bb), 1)
-        llvm.BuildBr(self.builder, loop_bb)
+        # Incrementing loop counter
+        i_next = llvm.BuildAdd(self.builder, i, step, "loop_{0}_next".format(target))
+        llvm.BuildStore(self.builder, i_next, i_ptr)
+        llvm.BuildBr(self.builder, test_bb)
 
         # Loop exit
         llvm.PositionBuilderAtEnd(self.builder, exit_bb)
@@ -333,3 +350,13 @@ class FlattenAttributes(ast.NodeTransformer):
         assert isinstance(node.value, ast.Name)
 
         return ast.Name(id=node.value.id + "." + node.attr, ctx=ast.Load())
+
+
+def entry_alloca(func, type_, name):
+    """Reserves stack space for a variable at function entry point."""
+    entry = llvm.GetEntryBasicBlock(func)
+    builder = llvm.CreateBuilder()
+    llvm.PositionBuilder(builder, entry, llvm.GetFirstInstruction(entry))
+    a = llvm.BuildAlloca(builder, type_, name)
+    llvm.DisposeBuilder(builder)
+    return a

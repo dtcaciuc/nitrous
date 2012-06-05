@@ -30,7 +30,7 @@ class Module(object):
         self.clean()
 
     def function(self, result, **kwargs):
-        from .visitor import Visitor
+        from .visitor import Visitor, entry_alloca
         import ast
 
         def wrapper(func):
@@ -74,8 +74,8 @@ class Module(object):
 
             for i, name in enumerate(spec.args):
                 p = llvm.GetParam(func_, i)
-                llvm.SetValueName(p, name)
-                vars[name] = p
+                vars[name] = entry_alloca(func_, llvm.TypeOf(p), name + "_ptr")
+                llvm.BuildStore(self.builder, p, vars[name])
 
             t = ast.parse(remove_indent(inspect.getsourcelines(func)))
             func_body = list(t.body[0].body)
@@ -239,25 +239,6 @@ def range_(_, builder, *args):
             data[2] = args[2]
 
     return data
-
-
-@value_emitter
-def alloca(_, builder, element_type, n=1):
-    """Reserves stack memory for *n* elements of *element_type*.
-
-    Returns pointer to newly reserved block.
-
-    """
-    from .types import Long
-
-    if n <= 0:
-        raise ValueError("Number of elements must be positive")
-
-    if n == 1:
-        return llvm.BuildAlloca(builder, element_type.llvm_type, "v")
-    else:
-        return llvm.BuildArrayAlloca(builder, element_type.llvm_type,
-                                     llvm.ConstInt(Long.llvm_type, n, True))
 
 
 @value_emitter

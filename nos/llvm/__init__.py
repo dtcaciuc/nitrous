@@ -131,6 +131,8 @@ _func("AppendBasicBlock", BasicBlockRef, [ValueRef, ctypes.c_char_p])
 _func("MoveBasicBlockAfter", None, [BasicBlockRef, BasicBlockRef])
 _func("GetBasicBlockParent", ValueRef, [BasicBlockRef])
 
+_func("GetEntryBasicBlock", BasicBlockRef, [ValueRef])
+_func("GetFirstInstruction", ValueRef, [BasicBlockRef])
 
 # Phi expressions
 _func("AddIncoming", None, [ValueRef, ctypes.POINTER(ValueRef),
@@ -156,6 +158,7 @@ BuilderRef = ctypes.POINTER(OpaqueBuilder)
 _func("CreateBuilder", BuilderRef)
 _func("DisposeBuilder", None, [BuilderRef])
 _func("PositionBuilderAtEnd", None, [BuilderRef, BasicBlockRef])
+_func("PositionBuilder", None, [BuilderRef, BasicBlockRef, ValueRef])
 _func("GetInsertBlock", BasicBlockRef, [BuilderRef])
 
 _func("BuildRet", ValueRef, [BuilderRef, ValueRef])

@@ -204,7 +204,6 @@ class LoopTests(ModuleTest, unittest.TestCase):
         out.loop_2(data, 2, 7, 2)
         self.assertEqual(list(data), [0, 0, 2, 0, 4, 0, 6, 0])
 
-
     def test_double_for(self):
         from nos.types import Pointer, Long
         import ctypes
@@ -231,21 +230,6 @@ class LoopTests(ModuleTest, unittest.TestCase):
 
 
 class IntrinsicTests(ModuleTest, unittest.TestCase):
-
-    def test_alloca(self):
-        from nos.types import Double
-
-        @self.m.function(Double)
-        def f():
-            y = nos.alloca(Double)
-            return y[0]
-
-        out = self.m.compile()
-        self.assertAlmostEqual(out.f(), 0.0)
-
-        ir = self.m.dumps()
-        self.assertRegexpMatches(ir, "%v = alloca double")
-        self.assertRegexpMatches(ir, "%addr = getelementptr double\* %v, i(32|64) 0")
 
     def test_sqrt(self):
         from nos.types import Double
