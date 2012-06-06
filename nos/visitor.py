@@ -251,6 +251,7 @@ class Visitor(ast.NodeVisitor):
         self.stack.append(phi)
 
     def visit_For(self, node):
+        # FIXME hardcoded Long type for loop variable
         from .types import Long
 
         if len(node.orelse) != 0:
@@ -282,40 +283,37 @@ class Visitor(ast.NodeVisitor):
         self.visit(node.iter)
         start, stop, step = self.stack.pop()
 
-        # TODO Duplicated in assign; refactor
         if target in self.vars:
             # Cannot reassign variables
             raise ValueError("{0!s} is reassigned".format(target))
 
-        # FIXME hardcoded Long type for loop variable
         i_ptr = entry_alloca(func, Long.llvm_type, "loop_{0}_ptr".format(target))
         llvm.BuildStore(self.builder, start, i_ptr)
         llvm.BuildBr(self.builder, test_bb)
 
+        # Loop test
         llvm.PositionBuilderAtEnd(self.builder, test_bb)
         i = llvm.BuildLoad(self.builder, i_ptr, "loop_i")
         t = llvm.BuildICmp(self.builder, llvm.IntSLT, i, stop, "loop_{0}_cmp".format(target))
         llvm.BuildCondBr(self.builder, t, body_bb, exit_bb)
 
-        # Loop body; adding loop variable for the local scope
+        # Making loop variable visible before defining loop body.
         self.vars[target] = i_ptr
 
         llvm.PositionBuilderAtEnd(self.builder, body_bb)
         for b in node.body:
             self.visit(b)
 
-        # TODO loop variables in CPython functions are available from
-        # the point of declaration to end of the function scope, so this
-        # doesn't conform.
-        del self.vars[target]
-
         # Incrementing loop counter
         i_next = llvm.BuildAdd(self.builder, i, step, "loop_{0}_next".format(target))
         llvm.BuildStore(self.builder, i_next, i_ptr)
         llvm.BuildBr(self.builder, test_bb)
 
-        # Loop exit
+        # Loop exit; decrement the counter for consistency with python interpreter.
         llvm.PositionBuilderAtEnd(self.builder, exit_bb)
+        one = llvm.ConstInt(Long.llvm_type, 1, True)
+        i_final = llvm.BuildSub(self.builder, i, one, "loop_{0}_final".format(target))
+        llvm.BuildStore(self.builder, i_final, i_ptr)
 
     def visit_Call(self, node):
         ast.NodeVisitor.generic_visit(self, node)

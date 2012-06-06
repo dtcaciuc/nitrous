@@ -214,7 +214,9 @@ class LoopTests(ModuleTest, unittest.TestCase):
                 for j in range(n):
                     data[i * n + j] = i + j
 
-            return 0
+            # Check availability and correctness of
+            # loop variables outside the loop.
+            return i * j
 
         out = self.m.compile()
         data = (ctypes.c_long * 9)()
@@ -222,10 +224,10 @@ class LoopTests(ModuleTest, unittest.TestCase):
                     1, 2, 3,
                     2, 3, 4]
 
-        loop_1(data, 3)
+        self.assertEqual(loop_1(data, 3), 4)
         self.assertEqual(list(data), expected)
 
-        out.loop_1(data, 3)
+        self.assertEqual(out.loop_1(data, 3), 4)
         self.assertEqual(list(data), expected)
 
 
