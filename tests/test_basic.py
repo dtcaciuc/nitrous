@@ -104,6 +104,33 @@ class AssignTests(ModuleTest, unittest.TestCase):
 
 class IfTests(ModuleTest, unittest.TestCase):
 
+    def test_if(self):
+        from nos.types import Long
+
+        # if clause only
+        @self.m.function(Long, a=Long, b=Long)
+        def max2_1(a, b):
+            v = b
+            if a > b:
+                v = a
+            return v
+
+        # if/else clause
+        @self.m.function(Long, a=Long, b=Long)
+        def max2_2(a, b):
+            v = 0
+            if a > b:
+                v = a
+            else:
+                v = b
+            return v
+
+        out = self.m.compile()
+
+        for f in [out.max2_1, out.max2_2]:
+            self.assertEqual(f(2, 3), 3)
+            self.assertEqual(f(4, 1), 4)
+
     def test_if_expr(self):
         from nos.types import Long
 
@@ -130,7 +157,7 @@ class IfTests(ModuleTest, unittest.TestCase):
 
 class MemoryTests(ModuleTest, unittest.TestCase):
 
-    def test_load_pointer(self):
+    def test_load_element(self):
         from nos.types import Pointer, Long
         import ctypes
 
@@ -147,7 +174,7 @@ class MemoryTests(ModuleTest, unittest.TestCase):
         for i in range(5):
             self.assertEqual(out.get_i(data, i), data[i])
 
-    def test_store(self):
+    def test_store_element(self):
         from nos.types import Pointer, Long
         import ctypes
 

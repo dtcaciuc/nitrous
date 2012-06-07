@@ -259,6 +259,45 @@ class Visitor(ast.NodeVisitor):
 
         self.stack.append(phi)
 
+    def visit_If(self, node):
+        self.visit(node.test)
+        test_expr = self.stack.pop()
+
+        func = llvm.GetBasicBlockParent(llvm.GetInsertBlock(self.builder))
+        if_branch_bb = llvm.AppendBasicBlock(func, "if")
+        else_branch_bb = llvm.AppendBasicBlock(func, "else")
+        merge_bb = llvm.AppendBasicBlock(func, "merge")
+
+        merged_if = False
+        merged_else = False
+
+        llvm.BuildCondBr(self.builder, test_expr, if_branch_bb, else_branch_bb)
+
+        llvm.PositionBuilderAtEnd(self.builder, if_branch_bb)
+        for b in node.body:
+            ast.NodeVisitor.visit(self, b)
+
+        # Branching to merge bock only if the clause block hasn't terminated yet.
+        if not llvm.GetBasicBlockTerminator(if_branch_bb):
+            llvm.BuildBr(self.builder, merge_bb)
+            merged_if = True
+
+        llvm.PositionBuilderAtEnd(self.builder, else_branch_bb)
+        for b in node.orelse:
+            ast.NodeVisitor.visit(self, b)
+
+        if not llvm.GetBasicBlockTerminator(else_branch_bb):
+            llvm.BuildBr(self.builder, merge_bb)
+            merged_else = True
+
+        # If neither of if/else merged, it means they both returned;
+        # At this point there shouldn't be any more instructions afterwards
+        # in the current indent block, and we don't have to reposition the builder.
+        if merged_if or merged_else:
+            llvm.PositionBuilderAtEnd(self.builder, merge_bb)
+        else:
+            llvm.DeleteBasicBlock(merge_bb)
+
     def visit_For(self, node):
         # FIXME hardcoded Long type for loop variable
         from .types import Long

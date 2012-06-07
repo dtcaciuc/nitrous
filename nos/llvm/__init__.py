@@ -130,6 +130,7 @@ BasicBlockRef = ctypes.POINTER(OpaqueBasicBlock)
 _func("AppendBasicBlock", BasicBlockRef, [ValueRef, ctypes.c_char_p])
 _func("MoveBasicBlockAfter", None, [BasicBlockRef, BasicBlockRef])
 _func("GetBasicBlockParent", ValueRef, [BasicBlockRef])
+_func("GetBasicBlockTerminator", ValueRef, [BasicBlockRef])
 
 _func("GetEntryBasicBlock", BasicBlockRef, [ValueRef])
 _func("GetFirstInstruction", ValueRef, [BasicBlockRef])
