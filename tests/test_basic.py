@@ -85,6 +85,23 @@ class CastTests(ModuleTest, unittest.TestCase):
         self.assertEqual(out.div_double(3, 2), 1.5)
 
 
+class AssignTests(ModuleTest, unittest.TestCase):
+
+    def test_reassign(self):
+        from nos.types import Long
+
+        @self.m.function(Long, a=Long)
+        def f(a):
+            x = a
+            x = x + 5
+            return x
+
+        out = self.m.compile()
+
+        self.assertEqual(f(10), 15)
+        self.assertEqual(out.f(10), 15)
+
+
 class IfTests(ModuleTest, unittest.TestCase):
 
     def test_if_expr(self):

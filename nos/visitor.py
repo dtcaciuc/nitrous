@@ -60,6 +60,23 @@ class Visitor(ast.NodeVisitor):
         self.vars = vars
         self.stack = []
 
+    def _store(self, value, name):
+        """Stores *value* on the stack under *name*.
+
+        Allocates stack space if *name* is not an existing variable. Returns
+        the pointer to allocated space.
+
+        """
+        if name not in self.vars:
+            func = llvm.GetBasicBlockParent(llvm.GetInsertBlock(self.builder))
+            self.vars[name] = entry_alloca(func, llvm.TypeOf(value), name + "_ptr")
+        else:
+            # TODO Check if value type matches the storage.
+            pass
+
+        llvm.BuildStore(self.builder, value, self.vars[name])
+        return self.vars[name]
+
     def visit_Num(self, node):
         from .types import Long, Double
 
@@ -131,15 +148,7 @@ class Visitor(ast.NodeVisitor):
 
         if isinstance(target, ast.Name):
             # foo = rhs
-            name = self.stack.pop()
-            if name in self.vars:
-                # Cannot reassign variables
-                raise ValueError("{0!s} is reassigned".format(name))
-
-            func = llvm.GetBasicBlockParent(llvm.GetInsertBlock(self.builder))
-            self.vars[name] = entry_alloca(func, llvm.TypeOf(rhs), name)
-            llvm.BuildStore(self.builder, rhs, self.vars[name])
-
+            self._store(value=rhs, name=self.stack.pop())
         elif isinstance(target, ast.Subscript):
             # foo[i] = rhs; foo[i] is the GEP, previous pushed by visit_Subscript
             llvm.BuildStore(self.builder, rhs, self.stack.pop())
@@ -283,12 +292,8 @@ class Visitor(ast.NodeVisitor):
         self.visit(node.iter)
         start, stop, step = self.stack.pop()
 
-        if target in self.vars:
-            # Cannot reassign variables
-            raise ValueError("{0!s} is reassigned".format(target))
-
-        i_ptr = entry_alloca(func, Long.llvm_type, "loop_{0}_ptr".format(target))
-        llvm.BuildStore(self.builder, start, i_ptr)
+        # Loop counter
+        i_ptr = self._store(start, "loop_{0}".format(target))
         llvm.BuildBr(self.builder, test_bb)
 
         # Loop test
