@@ -278,7 +278,7 @@ class Visitor(ast.NodeVisitor):
             ast.NodeVisitor.visit(self, b)
 
         # Branching to merge bock only if the clause block hasn't terminated yet.
-        if not llvm.GetBasicBlockTerminator(if_branch_bb):
+        if not llvm.IsATerminatorInst(llvm.GetLastInstruction(if_branch_bb)):
             llvm.BuildBr(self.builder, merge_bb)
             merged_if = True
 
@@ -286,7 +286,7 @@ class Visitor(ast.NodeVisitor):
         for b in node.orelse:
             ast.NodeVisitor.visit(self, b)
 
-        if not llvm.GetBasicBlockTerminator(else_branch_bb):
+        if not llvm.IsATerminatorInst(llvm.GetLastInstruction(else_branch_bb)):
             llvm.BuildBr(self.builder, merge_bb)
             merged_else = True
 

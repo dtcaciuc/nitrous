@@ -98,6 +98,8 @@ _func("ConstNull", ValueRef, [TypeRef])
 _func("ConstInt", ValueRef, [TypeRef, ctypes.c_ulonglong, Bool])
 _func("ConstReal", ValueRef, [TypeRef, ctypes.c_double])
 
+_func("IsATerminatorInst", ValueRef, [ValueRef])
+
 Opcode = ctypes.c_int
 
 # Functions
@@ -130,10 +132,11 @@ BasicBlockRef = ctypes.POINTER(OpaqueBasicBlock)
 _func("AppendBasicBlock", BasicBlockRef, [ValueRef, ctypes.c_char_p])
 _func("MoveBasicBlockAfter", None, [BasicBlockRef, BasicBlockRef])
 _func("GetBasicBlockParent", ValueRef, [BasicBlockRef])
-_func("GetBasicBlockTerminator", ValueRef, [BasicBlockRef])
+_func("DeleteBasicBlock", None, [BasicBlockRef])
 
 _func("GetEntryBasicBlock", BasicBlockRef, [ValueRef])
 _func("GetFirstInstruction", ValueRef, [BasicBlockRef])
+_func("GetLastInstruction", ValueRef, [BasicBlockRef])
 
 # Phi expressions
 _func("AddIncoming", None, [ValueRef, ctypes.POINTER(ValueRef),

@@ -102,6 +102,25 @@ class AssignTests(ModuleTest, unittest.TestCase):
         self.assertEqual(out.f(10), 15)
 
 
+class ReturnTests(ModuleTest, unittest.TestCase):
+
+    def test_if(self):
+        """Return from if/else block"""
+        from nos.types import Long
+
+        @self.m.function(Long, a=Long, b=Long)
+        def max2(a, b):
+            if a > b:
+                return a
+            else:
+                return b
+
+        out = self.m.compile()
+
+        self.assertEqual(out.max2(2, 3), 3)
+        self.assertEqual(out.max2(4, 1), 4)
+
+
 class IfTests(ModuleTest, unittest.TestCase):
 
     def test_if(self):
