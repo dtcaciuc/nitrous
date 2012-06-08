@@ -66,6 +66,9 @@ class Visitor(ast.NodeVisitor):
         # the associated scope is popped off.
         self.local_vars = [local_vars]
 
+        # Stack of information for current loop and its parent ones.
+        self.loop_info = []
+
         # Value stack used to assemble LLVM IR as the syntax tree is traversed.
         self.stack = []
 
@@ -335,6 +338,29 @@ class Visitor(ast.NodeVisitor):
             llvm.DeleteBasicBlock(merge_bb)
 
     def visit_For(self, node):
+        """for/else loop block.
+
+        IR is structured as following:
+
+            start_bb:
+                - get range start/end/step
+                - set up loop counter
+            test_bb:
+                - if loop counter < end, goto body_bb; else goto exit_bb
+            body_bb:
+                - with new local scope
+                    - traverse nested AST
+            step_bb:
+                - increment loop counter
+                - goto test_bb
+
+            exit_bb:
+                - end loop IR
+
+        Every loop pushes test and step blocks onto `loop_info` stack
+        so that nested blocks can resolve break/continue statements.
+
+        """
         # FIXME hardcoded Long type for loop variable
         from .types import Long
 
@@ -348,13 +374,15 @@ class Visitor(ast.NodeVisitor):
         start_bb = llvm.AppendBasicBlock(func, "loop_start")
         test_bb = llvm.AppendBasicBlock(func, "loop_test")
         body_bb = llvm.AppendBasicBlock(func, "loop_body")
+        step_bb = llvm.AppendBasicBlock(func, "loop_step")
         exit_bb = llvm.AppendBasicBlock(func, "loop_exit")
 
         # Reorder blocks for better flowing IR listing; not strictly necessary
         llvm.MoveBasicBlockAfter(start_bb, top_bb)
         llvm.MoveBasicBlockAfter(test_bb, start_bb)
         llvm.MoveBasicBlockAfter(body_bb, test_bb)
-        llvm.MoveBasicBlockAfter(exit_bb, body_bb)
+        llvm.MoveBasicBlockAfter(step_bb, body_bb)
+        llvm.MoveBasicBlockAfter(exit_bb, step_bb)
 
         llvm.BuildBr(self.builder, start_bb)
 
@@ -379,11 +407,18 @@ class Visitor(ast.NodeVisitor):
 
         llvm.PositionBuilderAtEnd(self.builder, body_bb)
 
+        # Posting entrance and exit blocks (for continue/break respectively)
+        self.loop_info.append((step_bb, exit_bb))
+
         with self._local_scope():
             for b in node.body:
                 self.visit(b)
 
-        # Incrementing loop counter
+        self.loop_info.pop()
+        llvm.BuildBr(self.builder, step_bb)
+
+        # Loop step; incrementing counter and going back to test_bb
+        llvm.PositionBuilderAtEnd(self.builder, step_bb)
         i_next = llvm.BuildAdd(self.builder, i, step, "loop_{0}_next".format(target))
         llvm.BuildStore(self.builder, i_next, i_ptr)
         llvm.BuildBr(self.builder, test_bb)
@@ -393,6 +428,14 @@ class Visitor(ast.NodeVisitor):
         one = llvm.ConstInt(Long.llvm_type, 1, True)
         i_final = llvm.BuildSub(self.builder, i, one, "loop_{0}_final".format(target))
         llvm.BuildStore(self.builder, i_final, i_ptr)
+
+    def visit_Continue(self, node):
+        step_bb, _ = self.loop_info[-1]
+        llvm.BuildBr(self.builder, step_bb)
+
+    def visit_Break(self, node):
+        _, exit_bb = self.loop_info[-1]
+        llvm.BuildBr(self.builder, exit_bb)
 
     def visit_Call(self, node):
         ast.NodeVisitor.generic_visit(self, node)

@@ -267,6 +267,26 @@ class LoopTests(ModuleTest, unittest.TestCase):
         out.loop_2(data, 2, 7, 2)
         self.assertEqual(list(data), [0, 0, 2, 0, 4, 0, 6, 0])
 
+    def test_for_break_continue(self):
+        """Test for loop with break/continue."""
+        from nos.types import Long
+
+        @self.m.function(Long, n=Long)
+        def loop_1(n):
+            a = 0
+            for i in range(n):
+                if i < 3:
+                    continue
+                elif i == 7:
+                    break
+                else:
+                    a = a + 1
+
+            return a
+
+        out = self.m.compile()
+        self.assertEqual(out.loop_1(10), 4)
+
     def test_double_for(self):
         from nos.types import Pointer, Long
         import ctypes
