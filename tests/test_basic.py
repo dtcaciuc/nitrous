@@ -6,10 +6,6 @@ from nos.util import ModuleTest
 
 class AnnotationTests(ModuleTest, unittest.TestCase):
 
-    def setUp(self):
-        self.m = nos.Module(__name__)
-        self.addCleanup(self.m.clean)
-
     def test_args_mismatch(self):
         from nos.exceptions import CompilationError
         from nos.types import Double
@@ -27,10 +23,11 @@ class EmitterTests(ModuleTest, unittest.TestCase):
     def test_emitter(self):
         """Simple function call."""
         import nos.types
+        import nos.lib
 
         @self.m.function(nos.types.Double, y=nos.types.Long)
         def x(y):
-            return nos.cast(y, nos.types.Double)
+            return nos.lib.cast(y, nos.types.Double)
 
         out = self.m.compile()
         rv = out.x(int(5))
@@ -41,7 +38,7 @@ class EmitterTests(ModuleTest, unittest.TestCase):
     def test_emitter_locals(self):
         """Simple function call; check if symbols are imported in outer scope."""
         from nos.types import Double, Long
-        from nos import cast
+        from nos.lib import cast
 
         @self.m.function(Double, y=Long)
         def x(y):
@@ -58,7 +55,7 @@ class CastTests(ModuleTest, unittest.TestCase):
 
     def test_cast(self):
         from nos.types import Long, Double
-        from nos import cast
+        from nos.lib import cast
 
         @self.m.function(Long, a=Long, b=Double)
         def div_long(a, b):
@@ -75,7 +72,7 @@ class CastTests(ModuleTest, unittest.TestCase):
 
     def test_cast_noop(self):
         from nos.types import Double
-        from nos import cast
+        from nos.lib import cast
 
         @self.m.function(Double, a=Double, b=Double)
         def div_double(a, b):
@@ -319,11 +316,12 @@ class IntrinsicTests(ModuleTest, unittest.TestCase):
 
     def test_sqrt(self):
         from nos.types import Double
+        import nos.lib
         import math
 
         @self.m.function(Double, x=Double)
         def sqrt(x):
-            return nos.sqrt(x)
+            return nos.lib.sqrt(x)
 
         out = self.m.compile()
         self.assertAlmostEqual(math.sqrt(10.0), out.sqrt(10.0))
