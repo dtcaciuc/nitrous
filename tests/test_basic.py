@@ -273,6 +273,7 @@ class LoopTests(ModuleTest, unittest.TestCase):
 
         @self.m.function(Long, data=Pointer(Long), n=Long)
         def loop_1(data, n):
+            j = 0
             for i in range(n):
                 for j in range(n):
                     data[i * n + j] = i + j
@@ -309,3 +310,38 @@ class IntrinsicTests(ModuleTest, unittest.TestCase):
 
         ir = self.m.dumps()
         self.assertRegexpMatches(ir, "%sqrt = call double @llvm.sqrt.f64\(double %x\)")
+
+
+class FunctionBuilderTests(unittest.TestCase):
+
+    def test_local_scope(self):
+        from nos.visitor import Visitor
+
+        # Topmost local scope.
+        v = Visitor(None, None, {}, {"a": 1})
+
+        self.assertEqual(v._local_var("a"), 1)
+        with self.assertRaises(KeyError):
+            v._local_var("b")
+
+        # Adding nested scopes
+        with v._local_scope():
+            v.local_vars[-1]["a"] = 2
+            v.local_vars[-1]["b"] = 3
+
+            with v._local_scope():
+                v.local_vars[-1]["c"] = 4
+                self.assertEqual(v._local_var("c"), 4)
+
+                # Should try most nested scope first
+                self.assertEqual(v._local_var("a"), 2)
+                self.assertEqual(v._local_var("b"), 3)
+
+            # Scope ended; variable c should disappear
+            with self.assertRaises(KeyError):
+                v._local_var("c")
+
+        # Scope ended; a should return to its old value
+        self.assertEqual(v._local_var("a"), 1)
+        with self.assertRaises(KeyError):
+            v._local_var("b")

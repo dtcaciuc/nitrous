@@ -92,6 +92,7 @@ ValueRef = ctypes.POINTER(OpaqueValue)
 
 _func("TypeOf", TypeRef, [ValueRef])
 _func("SetValueName", None, [ValueRef, ctypes.c_char_p])
+_func("GetValueName", ctypes.c_char_p, [ValueRef])
 
 # Operations on scalar constants
 _func("ConstNull", ValueRef, [TypeRef])

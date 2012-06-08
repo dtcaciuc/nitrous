@@ -63,25 +63,30 @@ class Module(object):
             body = llvm.AppendBasicBlock(func_, "body")
             llvm.PositionBuilderAtEnd(self.builder, body)
 
-            # Collecting available symbols; start with function parameters
-            vars = {}
-            vars["range"] = range_
+            # Collecting available symbols
+            # - Global variables are symbols declared outside the function.
+            global_vars = {}
+            global_vars["range"] = range_
 
             parent_frame = inspect.currentframe().f_back
-            vars.update(parent_frame.f_globals)
-            vars.update(parent_frame.f_locals)
+            global_vars.update(parent_frame.f_globals)
+            global_vars.update(parent_frame.f_locals)
             del parent_frame
 
+            # - Local variables are parameters and anything declared
+            #   inside the function itself which resides on stack and
+            #   can be written to.
+            local_vars = {}
             for i, name in enumerate(spec.args):
                 p = llvm.GetParam(func_, i)
-                vars[name] = entry_alloca(func_, llvm.TypeOf(p), name + "_ptr")
-                llvm.BuildStore(self.builder, p, vars[name])
+                local_vars[name] = entry_alloca(func_, llvm.TypeOf(p), name + "_ptr")
+                llvm.BuildStore(self.builder, p, local_vars[name])
 
             t = ast.parse(remove_indent(inspect.getsourcelines(func)))
             func_body = list(t.body[0].body)
 
             from .visitor import FlattenAttributes
-            v = FlattenAttributes(self.builder, vars)
+            v = FlattenAttributes(self.builder)
             for i, node in enumerate(func_body):
                 func_body[i] = v.visit(node)
 
@@ -90,7 +95,7 @@ class Module(object):
             # for tt in t.body[0].body:
             #     print dump_ast(tt)
 
-            v = Visitor(self.module, self.builder, vars)
+            v = Visitor(self.module, self.builder, global_vars, local_vars)
             for node in t.body[0].body:
                 v.visit(node)
 

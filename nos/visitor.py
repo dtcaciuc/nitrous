@@ -1,6 +1,7 @@
 import ast
 import ctypes
 
+from contextlib import contextmanager
 from .exceptions import CompilationError
 from . import llvm
 
@@ -54,11 +55,40 @@ BOOL_OPS = {
 
 class Visitor(ast.NodeVisitor):
 
-    def __init__(self, module, builder, vars):
+    def __init__(self, module, builder, global_vars, local_vars):
         self.module = module
         self.builder = builder
-        self.vars = vars
+        self.global_vars = global_vars
+
+        # Stack of dictionaries of scoped variables;
+        # Top scope is the function, then any nested indented
+        # blocks (eg. if, for) as they occur. On block exit,
+        # the associated scope is popped off.
+        self.local_vars = [local_vars]
+
+        # Value stack used to assemble LLVM IR as the syntax tree is traversed.
         self.stack = []
+
+    def _local_var(self, name):
+        """Finds and returns local variable with a given *name*.
+
+        Traverses the scope stack outwards until *name* is found; throws
+        KeyError if unsuccessful.
+
+        """
+        for scope in self.local_vars[::-1]:
+            v = scope.get(name)
+            if v is not None:
+                return v
+
+        raise KeyError(name)
+
+    @contextmanager
+    def _local_scope(self):
+        """Temporarily create new local variable scope."""
+        self.local_vars.append({})
+        yield
+        self.local_vars.pop()
 
     def _store(self, value, name):
         """Stores *value* on the stack under *name*.
@@ -67,15 +97,17 @@ class Visitor(ast.NodeVisitor):
         the pointer to allocated space.
 
         """
-        if name not in self.vars:
+        try:
+            v = self._local_var(name)
+        except KeyError:
+            # First time storing the variable; allocate stack space
+            # and register with most nested scope.
             func = llvm.GetBasicBlockParent(llvm.GetInsertBlock(self.builder))
-            self.vars[name] = entry_alloca(func, llvm.TypeOf(value), name + "_ptr")
-        else:
-            # TODO Check if value type matches the storage.
-            pass
+            v = entry_alloca(func, llvm.TypeOf(value), name + "_ptr")
+            self.local_vars[-1][name] = v
 
-        llvm.BuildStore(self.builder, value, self.vars[name])
-        return self.vars[name]
+        llvm.BuildStore(self.builder, value, v)
+        return v
 
     def visit_Num(self, node):
         from .types import Long, Double
@@ -90,27 +122,27 @@ class Visitor(ast.NodeVisitor):
     def visit_Name(self, node):
         if isinstance(node.ctx, ast.Load):
             try:
-                v = self.vars[node.id]
-                if isinstance(v, llvm.ValueRef):
-                    name = node.id.rstrip("_ptr")
-                    self.stack.append(llvm.BuildLoad(self.builder, v, name))
-                else:
-                    # Can be an emitter function
-                    self.stack.append(v)
-
+                # Try variables; they are all LLVM values and stack pointers.
+                v = self._local_var(node.id)
+                # Stack variables are pointers and carry _ptr prefix;
+                # drop it when loading the value.
+                name = llvm.GetValueName(v).rstrip("_ptr")
+                self.stack.append(llvm.BuildLoad(self.builder, v, name))
             except KeyError:
-                # `vars` would contain all local/global symbols
-                # that were available during decoration, so last thing
-                # is to try importing the symbol by its name.
                 try:
-                    modulename, attrname = node.id.rsplit(".", 1)
-                except ValueError:
-                    raise CompilationError(
-                        "Line {0}: {1} is not defined or available at this point"
-                        .format(node.lineno, node.id)
-                    )
-                attr = getattr(__import__(modulename, {}, {}, [attrname]), attrname)
-                self.stack.append(attr)
+                    # Emitters declared externally.
+                    self.stack.append(self.global_vars[node.id])
+                except KeyError:
+                    # Last thing to try is {module 1}...{module n}.{symbol} import.
+                    try:
+                        modulename, attrname = node.id.rsplit(".", 1)
+                    except ValueError:
+                        raise CompilationError(
+                            "Line {0}: {1} is not defined or available at this point"
+                            .format(node.lineno, node.id)
+                        )
+                    attr = getattr(__import__(modulename, {}, {}, [attrname]), attrname)
+                    self.stack.append(attr)
 
         elif isinstance(node.ctx, ast.Store):
             self.stack.append(node.id)
@@ -231,7 +263,7 @@ class Visitor(ast.NodeVisitor):
         llvm.BuildCondBr(self.builder, test_expr, if_branch_bb, else_branch_bb)
 
         llvm.PositionBuilderAtEnd(self.builder, if_branch_bb)
-        ast.NodeVisitor.visit(self, node.body)
+        self.visit(node.body)
         if_expr = self.stack.pop()
         llvm.BuildBr(self.builder, merge_bb)
 
@@ -239,7 +271,7 @@ class Visitor(ast.NodeVisitor):
         if_branch_bb = llvm.GetInsertBlock(self.builder)
 
         llvm.PositionBuilderAtEnd(self.builder, else_branch_bb)
-        ast.NodeVisitor.visit(self, node.orelse)
+        self.visit(node.orelse)
         else_expr = self.stack.pop()
         llvm.BuildBr(self.builder, merge_bb)
 
@@ -274,8 +306,10 @@ class Visitor(ast.NodeVisitor):
         llvm.BuildCondBr(self.builder, test_expr, if_branch_bb, else_branch_bb)
 
         llvm.PositionBuilderAtEnd(self.builder, if_branch_bb)
-        for b in node.body:
-            ast.NodeVisitor.visit(self, b)
+
+        with self._local_scope():
+            for b in node.body:
+                self.visit(b)
 
         # Branching to merge bock only if the clause block hasn't terminated yet.
         if not llvm.IsATerminatorInst(llvm.GetLastInstruction(if_branch_bb)):
@@ -283,8 +317,10 @@ class Visitor(ast.NodeVisitor):
             merged_if = True
 
         llvm.PositionBuilderAtEnd(self.builder, else_branch_bb)
-        for b in node.orelse:
-            ast.NodeVisitor.visit(self, b)
+
+        with self._local_scope():
+            for b in node.orelse:
+                self.visit(b)
 
         if not llvm.IsATerminatorInst(llvm.GetLastInstruction(else_branch_bb)):
             llvm.BuildBr(self.builder, merge_bb)
@@ -332,7 +368,7 @@ class Visitor(ast.NodeVisitor):
         start, stop, step = self.stack.pop()
 
         # Loop counter
-        i_ptr = self._store(start, "loop_{0}".format(target))
+        i_ptr = self._store(start, target)
         llvm.BuildBr(self.builder, test_bb)
 
         # Loop test
@@ -341,12 +377,11 @@ class Visitor(ast.NodeVisitor):
         t = llvm.BuildICmp(self.builder, llvm.IntSLT, i, stop, "loop_{0}_cmp".format(target))
         llvm.BuildCondBr(self.builder, t, body_bb, exit_bb)
 
-        # Making loop variable visible before defining loop body.
-        self.vars[target] = i_ptr
-
         llvm.PositionBuilderAtEnd(self.builder, body_bb)
-        for b in node.body:
-            self.visit(b)
+
+        with self._local_scope():
+            for b in node.body:
+                self.visit(b)
 
         # Incrementing loop counter
         i_next = llvm.BuildAdd(self.builder, i, step, "loop_{0}_next".format(target))
@@ -379,9 +414,8 @@ class FlattenAttributes(ast.NodeTransformer):
 
     """
 
-    def __init__(self, builder, vars):
+    def __init__(self, builder):
         self.builder = builder
-        self.vars = vars
         self.stack = []
 
     def visit_Attribute(self, node):
