@@ -1,5 +1,4 @@
 import unittest2 as unittest
-import nos
 
 from nos.util import ModuleTest
 
@@ -328,6 +327,47 @@ class IntrinsicTests(ModuleTest, unittest.TestCase):
 
         ir = self.m.dumps()
         self.assertRegexpMatches(ir, "%sqrt = call double @llvm.sqrt.f64\(double %x\)")
+
+
+class CallTests(ModuleTest, unittest.TestCase):
+
+    def test_call(self):
+        """Calling one compiled function from another."""
+        from nos.types import Long
+
+        @self.m.function(Long, x=Long)
+        def f1(x):
+            return x * x + 1
+
+        @self.m.function(Long, x=Long)
+        def f2(x):
+            return x + f1(x)
+
+        out = self.m.compile()
+
+        self.assertEqual(f2(2), 7)
+        self.assertEqual(out.f2(2), 7)
+
+    def test_call_wrong_args(self):
+        from nos.types import Long
+
+        @self.m.function(Long, x=Long)
+        def f1(x):
+            return x
+
+        def f2(x):
+            return f1(x, 1)
+
+        message = "f1 called with wrong number of arguments"
+        with self.assertRaisesRegexp(TypeError, message):
+            self.m.function(Long, x=Long)(f2)
+
+        def f3(x):
+            return f1(1.0)
+
+        message = "f1 called with wrong argument type\(s\) for x"
+        with self.assertRaisesRegexp(TypeError, message):
+            self.m.function(Long, x=Long)(f3)
 
 
 class FunctionBuilderTests(unittest.TestCase):

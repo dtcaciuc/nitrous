@@ -441,11 +441,18 @@ class Visitor(ast.NodeVisitor):
         ast.NodeVisitor.generic_visit(self, node)
         args = [self.stack.pop() for _ in range(len(node.args))][::-1]
         func = self.stack.pop()
-        result = func(*args)
 
-        # Function returned something that can be LLVM-ed
-        if getattr(result, "__nos_emitter__", False):
-            result = result.emit(self.module, self.builder)
+        if hasattr(func, "__nos_func__"):
+            # Function is compiled; check arguments for validity and make a direct call
+            _validate_function_args(func, args);
+            result = llvm.BuildCall(self.builder, func.__nos_func__,
+                                    (llvm.ValueRef * len(args))(*args),
+                                    len(args), func.func_name + "_result")
+        else:
+            # Function is either CPython one or an LLVM emitter.
+            result = func(*args)
+            if getattr(result, "__nos_emitter__", False):
+                result = result.emit(self.module, self.builder)
 
         self.stack.append(result)
 
@@ -479,3 +486,30 @@ def entry_alloca(func, type_, name):
     a = llvm.BuildAlloca(builder, type_, name)
     llvm.DisposeBuilder(builder)
     return a
+
+
+def types_equal(tx, ty):
+    """Returns True if *tx* is the same LLVMTypeRef as *ty*.
+
+    To check equality, retrieve and compare raw pointer values.
+
+    """
+    return ctypes.cast(tx, ctypes.c_void_p).value == ctypes.cast(ty, ctypes.c_void_p).value
+
+
+def _validate_function_args(func, args):
+    """Raises TypeError if if *args* do not match annotated function signature."""
+    import inspect
+
+    if len(args) != len(func.__nos_argtypes__):
+        raise TypeError("{0} called with wrong number of arguments".format(func.func_name))
+
+    spec = inspect.getargspec(func)
+    mask = map(types_equal,
+               (func.__nos_argtypes__[name].llvm_type for name in spec.args),
+               (llvm.TypeOf(val) for val in args))
+
+    if not all(mask):
+        wrong_args = ", ".join((a for a, ok in zip(spec.args, mask) if not ok))
+        raise TypeError("{0} called with wrong argument type(s) for {1}"
+                        .format(func.func_name, wrong_args))

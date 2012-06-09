@@ -55,10 +55,10 @@ class Module(object):
             restype = func.__nos_restype__.llvm_type
 
             functype = llvm.FunctionType(restype, argtypes, len(argtypes), 0)
-            func_ = llvm.AddFunction(self.module, self._qualify(func.func_name), functype)
-            llvm.SetLinkage(func_, llvm.ExternalLinkage)
+            nos_func = llvm.AddFunction(self.module, self._qualify(func.func_name), functype)
+            llvm.SetLinkage(nos_func, llvm.ExternalLinkage)
 
-            body = llvm.AppendBasicBlock(func_, "body")
+            body = llvm.AppendBasicBlock(nos_func, "body")
             llvm.PositionBuilderAtEnd(self.builder, body)
 
             # Collecting available symbols
@@ -76,8 +76,8 @@ class Module(object):
             #   can be written to.
             local_vars = {}
             for i, name in enumerate(spec.args):
-                p = llvm.GetParam(func_, i)
-                local_vars[name] = entry_alloca(func_, llvm.TypeOf(p), name + "_ptr")
+                p = llvm.GetParam(nos_func, i)
+                local_vars[name] = entry_alloca(nos_func, llvm.TypeOf(p), name + "_ptr")
                 llvm.BuildStore(self.builder, p, local_vars[name])
 
             t = ast.parse(remove_indent(inspect.getsourcelines(func)))
@@ -99,11 +99,12 @@ class Module(object):
 
             # TODO if stack is not empty, return last value
 
-            if llvm.VerifyFunction(func_, llvm.PrintMessageAction):
+            if llvm.VerifyFunction(nos_func, llvm.PrintMessageAction):
                 print self.dumps()
                 raise RuntimeError("Could not produce a valid function for " + func.func_name)
 
             # Remember original function object
+            func.__nos_func__ = nos_func
             self.funcs.append(func)
 
             return func
@@ -130,7 +131,7 @@ class Module(object):
             with tempfile.NamedTemporaryFile(suffix=".s") as tmp_s:
                 llvm.WriteBitcodeToFile(self.module, tmp_bc.name)
 
-                if call((LLC, "-o={0}".format(tmp_s.name), tmp_bc.name)):
+                if call((LLC, "-relocation-model=pic", "-o={0}".format(tmp_s.name), tmp_bc.name)):
                     raise RuntimeError("Could not assemble IR")
 
                 so_path = format(os.path.join(self.build_dir, self.name))
