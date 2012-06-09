@@ -358,14 +358,14 @@ class CallTests(ModuleTest, unittest.TestCase):
         def f2(x):
             return f1(x, 1)
 
-        message = "f1 called with wrong number of arguments"
+        message = "f1\(\) takes exactly 1 argument\(s\) \(2 given\)"
         with self.assertRaisesRegexp(TypeError, message):
             self.m.function(Long, x=Long)(f2)
 
         def f3(x):
             return f1(1.0)
 
-        message = "f1 called with wrong argument type\(s\) for x"
+        message = "f1\(\) called with wrong argument type\(s\) for x"
         with self.assertRaisesRegexp(TypeError, message):
             self.m.function(Long, x=Long)(f3)
 

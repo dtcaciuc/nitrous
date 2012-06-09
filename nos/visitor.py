@@ -502,7 +502,8 @@ def _validate_function_args(func, args):
     import inspect
 
     if len(args) != len(func.__nos_argtypes__):
-        raise TypeError("{0} called with wrong number of arguments".format(func.func_name))
+        raise TypeError("{0}() takes exactly {1} argument(s) ({2} given)"
+                        .format(func.func_name, len(func.__nos_argtypes__), len(args)))
 
     spec = inspect.getargspec(func)
     mask = map(types_equal,
@@ -511,5 +512,5 @@ def _validate_function_args(func, args):
 
     if not all(mask):
         wrong_args = ", ".join((a for a, ok in zip(spec.args, mask) if not ok))
-        raise TypeError("{0} called with wrong argument type(s) for {1}"
+        raise TypeError("{0}() called with wrong argument type(s) for {1}"
                         .format(func.func_name, wrong_args))
