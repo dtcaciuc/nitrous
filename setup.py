@@ -1,5 +1,6 @@
 from setuptools import setup, find_packages, Extension
 from ctypes.util import find_library
+from subprocess import Popen, PIPE
 
 CONFIG = """
 VERSION = "{version}"
@@ -8,10 +9,18 @@ LLC = "{bindir}/llc"
 CLANG = "{bindir}/clang"
 """
 
+# Determine the name for LLVM config binary
+for path in ["llvm-config-3.1", "llvm-config-2.9", "llvm-config"]:
+    proc = Popen(["which", path], stdout=PIPE)
+    if not proc.wait():
+        LLVM_CONFIG = proc.stdout.read().strip()
+        break
+else:
+    raise OSError("Could not locate a suitable llvm-config binary")
+
 
 def llvm_config(*args):
-    from subprocess import Popen, PIPE
-    p = Popen(["llvm-config"] + list(args), stdout=PIPE)
+    p = Popen([LLVM_CONFIG] + list(args), stdout=PIPE)
     return p.communicate()[0].strip().split()
 
 
