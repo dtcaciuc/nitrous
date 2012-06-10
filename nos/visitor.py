@@ -112,37 +112,38 @@ class Visitor(ast.NodeVisitor):
         llvm.BuildStore(self.builder, value, v)
         return v
 
+    def _load(self, node):
+        # TODO pretty awkward, passing node only for line number used in raising error.
+        try:
+            # Try variables; they are all LLVM values and stack pointers.
+            v = self._local_var(node.id)
+            # Stack variables are pointers and carry _ptr prefix;
+            # drop it when loading the value.
+            name = llvm.GetValueName(v).rstrip("_ptr")
+            return llvm.BuildLoad(self.builder, v, name)
+        except KeyError:
+            try:
+                # Constant values or emitter functions declared externally.
+                return self.global_vars[node.id]
+            except KeyError:
+                # Last thing to try is {module 1}...{module n}.{symbol} import.
+                try:
+                    modulename, attrname = node.id.rsplit(".", 1)
+                except ValueError:
+                    raise CompilationError(
+                        "Line {0}: {1} is not defined or available at this point"
+                        .format(node.lineno, node.id)
+                    )
+                return getattr(__import__(modulename, {}, {}, [attrname]), attrname)
+
     def visit_Num(self, node):
         self.stack.append(emit_constant(node.n))
 
     def visit_Name(self, node):
         if isinstance(node.ctx, ast.Load):
-            try:
-                # Try variables; they are all LLVM values and stack pointers.
-                v = self._local_var(node.id)
-                # Stack variables are pointers and carry _ptr prefix;
-                # drop it when loading the value.
-                name = llvm.GetValueName(v).rstrip("_ptr")
-                self.stack.append(llvm.BuildLoad(self.builder, v, name))
-            except KeyError:
-                try:
-                    # Constant values or emitter functions declared externally.
-                    self.stack.append(self.global_vars[node.id])
-                except KeyError:
-                    # Last thing to try is {module 1}...{module n}.{symbol} import.
-                    try:
-                        modulename, attrname = node.id.rsplit(".", 1)
-                    except ValueError:
-                        raise CompilationError(
-                            "Line {0}: {1} is not defined or available at this point"
-                            .format(node.lineno, node.id)
-                        )
-                    attr = getattr(__import__(modulename, {}, {}, [attrname]), attrname)
-                    self.stack.append(attr)
-
+            self.stack.append(self._load(node))
         elif isinstance(node.ctx, ast.Store):
             self.stack.append(node.id)
-
         else:
             raise ValueError("Uknown Name context {0!s}".format(type(node.ctx)))
 
@@ -180,6 +181,29 @@ class Visitor(ast.NodeVisitor):
         elif isinstance(target, ast.Subscript):
             # foo[i] = rhs; foo[i] is the GEP, previous pushed by visit_Subscript
             llvm.BuildStore(self.builder, rhs, self.stack.pop())
+        else:
+            raise CompilationError("Unsupported augmented assignment target {0}"
+                                   .format(node.target))
+
+    def visit_AugAssign(self, node):
+        ast.NodeVisitor.generic_visit(self, node)
+        rhs = self.stack.pop()
+
+        if isinstance(node.target, ast.Name):
+            # foo += rhs
+            name = self.stack.pop()
+            lhs = self._load(node.target)
+            rhs = emit_binary_op(self.builder, node.op, lhs, rhs)
+            self._store(value=rhs, name=name)
+        elif isinstance(node.target, ast.Subscript):
+            # foo[i] += rhs; foo[i] is the GEP, previous pushed by visit_Subscript
+            lhs_addr = self.stack.pop()
+            lhs = llvm.BuildLoad(self.builder, lhs_addr, "element")
+            rhs = emit_binary_op(self.builder, node.op, lhs, rhs)
+            llvm.BuildStore(self.builder, rhs, lhs_addr)
+        else:
+            raise CompilationError("Unsupported augmented assignment target {0}"
+                                   .format(node.target))
 
     def visit_Return(self, node):
         from .types import Bool
@@ -201,21 +225,7 @@ class Visitor(ast.NodeVisitor):
         rhs = self.stack.pop()
         lhs = self.stack.pop()
 
-        # Operands must be of the same type kind
-        # TODO if integer, also verify the bit width?
-        type_kind = llvm.GetTypeKind(llvm.TypeOf(lhs))
-        if (type_kind != llvm.GetTypeKind(llvm.TypeOf(rhs))):
-            raise CompilationError(
-                "Cannot apply {0} to {1} and {2}; type kind doesn't match"
-                .format(node.op, lhs, rhs)
-            )
-
-        # Python uses floor integer division; make it so by default
-        # TODO add a decorator to revert back to C behaviour
-        if type_kind == llvm.IntegerTypeKind and type(node.op) == ast.Div:
-            v = llvm.build_pydiv(self.builder, lhs, rhs)
-        else:
-            v = OPS[type_kind][type(node.op)](self.builder, lhs, rhs, "tmp")
+        v = emit_binary_op(self.builder, node.op, lhs, rhs)
         self.stack.append(v)
 
     def visit_BoolOp(self, node):
@@ -500,6 +510,24 @@ def emit_constant(value):
         return llvm.ConstInt(Long.llvm_type, value, True)
     else:
         raise TypeError("Uknown Number type {0!s}".format(type(value)))
+
+
+def emit_binary_op(builder, op, lhs, rhs):
+    # Operands must be of the same type kind
+    # TODO if integer, also verify the bit width?
+    type_kind = llvm.GetTypeKind(llvm.TypeOf(lhs))
+    if (type_kind != llvm.GetTypeKind(llvm.TypeOf(rhs))):
+        raise CompilationError(
+            "Cannot apply {0} to {1} and {2}; type kind doesn't match"
+            .format(op, lhs, rhs)
+        )
+
+    # Python uses floor integer division; make it so by default
+    # TODO add a decorator to revert back to C behaviour
+    if type_kind == llvm.IntegerTypeKind and type(op) == ast.Div:
+        return llvm.build_pydiv(builder, lhs, rhs)
+    else:
+        return OPS[type_kind][type(op)](builder, lhs, rhs, "tmp")
 
 
 def _validate_function_args(func, args):

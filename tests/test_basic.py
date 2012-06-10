@@ -83,6 +83,26 @@ class CastTests(ModuleTest, unittest.TestCase):
 
 class AssignTests(ModuleTest, unittest.TestCase):
 
+    def test_aug(self):
+        """Augmented assignment."""
+        from nos.types import Long, Pointer
+
+        @self.m.function(Long, a=Long, b=Pointer(Long))
+        def f(a, b):
+            a += 5
+            b[0] += 7
+            return a
+
+        out = self.m.compile()
+
+        b = (Long.c_type * 1)(5)
+        self.assertEqual(f(6, b), 11)
+        self.assertEqual(b[0], 12)
+
+        b = (Long.c_type * 1)(5)
+        self.assertEqual(out.f(6, b), 11)
+        self.assertEqual(b[0], 12)
+
     def test_reassign(self):
         from nos.types import Long
 
