@@ -6,7 +6,7 @@ CONFIG = """
 VERSION = "{version}"
 LIB = "{lib}"
 LLC = "{bindir}/llc"
-CLANG = "{bindir}/clang"
+CLANG = "clang"
 """
 
 # Determine the name for LLVM config binary
