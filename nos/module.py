@@ -24,7 +24,7 @@ class Module(object):
         self.clean()
 
     def function(self, result, **kwargs):
-        from .visitor import Visitor, entry_alloca
+        from .visitor import Visitor, FlattenAttributes, entry_alloca, emit_constant
         import ast
 
         def wrapper(func):
@@ -68,6 +68,14 @@ class Module(object):
             global_vars.update(parent_frame.f_locals)
             del parent_frame
 
+            # Resolve constants
+            for k, v in global_vars.items():
+                try:
+                    global_vars[k] = emit_constant(v)
+                except TypeError:
+                    # Not a constant, something else will handle this.
+                    continue
+
             # - Local variables are parameters and anything declared
             #   inside the function itself which resides on stack and
             #   can be written to.
@@ -80,7 +88,6 @@ class Module(object):
             t = ast.parse(remove_indent(inspect.getsourcelines(func)))
             func_body = list(t.body[0].body)
 
-            from .visitor import FlattenAttributes
             v = FlattenAttributes(self.builder)
             for i, node in enumerate(func_body):
                 func_body[i] = v.visit(node)

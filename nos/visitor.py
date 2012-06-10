@@ -113,14 +113,7 @@ class Visitor(ast.NodeVisitor):
         return v
 
     def visit_Num(self, node):
-        from .types import Long, Double
-
-        if isinstance(node.n, float):
-            self.stack.append(llvm.ConstReal(Double.llvm_type, node.n))
-        elif isinstance(node.n, int):
-            self.stack.append(llvm.ConstInt(Long.llvm_type, node.n, True))
-        else:
-            raise TypeError("Uknown Number type {0!s}".format(type(node.n)))
+        self.stack.append(emit_constant(node.n))
 
     def visit_Name(self, node):
         if isinstance(node.ctx, ast.Load):
@@ -133,7 +126,7 @@ class Visitor(ast.NodeVisitor):
                 self.stack.append(llvm.BuildLoad(self.builder, v, name))
             except KeyError:
                 try:
-                    # Emitters declared externally.
+                    # Constant values or emitter functions declared externally.
                     self.stack.append(self.global_vars[node.id])
                 except KeyError:
                     # Last thing to try is {module 1}...{module n}.{symbol} import.
@@ -495,6 +488,18 @@ def types_equal(tx, ty):
 
     """
     return ctypes.cast(tx, ctypes.c_void_p).value == ctypes.cast(ty, ctypes.c_void_p).value
+
+
+def emit_constant(value):
+    """Emit constant IR for known value types."""
+    from .types import Long, Double
+
+    if isinstance(value, float):
+        return llvm.ConstReal(Double.llvm_type, value)
+    elif isinstance(value, int):
+        return llvm.ConstInt(Long.llvm_type, value, True)
+    else:
+        raise TypeError("Uknown Number type {0!s}".format(type(value)))
 
 
 def _validate_function_args(func, args):

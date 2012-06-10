@@ -97,6 +97,22 @@ class AssignTests(ModuleTest, unittest.TestCase):
         self.assertEqual(f(10), 15)
         self.assertEqual(out.f(10), 15)
 
+    def test_assign_global_const(self):
+        """Externally declared values are resolved at compile."""
+        from nos.types import Long
+
+        y = 5
+
+        @self.m.function(Long, a=Long)
+        def f(a):
+            x = a + y
+            return x
+
+        out = self.m.compile()
+
+        self.assertEqual(f(10), 15)
+        self.assertEqual(out.f(10), 15)
+
 
 class ReturnTests(ModuleTest, unittest.TestCase):
 
