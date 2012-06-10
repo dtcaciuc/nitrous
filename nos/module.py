@@ -6,9 +6,6 @@ import tempfile
 
 from . import llvm
 
-LLC = os.environ.get("NOS_LLC", "llc")
-CLANG = os.environ.get("NOS_CLANG", "clang")
-
 
 class Module(object):
 
@@ -118,6 +115,7 @@ class Module(object):
         return llvm.DumpModule(self.module)
 
     def compile(self):
+        from .llvm.__config__ import LLC, CLANG
         import tempfile
         import os
         import inspect

@@ -1,27 +1,18 @@
 import ctypes
 import ctypes.util
-import platform
 import os
 
+import __config__
 
-VERSION = os.environ["NOS_LLVM_VERSION"]
-
-if VERSION == "2.9":
+if __config__.VERSION == "2.9":
     from .v29 import *
-elif VERSION == "3.1":
+elif __config__.VERSION == "3.1":
     from .v31 import *
 else:
     raise RuntimeError("Incompatible LLVM version {0}".format(VERSION))
 
 
-def _load_llvm():
-    # TODO is there a standard way to get the extension?
-    ext = dict(Darwin="dylib", Linux="so", Windows="dll")[platform.system()]
-    name = "libLLVM-{0}.{1}".format(os.environ["NOS_LLVM_VERSION"], ext)
-    return ctypes.cdll.LoadLibrary(name)
-
-
-_llvm = _load_llvm()
+_llvm = ctypes.cdll.LoadLibrary(__config__.LIB)
 _llvm_addons = ctypes.cdll.LoadLibrary(os.path.join(os.path.dirname(__file__), "addons.so"))
 _libc = ctypes.cdll.LoadLibrary(ctypes.util.find_library("c"))
 

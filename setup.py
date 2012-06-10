@@ -1,8 +1,27 @@
 from setuptools import setup, find_packages, Extension
-import os
+from ctypes.util import find_library
 
-llvm_version = os.environ.setdefault("NOS_LLVM_VERSION", "3.1")
-llvm_prefix = os.environ.setdefault("NOS_LLVM_PREFIX", "/usr")
+CONFIG = """
+VERSION = "{version}"
+LIB = "{lib}"
+LLC = "{bindir}/llc"
+CLANG = "{bindir}/clang"
+"""
+
+
+def llvm_config(*args):
+    from subprocess import Popen, PIPE
+    p = Popen(["llvm-config"] + list(args), stdout=PIPE)
+    return p.communicate()[0].strip().split()
+
+
+llvm_version = llvm_config("--version")[0]
+llvm_lib = "LLVM-{0}".format(llvm_version)
+
+with open("nos/llvm/__config__.py", "w") as config:
+    config.write(CONFIG.format(version=llvm_version,
+                               lib=find_library(llvm_lib),
+                               bindir=llvm_config("--bindir")[0]))
 
 
 # HACK this isn't really a Python extension, however it's
@@ -10,14 +29,12 @@ llvm_prefix = os.environ.setdefault("NOS_LLVM_PREFIX", "/usr")
 llvm_addons = Extension(
     "nos.llvm.addons",
     ["src/llvm-addons.cc"],
-    include_dirs=[os.path.join(llvm_prefix, "include")],
-    library_dirs=[d for d in [os.path.join(llvm_prefix, "lib"),
-                              os.path.join(llvm_prefix, "lib64")]
-                  if os.path.isdir(d)],
-    libraries=["LLVM-{0}".format(llvm_version)],
-    define_macros=[("__STDC_LIMIT_MACROS", 1),
-                   ("__STDC_CONSTANT_MACROS", 1),
-                   ("NOS_LLVM_VERSION", int(llvm_version.replace(".", "")))]
+    include_dirs=llvm_config("--includedir"),
+    extra_compile_args=llvm_config("--cxxflags"),
+    define_macros=[("NOS_LLVM_VERSION", int(llvm_version.replace(".", "")))],
+    libraries=[llvm_lib],
+    library_dirs=llvm_config("--libdir"),
+    extra_link_args=llvm_config("--ldflags"),
 )
 
 
