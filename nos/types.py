@@ -29,4 +29,23 @@ class Pointer(object):
 
     @property
     def c_type(self):
-        return ctypes.POINTER(self.element_type.c_type)
+        # Ctypes requires an object with from_param() method.
+        return self
+
+    def from_param(self, p):
+        import array
+
+        pointer_type = ctypes.POINTER(self.element_type.c_type)
+
+        try:
+            import numpy as np
+            if isinstance(p, np.ndarray):
+                return p.ctypes.data_as(pointer_type)
+        except ImportError:
+            pass
+
+        if isinstance(p, array.array):
+            addr, count = p.buffer_info()
+            return ctypes.cast(addr, pointer_type)
+
+        return p
