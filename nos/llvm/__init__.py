@@ -213,7 +213,7 @@ VerifierFailureAction = ctypes.c_int
 _func("VerifyFunction", Bool, [ValueRef, VerifierFailureAction])
 
 
-def build_pydiv(builder, a, b):
+def build_py_idiv(builder, a, b, name):
     """Build expression for floor integer division.
 
     As seen in Cython:
@@ -225,18 +225,18 @@ def build_pydiv(builder, a, b):
 
     """
 
-    q = BuildSDiv(builder, a, b, "pydiv_q")
-    r = BuildSub(builder, a, BuildMul(builder, q, b, "pydiv_r"), "pydiv_sub")
+    q = BuildSDiv(builder, a, b, name + "_q")
+    r = BuildSub(builder, a, BuildMul(builder, q, b, name + "_r"), name + "_sub")
 
     # TODO Assumes signed integers
     zero = ConstNull(TypeOf(r))
     q_sub = BuildAnd(builder,
-                     BuildICmp(builder, IntNE, r, zero, "pydiv_cmp_1"),
+                     BuildICmp(builder, IntNE, r, zero, name + "_cmp_1"),
                      BuildICmp(builder, IntSLT,
-                               BuildXor(builder, r, b, "pydiv_xor"),
-                               zero, "pydiv_cmp_2"),
-                     "pydiv_q_and")
+                               BuildXor(builder, r, b, name + "_xor"),
+                               zero, name + "_cmp_2"),
+                     name + "_q_and")
 
     return BuildSub(builder, q,
-                    BuildCast(builder, ZExt, q_sub, TypeOf(a), "pydiv_cast"),
-                    "pydiv_sub")
+                    BuildCast(builder, ZExt, q_sub, TypeOf(a), name + "_cast"),
+                    name)

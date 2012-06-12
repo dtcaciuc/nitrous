@@ -46,7 +46,8 @@ BINARY_INST = {
         ast.Add: llvm.BuildAdd,
         ast.Sub: llvm.BuildSub,
         ast.Mult: llvm.BuildMul,
-        ast.Div: llvm.BuildSDiv,
+        # Python uses floor integer division
+        ast.Div: llvm.build_py_idiv,
     }
 }
 

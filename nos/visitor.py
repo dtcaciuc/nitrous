@@ -476,13 +476,9 @@ def emit_binary_op(builder, op, lhs, rhs):
             .format(op, lhs, rhs)
         )
 
-    op_type = type(op)
-    if (llvm.GetTypeKind(ty) == llvm.IntegerTypeKind and op_type == ast.Div):
-        # Python uses floor integer division; make it so by default
-        # TODO add a decorator to revert back to C behaviour
-        return llvm.build_pydiv(builder, lhs, rhs)
-    else:
-        return BINARY_INST[type_key(ty)][op_type](builder, lhs, rhs, "tmp")
+    return BINARY_INST[type_key(ty)][type(op)](
+        builder, lhs, rhs, type(op).__name__.lower()
+    )
 
 
 def _validate_function_args(func, args):
