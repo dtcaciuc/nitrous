@@ -130,7 +130,7 @@ class NBodyTests(ModuleTest, unittest.TestCase):
                 advance(xyz, vxyz, mass, n_bodies, 0.01)
             return 0.0
 
-        out = self.m.compile()
+        out = self.m.build()
 
         out.offset_momentum(xyz, vxyz, mass, 5)
 

@@ -121,7 +121,7 @@ class Module(object):
     def dump(self):
         return llvm.DumpModule(self.module)
 
-    def compile(self):
+    def build(self):
         from .llvm.__config__ import LLC, CLANG
         import tempfile
         import os
@@ -141,7 +141,7 @@ class Module(object):
 
                 so_path = format(os.path.join(self.build_dir, self.name))
                 if call((CLANG, "-shared", "-o", so_path, tmp_s.name)):
-                    raise RuntimeError("Could not compile target extension")
+                    raise RuntimeError("Could not build target extension")
 
                 out_module = type(self.name, (types.ModuleType,), {})
                 out_module.__nos_shlib__ = ctypes.cdll.LoadLibrary(so_path)

@@ -28,7 +28,7 @@ class EmitterTests(ModuleTest, unittest.TestCase):
         def x(y):
             return nos.lib.cast(y, nos.types.Double)
 
-        out = self.m.compile()
+        out = self.m.build()
         rv = out.x(int(5))
 
         self.assertEqual(rv, 5.0)
@@ -43,7 +43,7 @@ class EmitterTests(ModuleTest, unittest.TestCase):
         def x(y):
             return cast(y, Double)
 
-        out = self.m.compile()
+        out = self.m.build()
         rv = out.x(int(5))
 
         self.assertEqual(rv, 5.0)
@@ -64,7 +64,7 @@ class CastTests(ModuleTest, unittest.TestCase):
         def div_double(a, b):
             return cast(a, Double) / b
 
-        out = self.m.compile()
+        out = self.m.build()
 
         self.assertEqual(out.div_long(3, 2), 1)
         self.assertEqual(out.div_double(3, 2), 1.5)
@@ -77,7 +77,7 @@ class CastTests(ModuleTest, unittest.TestCase):
         def div_double(a, b):
             return cast(a, Double) / b
 
-        out = self.m.compile()
+        out = self.m.build()
         self.assertEqual(out.div_double(3, 2), 1.5)
 
 
@@ -93,7 +93,7 @@ class AssignTests(ModuleTest, unittest.TestCase):
             b[0] += 7
             return a
 
-        out = self.m.compile()
+        out = self.m.build()
 
         b = (Long.c_type * 1)(5)
         self.assertEqual(f(6, b), 11)
@@ -112,7 +112,7 @@ class AssignTests(ModuleTest, unittest.TestCase):
             x = x + 5
             return x
 
-        out = self.m.compile()
+        out = self.m.build()
 
         self.assertEqual(f(10), 15)
         self.assertEqual(out.f(10), 15)
@@ -128,7 +128,7 @@ class AssignTests(ModuleTest, unittest.TestCase):
             x = a + y
             return x
 
-        out = self.m.compile()
+        out = self.m.build()
 
         self.assertEqual(f(10), 15)
         self.assertEqual(out.f(10), 15)
@@ -147,7 +147,7 @@ class ReturnTests(ModuleTest, unittest.TestCase):
             else:
                 return b
 
-        out = self.m.compile()
+        out = self.m.build()
 
         self.assertEqual(out.max2(2, 3), 3)
         self.assertEqual(out.max2(4, 1), 4)
@@ -176,7 +176,7 @@ class IfTests(ModuleTest, unittest.TestCase):
                 v = b
             return v
 
-        out = self.m.compile()
+        out = self.m.build()
 
         for f in [out.max2_1, out.max2_2]:
             self.assertEqual(f(2, 3), 3)
@@ -197,7 +197,7 @@ class IfTests(ModuleTest, unittest.TestCase):
                     (b if (b > a and b > c) else
                      (c)))
 
-        out = self.m.compile()
+        out = self.m.build()
 
         self.assertEqual(out.max2(2, 3), 3)
         self.assertEqual(out.max2(4, 1), 4)
@@ -217,7 +217,7 @@ class MemoryTests(ModuleTest, unittest.TestCase):
             e = data[i]
             return e
 
-        out = self.m.compile()
+        out = self.m.build()
 
         dtype = (ctypes.c_long * 5)
         data = dtype(0, 10, 20, 30, 40)
@@ -234,7 +234,7 @@ class MemoryTests(ModuleTest, unittest.TestCase):
             data[i] = e
             return 0
 
-        out = self.m.compile()
+        out = self.m.build()
 
         dtype = (ctypes.c_long * 5)
         data = dtype(0, 0, 0, 0, 0)
@@ -263,7 +263,7 @@ class LoopTests(ModuleTest, unittest.TestCase):
 
             return 0
 
-        out = self.m.compile()
+        out = self.m.build()
         # 5 + 1 elements to check stop correctness
         data = (ctypes.c_long * 6)()
 
@@ -289,7 +289,7 @@ class LoopTests(ModuleTest, unittest.TestCase):
 
             return 0
 
-        out = self.m.compile()
+        out = self.m.build()
 
         data = (ctypes.c_long * 8)()
         out.loop_1(data, 2, 7)
@@ -316,7 +316,7 @@ class LoopTests(ModuleTest, unittest.TestCase):
 
             return a
 
-        out = self.m.compile()
+        out = self.m.build()
         self.assertEqual(out.loop_1(10), 4)
 
     def test_double_for(self):
@@ -334,7 +334,7 @@ class LoopTests(ModuleTest, unittest.TestCase):
             # loop variables outside the loop.
             return i * j
 
-        out = self.m.compile()
+        out = self.m.build()
         data = (ctypes.c_long * 9)()
         expected = [0, 1, 2,
                     1, 2, 3,
@@ -358,7 +358,7 @@ class IntrinsicTests(ModuleTest, unittest.TestCase):
         def sqrt(x):
             return nos.lib.sqrt(x)
 
-        out = self.m.compile()
+        out = self.m.build()
         self.assertAlmostEqual(math.sqrt(10.0), out.sqrt(10.0))
 
         ir = self.m.dumps()
@@ -379,7 +379,7 @@ class CallTests(ModuleTest, unittest.TestCase):
         def f2(x):
             return x + f1(x)
 
-        out = self.m.compile()
+        out = self.m.build()
 
         self.assertEqual(f2(2), 7)
         self.assertEqual(out.f2(2), 7)

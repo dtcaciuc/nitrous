@@ -22,7 +22,7 @@ class PointerTests(ModuleTest, unittest.TestCase):
 
     def test_ctypes_array(self):
         """Pointer() accepts regular ctypes arrays"""
-        out = self.m.compile()
+        out = self.m.build()
         x = (Double.c_type * 1)(3)
         self.assertEqual(out.f(x), 3)
 
@@ -30,14 +30,14 @@ class PointerTests(ModuleTest, unittest.TestCase):
         """Pointer() accepts array.array objects."""
         from array import array
 
-        out = self.m.compile()
+        out = self.m.build()
         x = array('d', (3,))
         self.assertEqual(out.f(x), 3)
 
     @unittest.skipIf(not np, "NumPy integration feature")
     def test_numpy_array(self):
         """Pointer() accepts NumPy ndarray objects."""
-        out = self.m.compile()
+        out = self.m.build()
         x = np.double((3,))
         self.assertEqual(out.f(x), 3)
 
@@ -45,6 +45,6 @@ class PointerTests(ModuleTest, unittest.TestCase):
         """Raise error if an incompatible data structure is supplied"""
         import ctypes
 
-        out = self.m.compile()
+        out = self.m.build()
         with self.assertRaises(ctypes.ArgumentError):
             out.f([1])

@@ -13,7 +13,7 @@ class BoolTests(ModuleTest, unittest.TestCase):
         def and_(a, b):
             return a and b
 
-        out = self.m.compile()
+        out = self.m.build()
 
         self.assertEqual(out.and_(True, True), True)
         self.assertEqual(out.and_(True, False), False)
@@ -27,7 +27,7 @@ class BoolTests(ModuleTest, unittest.TestCase):
         def or_(a, b):
             return a or b
 
-        out = self.m.compile()
+        out = self.m.build()
 
         self.assertEqual(out.or_(True, True), True)
         self.assertEqual(out.or_(True, False), True)
@@ -46,14 +46,14 @@ class LongTests(ModuleTest, unittest.TestCase):
             a = 5.0
             return a
 
-        out = self.m.compile()
+        out = self.m.build()
         self.assertEqual(out.x(), 5.0)
 
     def test_binary(self):
         from nos.types import Long
         annotate = self.m.function(Long, a=Long, b=Long)
         funcs = [annotate(f) for f in binary_funcs()]
-        out = self.m.compile()
+        out = self.m.build()
 
         values = [(0, 1), (3, 2), (2, 3), (-3, 2), (3, -2)]
 
@@ -68,7 +68,7 @@ class LongTests(ModuleTest, unittest.TestCase):
 
         annotate = self.m.function(Bool, a=Long, b=Long)
         funcs = [annotate(f) for f in cmp_funcs()]
-        out = self.m.compile()
+        out = self.m.build()
 
         for f in funcs:
             cf = getattr(out, f.func_name)
@@ -91,7 +91,7 @@ class DoubleTests(ModuleTest, unittest.TestCase):
         from nos.types import Double
         annotate = self.m.function(Double, a=Double, b=Double)
         funcs = [annotate(f) for f in binary_funcs()]
-        out = self.m.compile()
+        out = self.m.build()
 
         values = [(0.0, 1.0), (3.0, 2.0), (2.0, 3.0), (-3.0, 2.0), (3.0, -2.0)]
 
@@ -105,7 +105,7 @@ class DoubleTests(ModuleTest, unittest.TestCase):
         from nos.types import Bool, Double
         annotate = self.m.function(Bool, a=Double, b=Double)
         funcs = [annotate(f) for f in cmp_funcs()]
-        out = self.m.compile()
+        out = self.m.build()
 
         for f in funcs:
             cf = getattr(out, f.func_name)
