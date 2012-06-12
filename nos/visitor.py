@@ -6,48 +6,7 @@ from .exceptions import CompilationError
 from . import llvm
 
 
-OPS = {
-    llvm.DoubleTypeKind: {
-        ast.Add: llvm.BuildFAdd,
-        ast.Sub: llvm.BuildFSub,
-        ast.Mult: llvm.BuildFMul,
-        ast.Div: llvm.BuildFDiv,
-    },
-    llvm.IntegerTypeKind: {
-        ast.Add: llvm.BuildAdd,
-        ast.Sub: llvm.BuildSub,
-        ast.Mult: llvm.BuildMul,
-        ast.Div: llvm.BuildSDiv,
-    }
-}
-
-ICMP = {
-    llvm.IntegerTypeKind: llvm.BuildICmp,
-    llvm.DoubleTypeKind: llvm.BuildFCmp,
-}
-
-ICMP_OPS = {
-    llvm.IntegerTypeKind: {
-        ast.Eq: llvm.IntEQ,
-        ast.Gt: llvm.IntSGT,
-        ast.GtE: llvm.IntSGE,
-        ast.Lt: llvm.IntSLT,
-        ast.LtE: llvm.IntSLE,
-        ast.NotEq: llvm.IntNE
-    },
-    llvm.DoubleTypeKind: {
-        # TODO Currently allow unordered floats; possible
-        # optimization to introduce ordered-only mode?
-        ast.Eq: llvm.RealUEQ,
-        ast.Gt: llvm.RealUGT,
-        ast.GtE: llvm.RealUGE,
-        ast.Lt: llvm.RealULT,
-        ast.LtE: llvm.RealULE,
-        ast.NotEq: llvm.RealUNE,
-    }
-}
-
-BOOL_OPS = {
+BOOL_INST = {
     ast.And: llvm.BuildAnd,
     ast.Or: llvm.BuildOr
 }
@@ -233,31 +192,35 @@ class Visitor(ast.NodeVisitor):
         rhs = self.stack.pop()
         lhs = self.stack.pop()
 
-        v = BOOL_OPS[type(node.op)](self.builder, lhs, rhs, "tmp")
+        v = BOOL_INST[type(node.op)](self.builder, lhs, rhs, "tmp")
         self.stack.append(v)
 
     def visit_Compare(self, node):
+        from .types import COMPARE_INST, type_key, types_equal
+
         if len(node.ops) > 1 or len(node.comparators) > 1:
             raise CompilationError("Only simple `if` expressions are supported")
 
         ast.NodeVisitor.generic_visit(self, node)
         rhs = self.stack.pop()
         lhs = self.stack.pop()
+        op = node.ops[0]
 
-        # TODO for now support simple comparisons only
-        type_kind = llvm.GetTypeKind(llvm.TypeOf(lhs))
-        if type_kind != llvm.GetTypeKind(llvm.TypeOf(rhs)):
+        ty = llvm.TypeOf(lhs)
+        if not types_equal(ty, llvm.TypeOf(rhs)):
             raise CompilationError(
                 "Cannot apply {0} to {1} and {2}; type kind doesn't match"
-                .format(node.op, lhs, rhs)
+                .format(op, lhs, rhs)
             )
 
-        op = ICMP_OPS[type_kind][type(node.ops[0])]
-        v = ICMP[type_kind](self.builder, op, lhs, rhs, "tmp")
+        inst, ops = COMPARE_INST[type_key(ty)]
+        v = inst(self.builder, ops[type(op)], lhs, rhs, "tmp")
 
         self.stack.append(v)
 
     def visit_IfExp(self, node):
+        from .types import types_equal
+
         self.visit(node.test)
         test_expr = self.stack.pop()
 
@@ -285,7 +248,7 @@ class Visitor(ast.NodeVisitor):
         else_branch_bb = llvm.GetInsertBlock(self.builder)
 
         expr_type = llvm.TypeOf(if_expr)
-        if llvm.GetTypeKind(expr_type) != llvm.GetTypeKind(llvm.TypeOf(else_expr)):
+        if not types_equal(expr_type, llvm.TypeOf(else_expr)):
             raise CompilationError(
                 "`if` expression clause return types don't match"
             )
@@ -447,7 +410,7 @@ class Visitor(ast.NodeVisitor):
 
         if hasattr(func, "__nos_func__"):
             # Function is compiled; check arguments for validity and make a direct call
-            _validate_function_args(func, args);
+            _validate_function_args(func, args)
             result = llvm.BuildCall(self.builder, func.__nos_func__,
                                     (llvm.ValueRef * len(args))(*args),
                                     len(args), func.func_name + "_result")
@@ -491,15 +454,6 @@ def entry_alloca(func, type_, name):
     return a
 
 
-def types_equal(tx, ty):
-    """Returns True if *tx* is the same LLVMTypeRef as *ty*.
-
-    To check equality, retrieve and compare raw pointer values.
-
-    """
-    return ctypes.cast(tx, ctypes.c_void_p).value == ctypes.cast(ty, ctypes.c_void_p).value
-
-
 def emit_constant(value):
     """Emit constant IR for known value types."""
     from .types import Long, Double
@@ -513,25 +467,27 @@ def emit_constant(value):
 
 
 def emit_binary_op(builder, op, lhs, rhs):
-    # Operands must be of the same type kind
-    # TODO if integer, also verify the bit width?
-    type_kind = llvm.GetTypeKind(llvm.TypeOf(lhs))
-    if (type_kind != llvm.GetTypeKind(llvm.TypeOf(rhs))):
+    from .types import BINARY_INST, type_key, types_equal
+
+    ty = llvm.TypeOf(lhs)
+    if not types_equal(ty, llvm.TypeOf(rhs)):
         raise CompilationError(
             "Cannot apply {0} to {1} and {2}; type kind doesn't match"
             .format(op, lhs, rhs)
         )
 
-    # Python uses floor integer division; make it so by default
-    # TODO add a decorator to revert back to C behaviour
-    if type_kind == llvm.IntegerTypeKind and type(op) == ast.Div:
+    op_type = type(op)
+    if (llvm.GetTypeKind(ty) == llvm.IntegerTypeKind and op_type == ast.Div):
+        # Python uses floor integer division; make it so by default
+        # TODO add a decorator to revert back to C behaviour
         return llvm.build_pydiv(builder, lhs, rhs)
     else:
-        return OPS[type_kind][type(op)](builder, lhs, rhs, "tmp")
+        return BINARY_INST[type_key(ty)][op_type](builder, lhs, rhs, "tmp")
 
 
 def _validate_function_args(func, args):
     """Raises TypeError if if *args* do not match annotated function signature."""
+    from .types import types_equal
     import inspect
 
     if len(args) != len(func.__nos_argtypes__):
