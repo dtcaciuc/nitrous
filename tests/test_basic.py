@@ -9,12 +9,13 @@ class AnnotationTests(ModuleTest, unittest.TestCase):
         from nos.exceptions import CompilationError
         from nos.types import Double
 
+        @self.m.function(Double, z=Double)
         def x(y):
             pass
 
         error = "Argument type annotations don't match function arguments"
         with self.assertRaisesRegexp(CompilationError, error):
-            self.m.function(Double, z=Double)(x)
+            self.m.build()
 
 
 class EmitterTests(ModuleTest, unittest.TestCase):
@@ -384,26 +385,35 @@ class CallTests(ModuleTest, unittest.TestCase):
         self.assertEqual(f2(2), 7)
         self.assertEqual(out.f2(2), 7)
 
-    def test_call_wrong_args(self):
+    def test_call_wrong_arg_count(self):
         from nos.types import Long
 
         @self.m.function(Long, x=Long)
         def f1(x):
             return x
 
+        @self.m.function(Long, x=Long)
         def f2(x):
             return f1(x, 1)
 
         message = "f1\(\) takes exactly 1 argument\(s\) \(2 given\)"
         with self.assertRaisesRegexp(TypeError, message):
-            self.m.function(Long, x=Long)(f2)
+            self.m.build()
 
-        def f3(x):
+    def test_call_wrong_arg_type(self):
+        from nos.types import Long
+
+        @self.m.function(Long, x=Long)
+        def f1(x):
+            return x
+
+        @self.m.function(Long, x=Long)
+        def f2(x):
             return f1(1.0)
 
         message = "f1\(\) called with wrong argument type\(s\) for x"
         with self.assertRaisesRegexp(TypeError, message):
-            self.m.function(Long, x=Long)(f3)
+            self.m.build()
 
 
 class FunctionBuilderTests(unittest.TestCase):
