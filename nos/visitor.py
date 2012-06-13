@@ -2,7 +2,6 @@ import ast
 import ctypes
 
 from contextlib import contextmanager
-from .exceptions import CompilationError
 from . import llvm
 
 
@@ -27,6 +26,12 @@ class Visitor(ast.NodeVisitor):
 
         # Stack of information for current loop and its parent ones.
         self.loop_info = []
+
+        # Push nodes on the stack as we're traversing down the tree,
+        # pop them back when we're done. This is useful for error reporting
+        # since not all nodes (eg. Slice) have the lineno attribute. In this
+        # case, climb up until there's a node which does have it.
+        self.node_stack = []
 
         # Value stack used to assemble LLVM IR as the syntax tree is traversed.
         self.stack = []
@@ -89,11 +94,23 @@ class Visitor(ast.NodeVisitor):
                 try:
                     modulename, attrname = node.id.rsplit(".", 1)
                 except ValueError:
-                    raise CompilationError(
-                        "Line {0}: {1} is not defined or available at this point"
-                        .format(node.lineno, node.id)
-                    )
+                    raise NameError("{0} is undefined or unavailable in current scope".format(node.id))
                 return getattr(__import__(modulename, {}, {}, [attrname]), attrname)
+
+
+    def visit(self, node):
+        from .exceptions import TranslationError
+
+        try:
+            self.node_stack.append(node)
+            super(Visitor, self).visit(node)
+        except (NameError, ValueError, TypeError, NotImplementedError), e:
+            # Use translation error tag the exception with line number and
+            # carry it upwards to translation routine where the traceback is reported.
+            lineno = next(n for n in self.node_stack[::-1] if hasattr(n, "lineno")).lineno
+            raise TranslationError(type(e), lineno, e.args[0])
+        finally:
+            self.node_stack.pop()
 
     def visit_Num(self, node):
         self.stack.append(emit_constant(node.n))
@@ -104,7 +121,7 @@ class Visitor(ast.NodeVisitor):
         elif isinstance(node.ctx, ast.Store):
             self.stack.append(node.id)
         else:
-            raise ValueError("Uknown Name context {0!s}".format(type(node.ctx)))
+            raise NotImplementedError("Unknown Name context {0!s}".format(type(node.ctx)))
 
     def visit_Subscript(self, node):
         """Label subscript of form `var_expr[index_expr]`.
@@ -124,12 +141,18 @@ class Visitor(ast.NodeVisitor):
         elif isinstance(node.ctx, ast.Store):
             self.stack.append(addr)
         else:
-            raise CompilationError("Unsupported subscript context {0}".format(node.ctx))
+            raise NotImplementedError("Unsupported subscript context {0}".format(node.ctx))
+
+    def visit_Slice(self, node):
+        raise NotImplementedError("Slices are not supported")
+
+    def visit_Delete(self, node):
+        raise NotImplementedError("`del`etions are not supported")
 
     def visit_Assign(self, node):
         target = node.targets[0]
         if len(node.targets) > 1:
-            raise CompilationError("Unpacking assignment is not supported")
+            raise NotImplementedError("Chained assignment is not supported")
 
         ast.NodeVisitor.generic_visit(self, node)
         rhs = self.stack.pop()
@@ -141,8 +164,8 @@ class Visitor(ast.NodeVisitor):
             # foo[i] = rhs; foo[i] is the GEP, previous pushed by visit_Subscript
             llvm.BuildStore(self.builder, rhs, self.stack.pop())
         else:
-            raise CompilationError("Unsupported augmented assignment target {0}"
-                                   .format(node.target))
+            raise NotImplementedError("Unsupported assignment target {0}"
+                                      .format(node.targets[0]))
 
     def visit_AugAssign(self, node):
         ast.NodeVisitor.generic_visit(self, node)
@@ -161,8 +184,8 @@ class Visitor(ast.NodeVisitor):
             rhs = emit_binary_op(self.builder, node.op, lhs, rhs)
             llvm.BuildStore(self.builder, rhs, lhs_addr)
         else:
-            raise CompilationError("Unsupported augmented assignment target {0}"
-                                   .format(node.target))
+            raise NotImplementedError("Unsupported augmented assignment target {0}"
+                                      .format(node.target))
 
     def visit_Return(self, node):
         from .types import Bool
@@ -199,7 +222,7 @@ class Visitor(ast.NodeVisitor):
         from .types import COMPARE_INST, type_key, types_equal
 
         if len(node.ops) > 1 or len(node.comparators) > 1:
-            raise CompilationError("Only simple `if` expressions are supported")
+            raise NotImplementedError("Only simple `if` expressions are supported")
 
         ast.NodeVisitor.generic_visit(self, node)
         rhs = self.stack.pop()
@@ -208,10 +231,8 @@ class Visitor(ast.NodeVisitor):
 
         ty = llvm.TypeOf(lhs)
         if not types_equal(ty, llvm.TypeOf(rhs)):
-            raise CompilationError(
-                "Cannot apply {0} to {1} and {2}; type kind doesn't match"
-                .format(op, lhs, rhs)
-            )
+            raise TypeError("Conflicting operand types for {0}: {1} and {2}"
+                            .format(op, lhs, rhs))
 
         inst, ops = COMPARE_INST[type_key(ty)]
         v = inst(self.builder, ops[type(op)], lhs, rhs, "tmp")
@@ -249,9 +270,7 @@ class Visitor(ast.NodeVisitor):
 
         expr_type = llvm.TypeOf(if_expr)
         if not types_equal(expr_type, llvm.TypeOf(else_expr)):
-            raise CompilationError(
-                "`if` expression clause return types don't match"
-            )
+            raise TypeError("`if` expression clause return types don't match")
 
         llvm.PositionBuilderAtEnd(self.builder, merge_bb)
         phi = llvm.BuildPhi(self.builder, expr_type, "phi")
@@ -331,7 +350,7 @@ class Visitor(ast.NodeVisitor):
         from .types import Long
 
         if len(node.orelse) != 0:
-            raise CompilationError("`else` in a `for` statement is not supported")
+            raise NotImplementedError("`else` in a `for` statement is not supported")
 
         func = llvm.GetBasicBlockParent(llvm.GetInsertBlock(self.builder))
 
@@ -436,7 +455,7 @@ class FlattenAttributes(ast.NodeTransformer):
 
     def visit_Attribute(self, node):
         if not isinstance(node.ctx, ast.Load):
-            raise CompilationError("Setting attributes not supported")
+            raise NotImplementedError("Setting attributes not supported")
 
         node = ast.NodeTransformer.generic_visit(self, node)
         assert isinstance(node.value, ast.Name)
@@ -463,7 +482,7 @@ def emit_constant(value):
     elif isinstance(value, int):
         return llvm.ConstInt(Long.llvm_type, value, True)
     else:
-        raise TypeError("Uknown Number type {0!s}".format(type(value)))
+        raise TypeError("Unknown Number type {0!s}".format(type(value)))
 
 
 def emit_binary_op(builder, op, lhs, rhs):
@@ -471,10 +490,8 @@ def emit_binary_op(builder, op, lhs, rhs):
 
     ty = llvm.TypeOf(lhs)
     if not types_equal(ty, llvm.TypeOf(rhs)):
-        raise CompilationError(
-            "Cannot apply {0} to {1} and {2}; type kind doesn't match"
-            .format(op, lhs, rhs)
-        )
+        raise TypeError("Conflicting operand types for {0}: {1} and {2}"
+                        .format(op, lhs, rhs))
 
     return BINARY_INST[type_key(ty)][type(op)](
         builder, lhs, rhs, type(op).__name__.lower()

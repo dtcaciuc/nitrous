@@ -30,7 +30,6 @@ _CASTS = {
 @value_emitter
 def cast(_, builder, value, target_type):
     """Casts expression to specified type."""
-    from ..exceptions import CompilationError
 
     value_kind = llvm.GetTypeKind(llvm.TypeOf(value))
     target_kind = llvm.GetTypeKind(target_type.llvm_type)
@@ -45,7 +44,7 @@ def cast(_, builder, value, target_type):
     try:
         op = _CASTS[(value_kind, target_kind)]
     except KeyError:
-        raise CompilationError("Cannot cast {0} to {1}".format(value, target_type))
+        raise TypeError("Cannot cast {0} to {1}".format(value, target_type))
 
     return llvm.BuildCast(builder, op, value, target_type.llvm_type, "tmp")
 

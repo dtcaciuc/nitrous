@@ -6,7 +6,7 @@ from nos.util import ModuleTest
 class AnnotationTests(ModuleTest, unittest.TestCase):
 
     def test_args_mismatch(self):
-        from nos.exceptions import CompilationError
+        from nos.exceptions import AnnotationError
         from nos.types import Double
 
         @self.m.function(Double, z=Double)
@@ -14,11 +14,25 @@ class AnnotationTests(ModuleTest, unittest.TestCase):
             pass
 
         error = "Argument type annotations don't match function arguments"
-        with self.assertRaisesRegexp(CompilationError, error):
+        with self.assertRaisesRegexp(AnnotationError, error):
             self.m.build()
 
 
-class EmitterTests(ModuleTest, unittest.TestCase):
+class SymbolTests(ModuleTest, unittest.TestCase):
+
+    def test_unsupported_context(self):
+        """Raise error on unsupported context (eg. `del x`)."""
+        from nos.types import Long
+
+        @self.m.function(Long)
+        def x():
+            y = 1
+            del y
+            return 0
+
+        message = ">>>     del y"
+        with self.assertRaisesRegexp(NotImplementedError, message):
+            self.m.build()
 
     def test_emitter(self):
         """Simple function call."""
@@ -49,6 +63,35 @@ class EmitterTests(ModuleTest, unittest.TestCase):
 
         self.assertEqual(rv, 5.0)
         self.assertEqual(type(rv), float)
+
+
+class LoadTests(ModuleTest, unittest.TestCase):
+
+    def test_missing_symbol(self):
+        """Raise error if cannot resolve a symbol."""
+        from nos.types import Double, Long
+
+        @self.m.function(Double, y=Long)
+        def x(y):
+            return z
+
+        error = ">>>     return z"
+        with self.assertRaisesRegexp(NameError, error):
+            self.m.build()
+
+    def test_symbol_out_of_scope(self):
+        """Raise error if symbol is available but not in the current scope."""
+        from nos.types import Double, Long
+
+        @self.m.function(Double, y=Long)
+        def x(y):
+            for i in range(y):
+                z = i
+            return z
+
+        error = ">>>     return z"
+        with self.assertRaisesRegexp(NameError, error):
+            self.m.build()
 
 
 class CastTests(ModuleTest, unittest.TestCase):
@@ -83,6 +126,32 @@ class CastTests(ModuleTest, unittest.TestCase):
 
 
 class AssignTests(ModuleTest, unittest.TestCase):
+
+    def test_unsupported_chain(self):
+        """Raise error on chain assignment."""
+        from nos.types import Long
+
+        @self.m.function(Long)
+        def f():
+            a = b = 1
+            return 0
+
+        message = ">>>     a = b = 1"
+        with self.assertRaisesRegexp(NotImplementedError, message):
+            self.m.build()
+
+    def test_unsupported_target(self):
+        """Check for unsupported assignments."""
+        from nos.types import Long
+
+        @self.m.function(Long, a=Long, b=Long)
+        def f(a, b):
+            a, b = 1
+            return 0
+
+        message = ">>>     a, b = 1"
+        with self.assertRaisesRegexp(NotImplementedError, message):
+            self.m.build()
 
     def test_aug(self):
         """Augmented assignment."""
@@ -135,6 +204,22 @@ class AssignTests(ModuleTest, unittest.TestCase):
         self.assertEqual(out.f(10), 15)
 
 
+class SubscriptTests(ModuleTest, unittest.TestCase):
+
+    def test_unsupported_slice(self):
+        """Raise error on unsupported context (eg. `del x`)."""
+        from nos.types import Long
+
+        @self.m.function(Long, y=Long)
+        def x(y):
+            y[:]
+            return 0
+
+        message = ">>>     y\[:\]"
+        with self.assertRaisesRegexp(NotImplementedError, message):
+            self.m.build()
+
+
 class ReturnTests(ModuleTest, unittest.TestCase):
 
     def test_if(self):
@@ -152,6 +237,45 @@ class ReturnTests(ModuleTest, unittest.TestCase):
 
         self.assertEqual(out.max2(2, 3), 3)
         self.assertEqual(out.max2(4, 1), 4)
+
+    def test_return_comparison(self):
+        """Returning comparison (1-bit integer) casts it to Bool type."""
+        from nos.types import Long, Bool
+
+        @self.m.function(Bool, a=Long, b=Long)
+        def max(a, b):
+            return a > b
+
+        out = self.m.build()
+
+        self.assertEqual(out.max(3, 2), True)
+        self.assertEqual(out.max(2, 3), False)
+
+
+class ConditionalTests(ModuleTest, unittest.TestCase):
+
+    def test_type_mismatch(self):
+        from nos.types import Bool, Long
+
+        @self.m.function(Bool, x=Long)
+        def f1(x):
+            return x < 1.0
+
+        message = ">>>     return x < 1.0"
+        with self.assertRaisesRegexp(TypeError, message):
+            self.m.build()
+
+    def test_compound_test(self):
+        """Support compound conditionals such as 1 < x < 2."""
+        from nos.types import Bool, Long
+
+        @self.m.function(Bool, x=Long)
+        def f1(x):
+            return 1 < x < 2
+
+        message = ">>>     return 1 < x < 2"
+        with self.assertRaisesRegexp(NotImplementedError, message):
+            self.m.build()
 
 
 class IfTests(ModuleTest, unittest.TestCase):
@@ -205,6 +329,19 @@ class IfTests(ModuleTest, unittest.TestCase):
 
         self.assertEqual(out.max3(2, 3, 1), 3)
         self.assertEqual(out.max3(4, 1, 5), 5)
+
+    def test_if_expr_type_mismatch(self):
+        """Raise error when `if` expression clause types don't match."""
+        from nos.types import Long
+
+        # Simple expression
+        @self.m.function(Long, a=Long, b=Long)
+        def max2(a, b):
+            return 1.0 if a > b else 0
+
+        message = ">>>     return 1.0 if a > b else 0"
+        with self.assertRaisesRegexp(TypeError, message):
+            self.m.build()
 
 
 class MemoryTests(ModuleTest, unittest.TestCase):
@@ -270,6 +407,23 @@ class LoopTests(ModuleTest, unittest.TestCase):
 
         out.loop_1(data, 5)
         self.assertEqual(list(data), [0, 1, 2, 99, 99, 0])
+
+    def test_for_else(self):
+        """for/else clause is not supported."""
+        from nos.types import Long
+
+        @self.m.function(Long, n=Long)
+        def loop_1(n):
+            for i in range(n):
+                pass
+            else:
+                pass
+
+            return 0
+
+        message = ">>>     for i in range\(n\):"
+        with self.assertRaisesRegexp(NotImplementedError, message):
+            self.m.build()
 
     def test_for_range(self):
         """More advanced loop ranges."""

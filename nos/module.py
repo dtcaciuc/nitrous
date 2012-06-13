@@ -107,7 +107,7 @@ class Module(object):
 
     def _translate(self, func):
         from .visitor import Visitor, FlattenAttributes, entry_alloca, emit_constant
-        from .exceptions import CompilationError
+        from .exceptions import TranslationError, AnnotationError
         from .util import remove_indent
         from .lib import range_
 
@@ -117,12 +117,11 @@ class Module(object):
         # Function parameters, return type and other glue
         spec = inspect.getargspec(func)
         if spec.varargs or spec.keywords:
-            raise CompilationError("Variable and/or keyword arguments are not allowed")
+            raise AnnotationError("Variable and/or keyword arguments are not allowed")
 
         argtypes = (llvm.TypeRef * len(spec.args))()
         if set(spec.args) != set(func.__nos_argtypes__):
-            raise CompilationError("Argument type annotations don't "
-                                   "match function arguments.")
+            raise AnnotationError("Argument type annotations don't match function arguments.")
 
         for i, arg in enumerate(spec.args):
             argtypes[i] = func.__nos_argtypes__[arg].llvm_type
@@ -157,7 +156,8 @@ class Module(object):
             local_vars[name] = entry_alloca(nos_func, llvm.TypeOf(p), name + "_ptr")
             llvm.BuildStore(self.builder, p, local_vars[name])
 
-        t = ast.parse(remove_indent(inspect.getsourcelines(func)))
+        func_source = remove_indent(inspect.getsourcelines(func))
+        t = ast.parse(func_source)
         func_body = list(t.body[0].body)
 
         v = FlattenAttributes(self.builder)
@@ -170,8 +170,12 @@ class Module(object):
         #     print dump_ast(tt)
 
         v = Visitor(self.module, self.builder, global_vars, local_vars)
-        for node in t.body[0].body:
-            v.visit(node)
+
+        try:
+            for node in t.body[0].body:
+                v.visit(node)
+        except TranslationError, e:
+            raise _unpack_translation_error(func.func_name, func_source, e)
 
         # TODO if stack is not empty, return last value
 
@@ -180,3 +184,29 @@ class Module(object):
             raise RuntimeError("Could not produce a valid function for " + func.func_name)
 
         return nos_func
+
+
+def _unpack_translation_error(func_name, func_lines, e, before=2, after=5):
+    """Unpacks TranslationError instance *e* and reconstructs the contained exception.
+
+    Translation errors are used to attach source localtion (line number / column offset)
+    and shuttle them out of AST traversal where they can be formatted and rethrown.
+
+    :param before: number of lines to show before the offending one.
+    :param after: number of lines to show after the offending one.
+
+    """
+    from itertools import chain
+
+    def draw_arrow(snippet, line_index):
+        for i, line in enumerate(snippet):
+            prefix = "  >>> " if i == line_index else "      "
+            yield prefix + line
+
+    error_type, line_number, message = e.args
+    line_i = line_number - 1
+
+    snippet = func_lines.split("\n")[min(0, line_i - before): line_i + after]
+    tb = draw_arrow(snippet, line_i)
+
+    return error_type("\n".join(chain((message, "  Traceback:"), tb)))
