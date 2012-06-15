@@ -260,6 +260,27 @@ class ReturnTests(ModuleTest, unittest.TestCase):
         out = self.m.build()
         self.assertIsNone(out.f())
 
+    def test_return_implicit_void(self):
+
+        @self.m.function()
+        def f():
+            pass
+
+        out = self.m.build()
+        self.assertIsNone(out.f())
+
+    def test_missing_return(self):
+        """Raise error if no return in function with non-void return type."""
+        from nos.types import Double
+
+        @self.m.function(Double)
+        def f():
+            pass
+
+        message = "Function f\(\) must return"
+        with self.assertRaisesRegexp(TypeError, message):
+            self.m.build()
+
     def test_return_non_void(self):
         """Raise error if void function returns non-void value"""
 

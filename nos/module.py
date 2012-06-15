@@ -181,7 +181,14 @@ class Module(object):
         except TranslationError, e:
             raise _unpack_translation_error(func.func_name, func_source, e)
 
-        # TODO if stack is not empty, return last value
+        last_block = llvm.GetInsertBlock(self.builder)
+        if not llvm.IsATerminatorInst(llvm.GetLastInstruction(last_block)):
+            # Last return out of a void function can be implicit.
+            if llvm.GetTypeKind(restype) == llvm.VoidTypeKind:
+                llvm.BuildRetVoid(self.builder)
+            else:
+                raise TypeError("Function {0}() must return a {1}"
+                                .format(func.func_name, func.__nos_restype__))
 
         if llvm.VerifyFunction(nos_func, llvm.PrintMessageAction):
             print self.dumps()
