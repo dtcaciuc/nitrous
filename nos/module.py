@@ -23,7 +23,7 @@ class Module(object):
         llvm.DisposeModule(self.module)
         self.clean()
 
-    def function(self, result, **kwargs):
+    def function(self, result=None, **kwargs):
 
         def wrapper(func):
             import inspect
@@ -91,7 +91,9 @@ class Module(object):
                 argtypes.append(func.__nos_argtypes__[arg].c_type)
 
             cfunc.argtypes = argtypes
-            cfunc.restype = func.__nos_restype__.c_type
+            cfunc.restype = (func.__nos_restype__.c_type
+                             if func.__nos_restype__ is not None
+                             else None)
 
             setattr(out_module, func.func_name, cfunc)
 
@@ -126,7 +128,9 @@ class Module(object):
         for i, arg in enumerate(spec.args):
             argtypes[i] = func.__nos_argtypes__[arg].llvm_type
 
-        restype = func.__nos_restype__.llvm_type
+        restype = (func.__nos_restype__.llvm_type
+                   if func.__nos_restype__ is not None
+                   else llvm.VoidType())
 
         functype = llvm.FunctionType(restype, argtypes, len(argtypes), 0)
         nos_func = llvm.AddFunction(self.module, self._qualify(func.func_name), functype)

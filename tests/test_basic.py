@@ -251,6 +251,38 @@ class ReturnTests(ModuleTest, unittest.TestCase):
         self.assertEqual(out.max(3, 2), True)
         self.assertEqual(out.max(2, 3), False)
 
+    def test_return_void(self):
+
+        @self.m.function()
+        def f():
+            return
+
+        out = self.m.build()
+        self.assertIsNone(out.f())
+
+    def test_return_non_void(self):
+        """Raise error if void function returns non-void value"""
+
+        @self.m.function()
+        def f():
+            return 5
+
+        message = ">>>     return 5"
+        with self.assertRaisesRegexp(ValueError, message):
+            self.m.build()
+
+    def test_unexpected_type(self):
+        """Raise error if returning unexpected value type."""
+        from nos.types import Double
+
+        @self.m.function(Double, x=Double)
+        def f(x):
+            return 5
+
+        message = ">>>     return 5"
+        with self.assertRaisesRegexp(TypeError, message):
+            self.m.build()
+
 
 class ConditionalTests(ModuleTest, unittest.TestCase):
 

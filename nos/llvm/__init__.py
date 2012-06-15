@@ -2,6 +2,13 @@ import ctypes
 import ctypes.util
 import os
 
+try:
+    # If possible, get nicer tracebacks from low-level signals.
+    import faulthandler
+    faulthandler.enable()
+except:
+    pass
+
 import __config__
 
 if __config__.VERSION == "2.9":
@@ -63,6 +70,7 @@ TypeRef = ctypes.POINTER(OpaqueType)
 
 TypeKind = ctypes.c_int
 
+_func("VoidType", TypeRef)
 _func("FloatType", TypeRef)
 _func("DoubleType", TypeRef)
 _func("IntType", TypeRef, [ctypes.c_uint])
@@ -73,6 +81,8 @@ _func("GetIntTypeWidth", ctypes.c_uint, [TypeRef])
 
 # Sequential types
 _func("PointerType", TypeRef, [TypeRef, ctypes.c_uint])
+
+_func("GetElementType", TypeRef, [TypeRef])
 
 
 # Value
@@ -99,6 +109,7 @@ _func("FunctionType", TypeRef, [TypeRef, ctypes.POINTER(TypeRef), ctypes.c_uint,
 _func("AddFunction", ValueRef, [ModuleRef, ctypes.c_char_p, TypeRef])
 _func("SetLinkage", None, [ValueRef, ctypes.c_int])
 _func("GetParam", ValueRef, [ValueRef, ctypes.c_uint])
+_func("GetReturnType", TypeRef, [TypeRef])
 
 _func("GetIntrinsicDeclaration", ValueRef,
       [ModuleRef, ctypes.c_uint, ctypes.POINTER(TypeRef), ctypes.c_uint],
@@ -157,6 +168,8 @@ _func("PositionBuilderAtEnd", None, [BuilderRef, BasicBlockRef])
 _func("PositionBuilder", None, [BuilderRef, BasicBlockRef, ValueRef])
 _func("GetInsertBlock", BasicBlockRef, [BuilderRef])
 
+# Terminators
+_func("BuildRetVoid", ValueRef, [BuilderRef])
 _func("BuildRet", ValueRef, [BuilderRef, ValueRef])
 _func("BuildBr", ValueRef, [BuilderRef, BasicBlockRef])
 _func("BuildCondBr", ValueRef, [BuilderRef, ValueRef,

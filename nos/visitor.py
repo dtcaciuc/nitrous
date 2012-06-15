@@ -188,19 +188,30 @@ class Visitor(ast.NodeVisitor):
                                       .format(node.target))
 
     def visit_Return(self, node):
-        from .types import Bool
+        from .types import Bool, types_equal
 
         ast.NodeVisitor.generic_visit(self, node)
-        v = self.stack.pop()
 
-        # Special case; if we're returning boolean, cast to i8
-        # FIXME Move this to Bool.emit_cast_to or similar?
-        t = llvm.TypeOf(v)
-        if (llvm.GetTypeKind(t) == llvm.IntegerTypeKind
-            and llvm.GetIntTypeWidth(t) == 1):
-            v = llvm.BuildCast(self.builder, llvm.ZExt, v, Bool.llvm_type, "tmp")
+        func = llvm.GetBasicBlockParent(llvm.GetInsertBlock(self.builder))
+        return_type = llvm.GetReturnType(llvm.GetElementType(llvm.TypeOf(func)))
+        if llvm.GetTypeKind(return_type) == llvm.VoidTypeKind:
+            if len(self.stack) > 0:
+                raise ValueError("No return value expected")
 
-        llvm.BuildRet(self.builder, v)
+            llvm.BuildRetVoid(self.builder)
+
+        else:
+            v = self.stack.pop()
+            t = llvm.TypeOf(v)
+            # Special case; if we're returning boolean, cast to i8
+            # FIXME Move this to Bool.emit_cast_to or similar?
+            if (llvm.GetTypeKind(t) == llvm.IntegerTypeKind and llvm.GetIntTypeWidth(t) == 1):
+                v = llvm.BuildCast(self.builder, llvm.ZExt, v, Bool.llvm_type, "tmp")
+
+            if not types_equal(llvm.TypeOf(v), return_type):
+                raise TypeError("Unexpected return value type")
+
+            llvm.BuildRet(self.builder, v)
 
     def visit_BinOp(self, node):
         ast.NodeVisitor.generic_visit(self, node)
