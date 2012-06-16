@@ -16,12 +16,35 @@ class Module(object):
         self.module = llvm.ModuleCreateWithName(self.name)
         self.builder = llvm.CreateBuilder()
         self.build_dir = os.path.join(tempfile.gettempdir(), "nos", str(uuid.uuid4()))
+
         self.funcs = []
+
+        self.libs = []
+        self.libdirs = []
 
     def __del__(self):
         llvm.DisposeBuilder(self.builder)
         llvm.DisposeModule(self.module)
         self.clean()
+
+    def include_function(self, name, restype, argtypes, lib=None, libdir=None):
+        """Includes externally defined function for use with the module.
+
+        :param name: function name
+        :param restype: function return value type
+        :param argtypes: sequence of function argument types
+        :param lib: library name where function is defined and we'll link with
+        :param libdir: directory where library is located
+
+        """
+        from .visitor import ExternalFunction
+
+        func = _create_function(self.module, name, restype, argtypes)
+
+        self.libs.append(lib)
+        self.libdirs.append(libdir)
+
+        return ExternalFunction(name, func, restype, argtypes)
 
     def function(self, result=None, **kwargs):
 
@@ -68,6 +91,8 @@ class Module(object):
 
         # Path to output shared library.
         so_path = format(os.path.join(self.build_dir, self.name))
+        libs = tuple("-l{0}".format(lib) for lib in self.libs)
+        libdirs = tuple("-L{0}".format(d) for d in self.libdirs)
 
         with tempfile.NamedTemporaryFile(suffix=".bc") as tmp_bc:
             with tempfile.NamedTemporaryFile(suffix=".s") as tmp_s:
@@ -76,7 +101,7 @@ class Module(object):
                 if call((LLC, "-relocation-model=pic", "-o={0}".format(tmp_s.name), tmp_bc.name)):
                     raise RuntimeError("Could not assemble IR")
 
-                if call((CLANG, "-shared", "-o", so_path, tmp_s.name)):
+                if call((CLANG, "-shared", "-o", so_path, tmp_s.name) + libs + libdirs):
                     raise RuntimeError("Could not build target extension")
 
         # Compilation successful; build ctypes interface to new module.
@@ -118,23 +143,20 @@ class Module(object):
 
         # Function parameters, return type and other glue
         spec = inspect.getargspec(func)
+
         if spec.varargs or spec.keywords:
             raise AnnotationError("Variable and/or keyword arguments are not allowed")
 
-        argtypes = (llvm.TypeRef * len(spec.args))()
         if set(spec.args) != set(func.__nos_argtypes__):
             raise AnnotationError("Argument type annotations don't match function arguments.")
 
-        for i, arg in enumerate(spec.args):
-            argtypes[i] = func.__nos_argtypes__[arg].llvm_type
-
-        restype = (func.__nos_restype__.llvm_type
-                   if func.__nos_restype__ is not None
-                   else llvm.VoidType())
-
-        functype = llvm.FunctionType(restype, argtypes, len(argtypes), 0)
-        nos_func = llvm.AddFunction(self.module, self._qualify(func.func_name), functype)
-        llvm.SetLinkage(nos_func, llvm.ExternalLinkage)
+        # Create positional argument type list in order
+        # they appear in the function signature.
+        argtypes = [func.__nos_argtypes__[name] for name in spec.args]
+        nos_func = _create_function(self.module,
+                                    self._qualify(func.func_name),
+                                    func.__nos_restype__,
+                                    argtypes)
 
         body = llvm.AppendBasicBlock(nos_func, "body")
         llvm.PositionBuilderAtEnd(self.builder, body)
@@ -184,6 +206,7 @@ class Module(object):
         last_block = llvm.GetInsertBlock(self.builder)
         if not llvm.IsATerminatorInst(llvm.GetLastInstruction(last_block)):
             # Last return out of a void function can be implicit.
+            restype = llvm.function_return_type(nos_func)
             if llvm.GetTypeKind(restype) == llvm.VoidTypeKind:
                 llvm.BuildRetVoid(self.builder)
             else:
@@ -221,3 +244,19 @@ def _unpack_translation_error(func_name, func_lines, e, before=2, after=5):
     tb = draw_arrow(snippet, line_i)
 
     return error_type("\n".join(chain((message, "  Traceback:"), tb)))
+
+
+def _create_function(module, name, restype, argtypes):
+    """Creates an empty LLVM function."""
+
+    # Result type
+    restype_ = restype.llvm_type if restype is not None else llvm.VoidType()
+    argtypes_ = (llvm.TypeRef * len(argtypes))()
+    for i, ty in enumerate(argtypes):
+        argtypes_[i] = ty.llvm_type
+
+    func_type = llvm.FunctionType(restype_, argtypes_, len(argtypes_), 0)
+    func = llvm.AddFunction(module, name, func_type)
+    llvm.SetLinkage(func, llvm.ExternalLinkage)
+
+    return func

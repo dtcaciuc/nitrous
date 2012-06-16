@@ -11,6 +11,16 @@ BOOL_INST = {
 }
 
 
+class ExternalFunction(object):
+    """Stores information about externally defined function included in the module."""
+
+    def __init__(self, name, func, restype, argtypes):
+        self.func_name = name
+        self.__nos_func__ = func
+        self.__nos_restype__ = restype
+        self.__nos_argtypes__ = argtypes
+
+
 class Visitor(ast.NodeVisitor):
 
     def __init__(self, module, builder, global_vars, local_vars):
@@ -193,7 +203,8 @@ class Visitor(ast.NodeVisitor):
         ast.NodeVisitor.generic_visit(self, node)
 
         func = llvm.GetBasicBlockParent(llvm.GetInsertBlock(self.builder))
-        return_type = llvm.GetReturnType(llvm.GetElementType(llvm.TypeOf(func)))
+        return_type = llvm.function_return_type(func)
+
         if llvm.GetTypeKind(return_type) == llvm.VoidTypeKind:
             if len(self.stack) > 0:
                 raise ValueError("No return value expected")
@@ -439,11 +450,13 @@ class Visitor(ast.NodeVisitor):
         func = self.stack.pop()
 
         if hasattr(func, "__nos_func__"):
-            # Function is compiled; check arguments for validity and make a direct call
-            _validate_function_args(func, args)
+            # Function is compiled; check arguments for validity (unless
+            # it's a definition for an external function) and make a direct call
+            if not isinstance(func, ExternalFunction):
+                _validate_function_args(func, args)
             result = llvm.BuildCall(self.builder, func.__nos_func__,
                                     (llvm.ValueRef * len(args))(*args),
-                                    len(args), func.func_name + "_result")
+                                    len(args), "")
         else:
             # Function is either CPython one or an LLVM emitter.
             result = func(*args)

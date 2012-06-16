@@ -111,6 +111,10 @@ _func("SetLinkage", None, [ValueRef, ctypes.c_int])
 _func("GetParam", ValueRef, [ValueRef, ctypes.c_uint])
 _func("GetReturnType", TypeRef, [TypeRef])
 
+def function_return_type(func):
+    """Gets the return type directly from a function object."""
+    return GetReturnType(GetElementType(TypeOf(func)))
+
 _func("GetIntrinsicDeclaration", ValueRef,
       [ModuleRef, ctypes.c_uint, ctypes.POINTER(TypeRef), ctypes.c_uint],
       _llvm_addons)

@@ -32,6 +32,8 @@ Double = ScalarType(ctypes.c_double, llvm.DoubleType())
 
 Long = ScalarType(ctypes.c_long, llvm.IntType(ctypes.sizeof(ctypes.c_long) * 8))
 
+Int = ScalarType(ctypes.c_int, llvm.IntType(ctypes.sizeof(ctypes.c_int) * 8))
+
 Bool = ScalarType(ctypes.c_bool, llvm.IntType(8))
 
 

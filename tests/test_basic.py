@@ -623,6 +623,36 @@ class CallTests(ModuleTest, unittest.TestCase):
             self.m.build()
 
 
+class ExternalCallTests(ModuleTest, unittest.TestCase):
+
+    def test_shlib(self):
+        """Calling functions from arbitrary shared libraries."""
+        from nos.types import Pointer, Int
+        from nos.llvm import __config__
+        import os
+
+        # Test call to functions in LLVM library itself
+        libdir, _ = os.path.split(__config__.LIB)
+        lib = "LLVM-" + __config__.VERSION
+
+        lib_args = dict(lib=lib, libdir=libdir)
+
+        # This has no knowledge of OpaqueType, so using pointer
+        # to integers instead. This works just as well as long
+        # as we don't dereference it.
+        TypeRef = Pointer(Int)
+
+        Int16Type = self.m.include_function("LLVMInt16Type", TypeRef, [], **lib_args)
+        GetIntTypeWidth = self.m.include_function("LLVMGetIntTypeWidth", Int, [TypeRef], **lib_args)
+
+        @self.m.function(Int)
+        def wrapper():
+            return GetIntTypeWidth(Int16Type())
+
+        out = self.m.build()
+        self.assertEqual(out.wrapper(), 16)
+
+
 class FunctionBuilderTests(unittest.TestCase):
 
     def test_local_scope(self):
