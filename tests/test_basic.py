@@ -628,14 +628,11 @@ class ExternalCallTests(ModuleTest, unittest.TestCase):
     def test_shlib(self):
         """Calling functions from arbitrary shared libraries."""
         from nos.types import Pointer, Int
-        from nos.llvm import __config__
+        import nos.llvm
         import os
 
         # Test call to functions in LLVM library itself
-        libdir, _ = os.path.split(__config__.LIB)
-        lib = "LLVM-" + __config__.VERSION
-
-        lib_args = dict(lib=lib, libdir=libdir)
+        lib_args = dict(lib=":_llvm.so", libdir=os.path.dirname(nos.llvm.__file__))
 
         # This has no knowledge of OpaqueType, so using pointer
         # to integers instead. This works just as well as long

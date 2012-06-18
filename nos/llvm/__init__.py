@@ -9,16 +9,13 @@ try:
 except:
     pass
 
-import __config__
-
 from .v31 import *
 
-_llvm = ctypes.cdll.LoadLibrary(__config__.LIB)
-_llvm_addons = ctypes.cdll.LoadLibrary(os.path.join(os.path.dirname(__file__), "addons.so"))
+_llvm = ctypes.cdll.LoadLibrary(os.path.join(os.path.dirname(__file__), "_llvm.so"))
 _libc = ctypes.cdll.LoadLibrary(ctypes.util.find_library("c"))
 
 
-def _func(func_name, restype, argtypes=[], shlib=None):
+def _func(func_name, restype, argtypes=[]):
     """Creates ctypes wrapper for an LLVM API function.
 
     LLVM{name} -> llvm.{name}
@@ -26,7 +23,7 @@ def _func(func_name, restype, argtypes=[], shlib=None):
     """
     g = globals()
 
-    g[func_name] = getattr((shlib or _llvm), "LLVM" + func_name)
+    g[func_name] = getattr(_llvm, "LLVM" + func_name)
     g[func_name].restype = restype
     g[func_name].argtypes = argtypes
 
@@ -49,8 +46,7 @@ ModuleRef = ctypes.POINTER(OpaqueModule)
 
 _func("ModuleCreateWithName", ModuleRef)
 _func("DumpModule", None, [ModuleRef])
-_func("DumpModuleToString", owned_c_char_p, [ModuleRef], _llvm_addons)
-_func("WriteBitcodeToFile", Bool, [ModuleRef, ctypes.c_char_p])
+_func("DumpModuleToString", owned_c_char_p, [ModuleRef])
 _func("DisposeModule", None, [ModuleRef])
 
 _func("DisposeMessage", None, [ctypes.c_char_p])
@@ -110,11 +106,10 @@ def function_return_type(func):
     return GetReturnType(GetElementType(TypeOf(func)))
 
 _func("GetIntrinsicDeclaration", ValueRef,
-      [ModuleRef, ctypes.c_uint, ctypes.POINTER(TypeRef), ctypes.c_uint],
-      _llvm_addons)
+      [ModuleRef, ctypes.c_uint, ctypes.POINTER(TypeRef), ctypes.c_uint])
 
-_func("GetIntrinsicCount__", ctypes.c_uint, [], _llvm_addons)
-_func("GetIntrinsicName__", owned_c_char_p, [ctypes.c_uint], _llvm_addons)
+_func("GetIntrinsicCount__", ctypes.c_uint, [])
+_func("GetIntrinsicName__", owned_c_char_p, [ctypes.c_uint])
 
 
 INTRINSICS = dict((GetIntrinsicName__(i).value, i) for i in range(GetIntrinsicCount__()))
@@ -238,8 +233,8 @@ TargetRef = ctypes.POINTER(OpaqueTarget)
 TargetDataRef = ctypes.POINTER(OpaqueTargetData)
 TargetMachineRef = ctypes.POINTER(OpaqueTargetMachine)
 
-_func("InitializeNativeTarget__", Bool, [], _llvm_addons)
-_func("GetDefaultTargetTriple__", owned_c_char_p, [], _llvm_addons)
+_func("InitializeNativeTarget__", Bool, [])
+_func("GetDefaultTargetTriple__", owned_c_char_p, [])
 
 _func("GetFirstTarget", TargetRef, [])
 _func("GetTargetDescription", ctypes.c_char_p, [TargetRef])

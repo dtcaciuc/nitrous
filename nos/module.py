@@ -85,7 +85,6 @@ class Module(object):
         return llvm.DumpModule(self.module)
 
     def build(self):
-        from .llvm.__config__ import LLC, CLANG
         import tempfile
         import os
         import inspect
@@ -112,7 +111,7 @@ class Module(object):
             if error:
                 raise RuntimeError("Could not assemble IR: {0}".format(message.value))
 
-            if call((CLANG, "-shared", "-o", so_path, tmp_s.name) + libs + libdirs):
+            if call(("clang", "-shared", "-o", so_path, tmp_s.name) + libs + libdirs):
                 raise RuntimeError("Could not build target extension")
 
         # Compilation successful; build ctypes interface to new module.

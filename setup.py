@@ -1,13 +1,6 @@
 from setuptools import setup, find_packages, Extension
-from ctypes.util import find_library
 from subprocess import Popen, PIPE
 
-CONFIG = """
-VERSION = "{version}"
-LIB = "{lib}"
-LLC = "{bindir}/llc"
-CLANG = "clang"
-"""
 
 # Determine the name for LLVM config binary
 for path in ["llvm-config-3.1", "llvm-config"]:
@@ -27,23 +20,19 @@ def llvm_config(*args):
 llvm_version = llvm_config("--version")[0]
 llvm_lib = "LLVM-{0}".format(llvm_version)
 
-with open("nos/llvm/__config__.py", "w") as config:
-    config.write(CONFIG.format(version=llvm_version,
-                               lib=find_library(llvm_lib),
-                               bindir=llvm_config("--bindir")[0]))
-
 
 # HACK this isn't really a Python extension, however it's
 # a valid shared library so we'll use the available facilities.
 llvm_addons = Extension(
-    "nos.llvm.addons",
-    ["src/llvm-addons.cc"],
+    "nos.llvm._llvm",
+    ["src/_llvm.cc"],
     include_dirs=llvm_config("--includedir"),
     extra_compile_args=llvm_config("--cxxflags"),
     define_macros=[("NOS_LLVM_VERSION", int(llvm_version.replace(".", "")))],
-    libraries=[llvm_lib],
     library_dirs=llvm_config("--libdir"),
-    extra_link_args=llvm_config("--ldflags"),
+    extra_link_args=(llvm_config("--ldflags")
+                     + ["-Wl,--whole-archive"] + llvm_config("--libs", "native") + ["-lLLVMExecutionEngine"]
+                     + ["-Wl,--no-whole-archive", "-Wl,--no-undefined", "-lpthread", "-ldl", "-lc"])
 )
 
 
