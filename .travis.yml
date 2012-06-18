@@ -4,7 +4,7 @@ python:
     - 2.7
 
 before_install:
-    - sudo add-apt-repository ppa:xorg-edgers/ppa
+    - echo "yes" | sudo add-apt-repository ppa:xorg-edgers/ppa
     - sudo apt-get update
     - sudo apt-get install llvm-3.1-dev clang python-numpy
 
