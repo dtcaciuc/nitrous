@@ -3,8 +3,12 @@ language: python
 python:
     - 2.7
 
+before_install:
+    - sudo add-apt-repository ppa:xorg-edgers/ppa
+    - sudo apt-get update
+    - sudo apt-get install llvm-3.1-dev clang python-numpy
+
 install:
-    - sudo apt-get install llvm-2.9-dev clang python-numpy
     - pip install nose
     - pip install coverage
     - pip install .
