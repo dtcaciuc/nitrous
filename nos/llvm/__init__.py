@@ -11,13 +11,7 @@ except:
 
 import __config__
 
-if __config__.VERSION == "2.9":
-    from .v29 import *
-elif __config__.VERSION == "3.1":
-    from .v31 import *
-else:
-    raise RuntimeError("Incompatible LLVM version {0}".format(VERSION))
-
+from .v31 import *
 
 _llvm = ctypes.cdll.LoadLibrary(__config__.LIB)
 _llvm_addons = ctypes.cdll.LoadLibrary(os.path.join(os.path.dirname(__file__), "addons.so"))

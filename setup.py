@@ -10,7 +10,7 @@ CLANG = "clang"
 """
 
 # Determine the name for LLVM config binary
-for path in ["llvm-config-3.1", "llvm-config-2.9", "llvm-config"]:
+for path in ["llvm-config-3.1", "llvm-config"]:
     proc = Popen(["which", path], stdout=PIPE)
     if not proc.wait():
         LLVM_CONFIG = proc.stdout.read().strip()
