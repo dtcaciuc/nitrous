@@ -47,3 +47,27 @@
  RealUNE,
  RealPredicateTrue
 ) = range(16)
+
+
+(CodeGenLevelNone,
+ CodeGenLevelLess,
+ CodeGenLevelDefault,
+ CodeGenLevelAggressive) = range(4)
+
+
+(RelocDefault,
+ RelocStatic,
+ RelocPIC,
+ RelocDynamicNoPic) = range(4)
+
+
+(CodeModelDefault,
+ CodeModelJITDefault,
+ CodeModelSmall,
+ CodeModelKernel,
+ CodeModelMedium,
+ CodeModelLarge) = range(6)
+
+
+(AssemblyFile,
+ ObjectFile) = range(2)

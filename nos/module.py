@@ -13,16 +13,26 @@ class Module(object):
         import uuid
 
         self.name = name
-        self.module = llvm.ModuleCreateWithName(self.name)
-        self.builder = llvm.CreateBuilder()
-        self.build_dir = os.path.join(tempfile.gettempdir(), "nos", str(uuid.uuid4()))
-
         self.funcs = []
-
         self.libs = []
         self.libdirs = []
 
+        self.module = llvm.ModuleCreateWithName(self.name)
+        self.builder = llvm.CreateBuilder()
+        if llvm.InitializeNativeTarget__():
+            raise SystemError("Cannot initialize LLVM target")
+
+        self.target = llvm.GetFirstTarget()
+        self.machine = llvm.CreateTargetMachine(self.target,
+                                                llvm.GetDefaultTargetTriple__(), "", "",
+                                                llvm.CodeGenLevelDefault,
+                                                llvm.RelocPIC,
+                                                llvm.CodeModelDefault)
+
+        self.build_dir = os.path.join(tempfile.gettempdir(), "nos", str(uuid.uuid4()))
+
     def __del__(self):
+        llvm.DisposeTargetMachine(self.machine)
         llvm.DisposeBuilder(self.builder)
         llvm.DisposeModule(self.module)
         self.clean()
@@ -94,15 +104,16 @@ class Module(object):
         libs = tuple("-l{0}".format(lib) for lib in self.libs)
         libdirs = tuple("-L{0}".format(d) for d in self.libdirs)
 
-        with tempfile.NamedTemporaryFile(suffix=".bc") as tmp_bc:
-            with tempfile.NamedTemporaryFile(suffix=".s") as tmp_s:
-                llvm.WriteBitcodeToFile(self.module, tmp_bc.name)
+        with tempfile.NamedTemporaryFile(suffix=".s") as tmp_s:
+            message = ctypes.c_char_p()
+            error = llvm.TargetMachineEmitToFile(self.machine, self.module,
+                                                 tmp_s.name, llvm.AssemblyFile,
+                                                 ctypes.byref(message))
+            if error:
+                raise RuntimeError("Could not assemble IR: {0}".format(message.value))
 
-                if call((LLC, "-relocation-model=pic", "-o={0}".format(tmp_s.name), tmp_bc.name)):
-                    raise RuntimeError("Could not assemble IR")
-
-                if call((CLANG, "-shared", "-o", so_path, tmp_s.name) + libs + libdirs):
-                    raise RuntimeError("Could not build target extension")
+            if call((CLANG, "-shared", "-o", so_path, tmp_s.name) + libs + libdirs):
+                raise RuntimeError("Could not build target extension")
 
         # Compilation successful; build ctypes interface to new module.
         out_module = type(self.name, (types.ModuleType,), {})

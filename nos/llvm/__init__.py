@@ -151,15 +151,6 @@ _func("AddIncoming", None, [ValueRef, ctypes.POINTER(ValueRef),
                             ctypes.c_uint])
 
 
-# Execution engine
-class OpaqueExecutionEngine(ctypes.Structure):
-    pass
-
-ExecutionEngineRef = ctypes.POINTER(OpaqueExecutionEngine)
-
-_func("CreateExecutionEngineForModule", ExecutionEngineRef)
-
-
 # Builder
 class OpaqueBuilder(ctypes.Structure):
     pass
@@ -228,6 +219,47 @@ VerifierFailureAction = ctypes.c_int
 (AbortProcessAction, PrintMessageAction, ReturnStatusAction) = range(3)
 
 _func("VerifyFunction", Bool, [ValueRef, VerifierFailureAction])
+
+
+# Execution engine
+class OpaqueExecutionEngine(ctypes.Structure):
+    pass
+
+ExecutionEngineRef = ctypes.POINTER(OpaqueExecutionEngine)
+
+_func("CreateExecutionEngineForModule", ExecutionEngineRef)
+
+
+# Target
+class OpaqueTarget(ctypes.Structure):
+    pass
+
+class OpaqueTargetData(ctypes.Structure):
+    pass
+
+class OpaqueTargetMachine(ctypes.Structure):
+    pass
+
+TargetRef = ctypes.POINTER(OpaqueTarget)
+TargetDataRef = ctypes.POINTER(OpaqueTargetData)
+TargetMachineRef = ctypes.POINTER(OpaqueTargetMachine)
+
+_func("InitializeNativeTarget__", Bool, [], _llvm_addons)
+_func("GetDefaultTargetTriple__", owned_c_char_p, [], _llvm_addons)
+
+_func("GetFirstTarget", TargetRef, [])
+_func("GetTargetDescription", ctypes.c_char_p, [TargetRef])
+
+_func("CreateTargetMachine", TargetMachineRef,
+      [TargetRef, ctypes.c_char_p, ctypes.c_char_p,
+       ctypes.c_char_p, ctypes.c_int,
+       ctypes.c_int, ctypes.c_int])
+
+_func("DisposeTargetMachine", None, [TargetMachineRef])
+_func("GetTargetMachineData", TargetDataRef, [TargetMachineRef])
+_func("TargetMachineEmitToFile", Bool, [TargetMachineRef, ModuleRef,
+                                        ctypes.c_char_p, ctypes.c_int,
+                                        ctypes.POINTER(ctypes.c_char_p)])
 
 
 def build_py_idiv(builder, a, b, name):

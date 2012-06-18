@@ -3,8 +3,20 @@
  */
 
 #include <llvm-c/Core.h>
+
 #include <llvm/Support/raw_ostream.h>
+#include <llvm/Target/TargetMachine.h>
+
+#if NOS_LLVM_VERSION == 29
+#include <llvm/Target/TargetSelect.h>
+#elif NOS_LLVM_VERSION == 31
+#include <llvm/Support/TargetSelect.h>
+#else
+#error "Current NOS_LLVM_VERSION is not supported"
+#endif
+
 #include <llvm/Intrinsics.h>
+#include <llvm/Support/Host.h>
 
 #include <vector>
 
@@ -56,5 +68,25 @@ extern "C" {
         return strdup(name.c_str());
     }
 
+    LLVMBool
+    LLVMInitializeNativeTarget__(void) {
+        /* This is the contents of the original
+         * LLVMInitializeNativeTarget, plus initialization
+         * of ASM printer */
+#ifdef LLVM_NATIVE_TARGET
+        LLVM_NATIVE_TARGETINFO();
+        LLVM_NATIVE_TARGET();
+        LLVM_NATIVE_TARGETMC();
+        LLVM_NATIVE_ASMPRINTER();
+        LLVM_NATIVE_ASMPARSER();
+        return 0;
+#else
+        return 1;
+#endif
+    }
 
+    char *
+    LLVMGetDefaultTargetTriple__() {
+        return strdup(llvm::sys::getDefaultTargetTriple().c_str());
+    }
 }
