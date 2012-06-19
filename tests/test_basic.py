@@ -625,29 +625,39 @@ class CallTests(ModuleTest, unittest.TestCase):
 
 class ExternalCallTests(ModuleTest, unittest.TestCase):
 
+    def setUp(self):
+        from distutils.sysconfig import customize_compiler
+        from distutils.ccompiler import new_compiler
+        import tempfile
+        import shutil
+
+        super(ExternalCallTests, self).setUp()
+
+        self.libdir = tempfile.mkdtemp()
+        compiler = new_compiler()
+
+        with tempfile.NamedTemporaryFile(suffix=".c") as src:
+            src.write("#include <math.h>\ndouble pow(double x, double y) { pow(x, y); }\n")
+            obj = compiler.compile([src.name], output_dir=self.libdir)
+            compiler.link_shared_lib(obj, "foo", output_dir=self.libdir)
+
+        self.addCleanup(shutil.rmtree, self.libdir, ignore_errors=True)
+
     def test_shlib(self):
         """Calling functions from arbitrary shared libraries."""
-        from nos.types import Pointer, Int
-        import nos.llvm
+        from nos.types import Double
         import os
 
         # Test call to functions in LLVM library itself
-        lib_args = dict(lib=":_llvm.so", libdir=os.path.dirname(nos.llvm.__file__))
+        lib_args = dict(lib="foo", libdir=self.libdir)
+        pow = self.m.include_function("pow", Double, [Double, Double], **lib_args)
 
-        # This has no knowledge of OpaqueType, so using pointer
-        # to integers instead. This works just as well as long
-        # as we don't dereference it.
-        TypeRef = Pointer(Int)
-
-        Int16Type = self.m.include_function("LLVMInt16Type", TypeRef, [], **lib_args)
-        GetIntTypeWidth = self.m.include_function("LLVMGetIntTypeWidth", Int, [TypeRef], **lib_args)
-
-        @self.m.function(Int)
-        def wrapper():
-            return GetIntTypeWidth(Int16Type())
+        @self.m.function(Double, x=Double, y=Double)
+        def wrapper(x, y):
+            return pow(x, y)
 
         out = self.m.build()
-        self.assertEqual(out.wrapper(), 16)
+        self.assertEqual(out.wrapper(3, 5), 3 ** 5)
 
 
 class FunctionBuilderTests(unittest.TestCase):
