@@ -636,10 +636,11 @@ class ExternalCallTests(ModuleTest, unittest.TestCase):
         self.libdir = tempfile.mkdtemp()
         compiler = new_compiler()
 
-        with tempfile.NamedTemporaryFile(suffix=".c") as src:
-            src.write("#include <math.h>\ndouble pow(double x, double y) { pow(x, y); }\n")
-            obj = compiler.compile([src.name], output_dir=self.libdir)
-            compiler.create_static_lib(obj, "foo", output_dir=self.libdir)
+        with tempfile.NamedTemporaryFile(suffix=".c", dir=self.libdir, delete=False) as src:
+            src.write("#include <math.h>\ndouble my_pow(double x, double y) { return pow(x, y); }\n")
+
+        obj = compiler.compile([src.name], output_dir=self.libdir)
+        compiler.create_static_lib(obj, "foo", output_dir=self.libdir)
 
         self.addCleanup(shutil.rmtree, self.libdir, ignore_errors=True)
 
@@ -650,11 +651,11 @@ class ExternalCallTests(ModuleTest, unittest.TestCase):
 
         # Test call to functions in LLVM library itself
         lib_args = dict(lib="foo", libdir=self.libdir)
-        pow = self.m.include_function("pow", Double, [Double, Double], **lib_args)
+        my_pow = self.m.include_function("my_pow", Double, [Double, Double], **lib_args)
 
         @self.m.function(Double, x=Double, y=Double)
         def wrapper(x, y):
-            return pow(x, y)
+            return my_pow(x, y)
 
         out = self.m.build()
         self.assertEqual(out.wrapper(3, 5), 3 ** 5)
