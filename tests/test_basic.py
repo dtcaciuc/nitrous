@@ -639,7 +639,7 @@ class ExternalCallTests(ModuleTest, unittest.TestCase):
         with tempfile.NamedTemporaryFile(suffix=".c") as src:
             src.write("#include <math.h>\ndouble pow(double x, double y) { pow(x, y); }\n")
             obj = compiler.compile([src.name], output_dir=self.libdir)
-            compiler.link_shared_lib(obj, "foo", output_dir=self.libdir)
+            compiler.create_static_lib(obj, "foo", output_dir=self.libdir)
 
         self.addCleanup(shutil.rmtree, self.libdir, ignore_errors=True)
 
