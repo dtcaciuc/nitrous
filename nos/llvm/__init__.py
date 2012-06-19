@@ -235,8 +235,10 @@ TargetMachineRef = ctypes.POINTER(OpaqueTargetMachine)
 
 _func("InitializeNativeTarget__", Bool, [])
 _func("GetDefaultTargetTriple__", owned_c_char_p, [])
+_func("LookupTarget__", TargetRef, [ctypes.c_char_p, ctypes.POINTER(ctypes.c_char_p)])
 
 _func("GetFirstTarget", TargetRef, [])
+_func("GetNextTarget", TargetRef, [TargetRef])
 _func("GetTargetDescription", ctypes.c_char_p, [TargetRef])
 
 _func("CreateTargetMachine", TargetMachineRef,

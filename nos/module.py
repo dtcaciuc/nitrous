@@ -22,9 +22,19 @@ class Module(object):
         if llvm.InitializeNativeTarget__():
             raise SystemError("Cannot initialize LLVM target")
 
-        self.target = llvm.GetFirstTarget()
+        triple = llvm.GetDefaultTargetTriple__()
+
+        # At this point, multiple targets can be initialized
+        # (eg x86 and x86_64), but only one is functional.
+        message = ctypes.c_char_p()
+        self.target = llvm.LookupTarget__(triple, ctypes.byref(message))
+        if not self.target:
+            err = RuntimeError("Could not find suitable target: {0}".format(message.value))
+            llvm.DisposeMessage(message)
+            raise err
+
         self.machine = llvm.CreateTargetMachine(self.target,
-                                                llvm.GetDefaultTargetTriple__(), "", "",
+                                                triple, "", "",
                                                 llvm.CodeGenLevelDefault,
                                                 llvm.RelocPIC,
                                                 llvm.CodeModelDefault)
@@ -105,11 +115,13 @@ class Module(object):
 
         with tempfile.NamedTemporaryFile(suffix=".s") as tmp_s:
             message = ctypes.c_char_p()
-            error = llvm.TargetMachineEmitToFile(self.machine, self.module,
-                                                 tmp_s.name, llvm.AssemblyFile,
-                                                 ctypes.byref(message))
-            if error:
-                raise RuntimeError("Could not assemble IR: {0}".format(message.value))
+            status = llvm.TargetMachineEmitToFile(self.machine, self.module,
+                                                  tmp_s.name, llvm.AssemblyFile,
+                                                  ctypes.byref(message))
+            if status != 0:
+                error = RuntimeError("Could not assemble IR: {0}".format(message.value))
+                llvm.DisposeMessage(message)
+                raise error
 
             if call(("clang", "-shared", "-o", so_path, tmp_s.name) + libs + libdirs):
                 raise RuntimeError("Could not build target extension")

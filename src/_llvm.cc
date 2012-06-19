@@ -3,10 +3,13 @@
  */
 
 #include <llvm-c/Core.h>
+#include <llvm-c/Target.h>
+#include <llvm-c/TargetMachine.h>
 
 #include <llvm/Intrinsics.h>
 #include <llvm/Support/Host.h>
 #include <llvm/Support/TargetSelect.h>
+#include <llvm/Support/TargetRegistry.h>
 #include <llvm/Support/raw_ostream.h>
 #include <llvm/Target/TargetMachine.h>
 
@@ -62,8 +65,30 @@ extern "C" {
 #endif
     }
 
+    /**
+     * See llvm::sys::getDefaultTargetTriple()
+     *
+     * Result must be freed with LLVMDisposeMessage.
+     */
     char *
     LLVMGetDefaultTargetTriple__() {
         return strdup(llvm::sys::getDefaultTargetTriple().c_str());
+    }
+
+
+    /**
+     * See TargetRegistry::lookupTarget()
+     *
+     * Returns null pointer if cannot find appropriate target; in such
+     * case, *error must be freed with LLVMDisposeMessage()
+     */
+    LLVMTargetRef
+    LLVMLookupTarget__(char * triple, char ** error) {
+        std::string s;
+        const llvm::Target * target = llvm::TargetRegistry::lookupTarget(triple, s);
+        if (target == 0) {
+            *error = strdup(s.c_str());
+        }
+        return llvm::wrap(target);
     }
 }
