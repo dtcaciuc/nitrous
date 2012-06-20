@@ -122,24 +122,6 @@ class Visitor(ast.NodeVisitor):
                     raise NameError("{0} is undefined or unavailable in current scope".format(node.id))
                 return getattr(__import__(modulename, {}, {}, [attrname]), attrname)
 
-    def emit_body(self, func, body_nodes):
-        from .exceptions import TranslationError
-
-        # Emit function body IR
-        llvm.PositionBuilderAtEnd(self.builder, llvm.GetEntryBasicBlock(func))
-        for node in body_nodes:
-            self.visit(node)
-
-        last_block = llvm.GetInsertBlock(self.builder)
-        if not llvm.IsATerminatorInst(llvm.GetLastInstruction(last_block)):
-            # Last return out of a void function can be implicit.
-            restype = llvm.function_return_type(func)
-            if llvm.GetTypeKind(restype) == llvm.VoidTypeKind:
-                llvm.BuildRetVoid(self.builder)
-            else:
-                last_lineno = body_nodes[-1].lineno
-                raise TranslationError(TypeError, last_lineno, "Function must return a value")
-
     def visit(self, node):
         from .exceptions import TranslationError
 
@@ -519,6 +501,54 @@ class FlattenAttributes(ast.NodeTransformer):
         return ast.Name(id=node.value.id + "." + node.attr, ctx=ast.Load())
 
 
+
+def emit_body(module, builder, func):
+    """Emits function body IR.
+
+    Expects function already is declared and referenced as func.__nos_func__.
+
+    """
+    from .exceptions import TranslationError
+    from .util import remove_indent
+    from inspect import getsourcelines
+
+    # AST preprocessing
+    # ast.parse returns us a module, first function there is what we're parsing.
+    func_source = remove_indent(getsourcelines(func))
+    func_body = ast.parse(func_source).body[0].body
+
+    # - Flattening chained attribute nodes for easier lookup.
+    v = FlattenAttributes(builder)
+    for i, node in enumerate(func_body):
+        func_body[i] = v.visit(node)
+
+    # Emit function body IR
+    v = Visitor(module, builder, func.__nos_globals__)
+    llvm.PositionBuilderAtEnd(builder, llvm.AppendBasicBlock(func.__nos_func__, "entry"))
+
+    # Store function parameters as locals
+    for i, name in enumerate(func.__nos_args__):
+        v._store(llvm.GetParam(func.__nos_func__, i), name)
+
+    try:
+        for node in func_body:
+            v.visit(node)
+
+    except TranslationError, e:
+        raise _unpack_translation_error(func.func_name, func_source, e.args)
+
+    last_block = llvm.GetInsertBlock(builder)
+    if not llvm.IsATerminatorInst(llvm.GetLastInstruction(last_block)):
+        # Last return out of a void function can be implicit.
+        restype = llvm.function_return_type(func.__nos_func__)
+        if llvm.GetTypeKind(restype) == llvm.VoidTypeKind:
+            llvm.BuildRetVoid(builder)
+        else:
+            # Point to the last function line where the return statement should be.
+            e_args = (TypeError, func_body[-1].lineno, "Function must return a value")
+            raise _unpack_translation_error(func.func_name, func_source, e_args)
+
+
 def entry_alloca(func, type_, name):
     """Reserves stack space for a variable at function entry point."""
     entry = llvm.GetEntryBasicBlock(func)
@@ -572,3 +602,30 @@ def _validate_function_args(func, args):
         wrong_args = ", ".join((a for a, ok in zip(spec.args, mask) if not ok))
         raise TypeError("{0}() called with wrong argument type(s) for {1}"
                         .format(func.func_name, wrong_args))
+
+
+def _unpack_translation_error(func_name, func_lines, args, before=2, after=5):
+    """Unpacks TranslationError *args* data and reconstructs the contained exception.
+
+    Translation errors are used to attach source localtion (line number / column offset)
+    and shuttle them out of AST traversal where they can be formatted and rethrown.
+
+    :param args: TranslationError.args with (error type, line number and error message)
+    :param before: number of lines to show before the offending one.
+    :param after: number of lines to show after the offending one.
+
+    """
+    from itertools import chain
+
+    def draw_arrow(snippet, line_index):
+        for i, line in enumerate(snippet):
+            prefix = "  >>> " if i == line_index else "      "
+            yield prefix + line
+
+    error_type, line_number, message = args
+    line_i = line_number - 1
+
+    snippet = func_lines.split("\n")[min(0, line_i - before): line_i + after]
+    tb = draw_arrow(snippet, line_i)
+
+    return error_type("\n".join(chain((message, "  Traceback:"), tb)))

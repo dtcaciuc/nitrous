@@ -122,17 +122,29 @@ class Module(object):
         return llvm.DumpModule(self.module)
 
     def build(self):
-        import tempfile
         import os
+        import tempfile
         import types
 
         from subprocess import call
+        from .visitor import emit_body
 
         os.makedirs(self.build_dir)
 
         # Translate all registered functions
         for func in self.funcs:
-            func.__nos_func__ = self._translate(func)
+            argtypes = [func.__nos_argtypes__[name] for name in func.__nos_args__]
+            func.__nos_func__ = _create_function(self.module,
+                                                 self._qualify(func.func_name),
+                                                 func.__nos_restype__,
+                                                 argtypes)
+
+        # Once all functions are declared, emit their contents
+        for func in self.funcs:
+            emit_body(self.module, self.builder, func)
+            if llvm.VerifyFunction(func.__nos_func__, llvm.PrintMessageAction):
+                raise RuntimeError("Could not compile {0}()".format(func.func_name))
+
 
         # Path to output shared library.
         so_path = format(os.path.join(self.build_dir, self.name))
@@ -179,82 +191,6 @@ class Module(object):
     def _qualify(self, symbol):
         """Qualifies symbol with parent module name."""
         return "__".join((self.name, symbol))
-
-    def _translate(self, func):
-        from .visitor import Visitor, FlattenAttributes
-        from .exceptions import TranslationError
-        from .util import remove_indent
-
-        import ast
-        import inspect
-
-        # Create positional argument type list in order
-        # they appear in the function signature.
-        argtypes = [func.__nos_argtypes__[name] for name in func.__nos_args__]
-        nos_func = _create_function(self.module,
-                                    self._qualify(func.func_name),
-                                    func.__nos_restype__,
-                                    argtypes)
-
-        # AST preprocessing
-        # ast.parse returns us a module, first function there is what we're parsing.
-        func_source = remove_indent(inspect.getsourcelines(func))
-        func_body = ast.parse(func_source).body[0].body
-
-        # - Flattening chained attribute nodes for easier lookup.
-        v = FlattenAttributes(self.builder)
-        for i, node in enumerate(func_body):
-            func_body[i] = v.visit(node)
-
-        # Debugging
-        # from.util import dump_ast
-        # for tt in t.body[0].body:
-        #     print dump_ast(tt)
-
-        # Emitting function IR
-        v = Visitor(self.module, self.builder, func.__nos_globals__)
-        llvm.PositionBuilderAtEnd(self.builder, llvm.AppendBasicBlock(nos_func, "entry"))
-
-        # Store function parameters as locals
-        for i, name in enumerate(func.__nos_args__):
-            v._store(llvm.GetParam(nos_func, i), name)
-
-        try:
-            v.emit_body(nos_func, func_body)
-        except TranslationError, e:
-            raise _unpack_translation_error(func.func_name, func_source, e)
-
-        if llvm.VerifyFunction(nos_func, llvm.PrintMessageAction):
-            print self.dumps()
-            raise RuntimeError("Could not produce a valid function for " + func.func_name)
-
-        return nos_func
-
-
-def _unpack_translation_error(func_name, func_lines, e, before=2, after=5):
-    """Unpacks TranslationError instance *e* and reconstructs the contained exception.
-
-    Translation errors are used to attach source localtion (line number / column offset)
-    and shuttle them out of AST traversal where they can be formatted and rethrown.
-
-    :param before: number of lines to show before the offending one.
-    :param after: number of lines to show after the offending one.
-
-    """
-    from itertools import chain
-
-    def draw_arrow(snippet, line_index):
-        for i, line in enumerate(snippet):
-            prefix = "  >>> " if i == line_index else "      "
-            yield prefix + line
-
-    error_type, line_number, message = e.args
-    line_i = line_number - 1
-
-    snippet = func_lines.split("\n")[min(0, line_i - before): line_i + after]
-    tb = draw_arrow(snippet, line_i)
-
-    return error_type("\n".join(chain((message, "  Traceback:"), tb)))
 
 
 def _create_function(module, name, restype, argtypes):
