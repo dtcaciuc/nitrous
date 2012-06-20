@@ -68,19 +68,46 @@ class Module(object):
 
     def function(self, result=None, **kwargs):
 
+        def resolve_constants(symbols):
+            """Converts eligible values in a dictionary to LLVM constant objects."""
+            from .visitor import emit_constant
+
+            for k, v in symbols.iteritems():
+                try:
+                    yield k, emit_constant(v)
+                except TypeError:
+                    # Not a constant, something else will handle this.
+                    yield k, v
+
         def wrapper(func):
+            from .exceptions import AnnotationError
+            from .lib import range_
             import inspect
 
             # Annotate function and remember it for later translation.
             func.__nos_restype__ = result
             func.__nos_argtypes__ = kwargs
 
-            # Capture available symbols at the point of function definition.
-            func.__nos_globals__ = {}
+            # - Ordered argument name sequence
+            spec = inspect.getargspec(func)
+            if spec.varargs or spec.keywords:
+                raise AnnotationError("Variable and/or keyword arguments are not allowed")
+            if set(spec.args) != set(func.__nos_argtypes__):
+                raise AnnotationError("Argument type annotations don't match function arguments.")
 
+            # TODO Replace this with __nos_argtypes__ ordered dictionary?
+            # For consistency, same in ExternalFunction as well.
+            func.__nos_args__ = spec.args
+
+            # Immutable global symbols.
+            func.__nos_globals__ = {}
+            # - Built-ins
+            func.__nos_globals__["range"] = range_
+            # - Other symbols available at the point of function
+            #   definition; try to resolve as many constants as possible.
             parent_frame = inspect.currentframe().f_back
-            func.__nos_globals__.update(parent_frame.f_globals)
-            func.__nos_globals__.update(parent_frame.f_locals)
+            func.__nos_globals__.update(resolve_constants(parent_frame.f_globals))
+            func.__nos_globals__.update(resolve_constants(parent_frame.f_locals))
             del parent_frame
 
             self.funcs.append(func)
@@ -97,7 +124,6 @@ class Module(object):
     def build(self):
         import tempfile
         import os
-        import inspect
         import types
 
         from subprocess import call
@@ -134,7 +160,7 @@ class Module(object):
             cfunc = getattr(out_module.__nos_shlib__, self._qualify(func.func_name))
 
             argtypes = []
-            for i, arg in enumerate(inspect.getargspec(func).args):
+            for i, arg in enumerate(func.__nos_args__):
                 argtypes.append(func.__nos_argtypes__[arg].c_type)
 
             cfunc.argtypes = argtypes
@@ -155,43 +181,20 @@ class Module(object):
         return "__".join((self.name, symbol))
 
     def _translate(self, func):
-        from .visitor import Visitor, ScopedVars, FlattenAttributes, entry_alloca, emit_constant
-        from .exceptions import TranslationError, AnnotationError
+        from .visitor import Visitor, FlattenAttributes
+        from .exceptions import TranslationError
         from .util import remove_indent
-        from .lib import range_
 
         import ast
         import inspect
 
-        # Function parameters, return type and other glue
-        spec = inspect.getargspec(func)
-
-        if spec.varargs or spec.keywords:
-            raise AnnotationError("Variable and/or keyword arguments are not allowed")
-
-        if set(spec.args) != set(func.__nos_argtypes__):
-            raise AnnotationError("Argument type annotations don't match function arguments.")
-
         # Create positional argument type list in order
         # they appear in the function signature.
-        argtypes = [func.__nos_argtypes__[name] for name in spec.args]
+        argtypes = [func.__nos_argtypes__[name] for name in func.__nos_args__]
         nos_func = _create_function(self.module,
                                     self._qualify(func.func_name),
                                     func.__nos_restype__,
                                     argtypes)
-
-        # Immutable global symbols.
-        globals_ = {}
-        # - Built-ins
-        globals_["range"] = range_
-        # - Other symbols available at the point of function
-        #   definition; try to resolve as many constants as possible.
-        for k, v in func.__nos_globals__.items():
-            try:
-                globals_[k] = emit_constant(v)
-            except TypeError:
-                # Not a constant, something else will handle this.
-                globals_[k] = v
 
         # AST preprocessing
         # ast.parse returns us a module, first function there is what we're parsing.
@@ -209,11 +212,11 @@ class Module(object):
         #     print dump_ast(tt)
 
         # Emitting function IR
-        v = Visitor(self.module, self.builder, globals_)
+        v = Visitor(self.module, self.builder, func.__nos_globals__)
         llvm.PositionBuilderAtEnd(self.builder, llvm.AppendBasicBlock(nos_func, "entry"))
 
         # Store function parameters as locals
-        for i, name in enumerate(spec.args):
+        for i, name in enumerate(func.__nos_args__):
             v._store(llvm.GetParam(nos_func, i), name)
 
         try:

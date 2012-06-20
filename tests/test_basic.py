@@ -9,13 +9,12 @@ class AnnotationTests(ModuleTest, unittest.TestCase):
         from nos.exceptions import AnnotationError
         from nos.types import Double
 
-        @self.m.function(Double, z=Double)
         def x(y):
             pass
 
         error = "Argument type annotations don't match function arguments"
         with self.assertRaisesRegexp(AnnotationError, error):
-            self.m.build()
+            self.m.function(Double, z=Double)(x)
 
 
 class SymbolTests(ModuleTest, unittest.TestCase):
@@ -626,7 +625,6 @@ class CallTests(ModuleTest, unittest.TestCase):
 class ExternalCallTests(ModuleTest, unittest.TestCase):
 
     def setUp(self):
-        from distutils.sysconfig import customize_compiler
         from distutils.ccompiler import new_compiler
         import tempfile
         import shutil
@@ -639,7 +637,7 @@ class ExternalCallTests(ModuleTest, unittest.TestCase):
         with tempfile.NamedTemporaryFile(suffix=".c", dir=self.libdir, delete=False) as src:
             src.write("#include <math.h>\ndouble my_pow(double x, double y) { return pow(x, y); }\n")
 
-        obj = compiler.compile([src.name], output_dir=self.libdir)
+        obj = compiler.compile([src.name], extra_preargs=["-fPIC"], output_dir=self.libdir)
         compiler.create_static_lib(obj, "foo", output_dir=self.libdir)
 
         self.addCleanup(shutil.rmtree, self.libdir, ignore_errors=True)
@@ -647,7 +645,6 @@ class ExternalCallTests(ModuleTest, unittest.TestCase):
     def test_shlib(self):
         """Calling functions from arbitrary shared libraries."""
         from nos.types import Double
-        import os
 
         # Test call to functions in LLVM library itself
         lib_args = dict(lib="foo", libdir=self.libdir)
