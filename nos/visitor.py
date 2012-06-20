@@ -61,13 +61,14 @@ class ScopedVars(object):
 
 class Visitor(ast.NodeVisitor):
 
-    def __init__(self, module, builder, global_vars, locals_):
+    def __init__(self, module, builder, globals_):
         self.module = module
         self.builder = builder
-        self.global_vars = global_vars
 
+        # Global immutable symbols
+        self.globals = globals_
         # Scoped local symbols (including parameters)
-        self.locals = locals_
+        self.locals = ScopedVars()
 
         # Stack of information for current loop and its parent ones.
         self.loop_info = []
@@ -112,7 +113,7 @@ class Visitor(ast.NodeVisitor):
         except KeyError:
             try:
                 # Constant values or emitter functions declared externally.
-                return self.global_vars[node.id]
+                return self.globals[node.id]
             except KeyError:
                 # Last thing to try is {module 1}...{module n}.{symbol} import.
                 try:

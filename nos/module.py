@@ -183,31 +183,25 @@ class Module(object):
         body = llvm.AppendBasicBlock(nos_func, "body")
         llvm.PositionBuilderAtEnd(self.builder, body)
 
-        # Global symbols that were available at the point of function definition.
-        global_vars = func.__nos_globals__.copy()
-        global_vars["range"] = range_
-
-        # Resolve constants
-        for k, v in global_vars.items():
+        # Immutable global symbols.
+        globals_ = {}
+        # - Built-ins
+        globals_["range"] = range_
+        # - Other symbols available at the point of function
+        #   definition; try to resolve as many constants as possible.
+        for k, v in func.__nos_globals__.items():
             try:
-                global_vars[k] = emit_constant(v)
+                globals_[k] = emit_constant(v)
             except TypeError:
                 # Not a constant, something else will handle this.
-                continue
+                globals_[k] = v
 
-        # - Local variables are parameters and anything declared
-        #   inside the function itself which resides on stack and
-        #   can be written to.
-        local_vars = ScopedVars()
-        for i, name in enumerate(spec.args):
-            p = llvm.GetParam(nos_func, i)
-            local_vars[name] = entry_alloca(nos_func, llvm.TypeOf(p), name + "_ptr")
-            llvm.BuildStore(self.builder, p, local_vars[name])
-
+        # AST preprocessing
         func_source = remove_indent(inspect.getsourcelines(func))
         t = ast.parse(func_source)
         func_body = list(t.body[0].body)
 
+        # - Flattening chained attribute nodes for easier lookup.
         v = FlattenAttributes(self.builder)
         for i, node in enumerate(func_body):
             func_body[i] = v.visit(node)
@@ -217,7 +211,12 @@ class Module(object):
         # for tt in t.body[0].body:
         #     print dump_ast(tt)
 
-        v = Visitor(self.module, self.builder, global_vars, local_vars)
+        # Emitting function IR
+        v = Visitor(self.module, self.builder, globals_)
+
+        # Store function parameters as locals
+        for i, name in enumerate(spec.args):
+            v._store(llvm.GetParam(nos_func, i), name)
 
         try:
             for node in t.body[0].body:
