@@ -155,7 +155,7 @@ class Module(object):
         return "__".join((self.name, symbol))
 
     def _translate(self, func):
-        from .visitor import Visitor, FlattenAttributes, entry_alloca, emit_constant
+        from .visitor import Visitor, ScopedVars, FlattenAttributes, entry_alloca, emit_constant
         from .exceptions import TranslationError, AnnotationError
         from .util import remove_indent
         from .lib import range_
@@ -198,7 +198,7 @@ class Module(object):
         # - Local variables are parameters and anything declared
         #   inside the function itself which resides on stack and
         #   can be written to.
-        local_vars = {}
+        local_vars = ScopedVars()
         for i, name in enumerate(spec.args):
             p = llvm.GetParam(nos_func, i)
             local_vars[name] = entry_alloca(nos_func, llvm.TypeOf(p), name + "_ptr")

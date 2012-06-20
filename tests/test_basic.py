@@ -661,36 +661,37 @@ class ExternalCallTests(ModuleTest, unittest.TestCase):
         self.assertEqual(out.wrapper(3, 5), 3 ** 5)
 
 
-class FunctionBuilderTests(unittest.TestCase):
+class ScopedVarsTests(unittest.TestCase):
 
-    def test_local_scope(self):
-        from nos.visitor import Visitor
+    def test_scope(self):
+        from nos.visitor import ScopedVars
 
         # Topmost local scope.
-        v = Visitor(None, None, {}, {"a": 1})
+        v = ScopedVars()
+        v["a"] = 1
 
-        self.assertEqual(v._local_var("a"), 1)
+        self.assertEqual(v["a"], 1)
         with self.assertRaises(KeyError):
-            v._local_var("b")
+            v["b"]
 
         # Adding nested scopes
-        with v._local_scope():
-            v.local_vars[-1]["a"] = 2
-            v.local_vars[-1]["b"] = 3
+        with v.scope():
+            v["a"] = 2
+            v["b"] = 3
 
-            with v._local_scope():
-                v.local_vars[-1]["c"] = 4
-                self.assertEqual(v._local_var("c"), 4)
+            with v.scope():
+                v["c"] = 4
+                self.assertEqual(v["c"], 4)
 
                 # Should try most nested scope first
-                self.assertEqual(v._local_var("a"), 2)
-                self.assertEqual(v._local_var("b"), 3)
+                self.assertEqual(v["a"], 2)
+                self.assertEqual(v["b"], 3)
 
             # Scope ended; variable c should disappear
             with self.assertRaises(KeyError):
-                v._local_var("c")
+                v["c"]
 
         # Scope ended; a should return to its old value
-        self.assertEqual(v._local_var("a"), 1)
+        self.assertEqual(v["a"], 1)
         with self.assertRaises(KeyError):
-            v._local_var("b")
+            v["b"]

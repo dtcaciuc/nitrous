@@ -21,18 +21,53 @@ class ExternalFunction(object):
         self.__nos_argtypes__ = argtypes
 
 
+class ScopedVars(object):
+    """Stack of dictionaries of scoped variables.
+
+    Top scope is the function, then any nested according to
+    indented blocks (eg. if, for) as they occur. On block exit,
+    the associated scope is popped off.
+
+    """
+
+    def __init__(self):
+        self.__vars = [{}]
+
+    def __getitem__(self, name):
+        """Finds and returns local variable with a given *name*.
+
+        Traverses the scope stack outwards until *name* is found; throws
+        KeyError if unsuccessful.
+
+        """
+        for scope in self.__vars[::-1]:
+            v = scope.get(name)
+            if v is not None:
+                return v
+
+        raise KeyError(name)
+
+    def __setitem__(self, name, value):
+        """Sets the *name* to *value* in currently active scope."""
+        self.__vars[-1][name] = value
+
+    @contextmanager
+    def scope(self):
+        """Creates scope for the duration of the context manager."""
+        self.__vars.append({})
+        yield
+        self.__vars.pop()
+
+
 class Visitor(ast.NodeVisitor):
 
-    def __init__(self, module, builder, global_vars, local_vars):
+    def __init__(self, module, builder, global_vars, locals_):
         self.module = module
         self.builder = builder
         self.global_vars = global_vars
 
-        # Stack of dictionaries of scoped variables;
-        # Top scope is the function, then any nested indented
-        # blocks (eg. if, for) as they occur. On block exit,
-        # the associated scope is popped off.
-        self.local_vars = [local_vars]
+        # Scoped local symbols (including parameters)
+        self.locals = locals_
 
         # Stack of information for current loop and its parent ones.
         self.loop_info = []
@@ -46,27 +81,6 @@ class Visitor(ast.NodeVisitor):
         # Value stack used to assemble LLVM IR as the syntax tree is traversed.
         self.stack = []
 
-    def _local_var(self, name):
-        """Finds and returns local variable with a given *name*.
-
-        Traverses the scope stack outwards until *name* is found; throws
-        KeyError if unsuccessful.
-
-        """
-        for scope in self.local_vars[::-1]:
-            v = scope.get(name)
-            if v is not None:
-                return v
-
-        raise KeyError(name)
-
-    @contextmanager
-    def _local_scope(self):
-        """Temporarily create new local variable scope."""
-        self.local_vars.append({})
-        yield
-        self.local_vars.pop()
-
     def _store(self, value, name):
         """Stores *value* on the stack under *name*.
 
@@ -75,13 +89,13 @@ class Visitor(ast.NodeVisitor):
 
         """
         try:
-            v = self._local_var(name)
+            v = self.locals[name]
         except KeyError:
             # First time storing the variable; allocate stack space
             # and register with most nested scope.
             func = llvm.GetBasicBlockParent(llvm.GetInsertBlock(self.builder))
             v = entry_alloca(func, llvm.TypeOf(value), name + "_ptr")
-            self.local_vars[-1][name] = v
+            self.locals[name] = v
 
         llvm.BuildStore(self.builder, value, v)
         return v
@@ -90,7 +104,7 @@ class Visitor(ast.NodeVisitor):
         # TODO pretty awkward, passing node only for line number used in raising error.
         try:
             # Try variables; they are all LLVM values and stack pointers.
-            v = self._local_var(node.id)
+            v = self.locals[node.id]
             # Stack variables are pointers and carry _ptr prefix;
             # drop it when loading the value.
             name = llvm.GetValueName(v).rstrip("_ptr")
@@ -317,7 +331,7 @@ class Visitor(ast.NodeVisitor):
 
         llvm.PositionBuilderAtEnd(self.builder, if_branch_bb)
 
-        with self._local_scope():
+        with self.locals.scope():
             for b in node.body:
                 self.visit(b)
 
@@ -328,7 +342,7 @@ class Visitor(ast.NodeVisitor):
 
         llvm.PositionBuilderAtEnd(self.builder, else_branch_bb)
 
-        with self._local_scope():
+        with self.locals.scope():
             for b in node.orelse:
                 self.visit(b)
 
@@ -417,7 +431,7 @@ class Visitor(ast.NodeVisitor):
         # Posting entrance and exit blocks (for continue/break respectively)
         self.loop_info.append((step_bb, exit_bb))
 
-        with self._local_scope():
+        with self.locals.scope():
             for b in node.body:
                 self.visit(b)
 
