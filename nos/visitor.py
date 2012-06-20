@@ -122,6 +122,23 @@ class Visitor(ast.NodeVisitor):
                     raise NameError("{0} is undefined or unavailable in current scope".format(node.id))
                 return getattr(__import__(modulename, {}, {}, [attrname]), attrname)
 
+    def emit_body(self, func, body_nodes):
+        from .exceptions import TranslationError
+
+        # Emit function body IR
+        llvm.PositionBuilderAtEnd(self.builder, llvm.GetEntryBasicBlock(func))
+        for node in body_nodes:
+            self.visit(node)
+
+        last_block = llvm.GetInsertBlock(self.builder)
+        if not llvm.IsATerminatorInst(llvm.GetLastInstruction(last_block)):
+            # Last return out of a void function can be implicit.
+            restype = llvm.function_return_type(func)
+            if llvm.GetTypeKind(restype) == llvm.VoidTypeKind:
+                llvm.BuildRetVoid(self.builder)
+            else:
+                last_lineno = body_nodes[-1].lineno
+                raise TranslationError(TypeError, last_lineno, "Function must return a value")
 
     def visit(self, node):
         from .exceptions import TranslationError

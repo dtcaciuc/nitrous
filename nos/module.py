@@ -180,9 +180,6 @@ class Module(object):
                                     func.__nos_restype__,
                                     argtypes)
 
-        body = llvm.AppendBasicBlock(nos_func, "body")
-        llvm.PositionBuilderAtEnd(self.builder, body)
-
         # Immutable global symbols.
         globals_ = {}
         # - Built-ins
@@ -197,9 +194,9 @@ class Module(object):
                 globals_[k] = v
 
         # AST preprocessing
+        # ast.parse returns us a module, first function there is what we're parsing.
         func_source = remove_indent(inspect.getsourcelines(func))
-        t = ast.parse(func_source)
-        func_body = list(t.body[0].body)
+        func_body = ast.parse(func_source).body[0].body
 
         # - Flattening chained attribute nodes for easier lookup.
         v = FlattenAttributes(self.builder)
@@ -213,26 +210,16 @@ class Module(object):
 
         # Emitting function IR
         v = Visitor(self.module, self.builder, globals_)
+        llvm.PositionBuilderAtEnd(self.builder, llvm.AppendBasicBlock(nos_func, "entry"))
 
         # Store function parameters as locals
         for i, name in enumerate(spec.args):
             v._store(llvm.GetParam(nos_func, i), name)
 
         try:
-            for node in t.body[0].body:
-                v.visit(node)
+            v.emit_body(nos_func, func_body)
         except TranslationError, e:
             raise _unpack_translation_error(func.func_name, func_source, e)
-
-        last_block = llvm.GetInsertBlock(self.builder)
-        if not llvm.IsATerminatorInst(llvm.GetLastInstruction(last_block)):
-            # Last return out of a void function can be implicit.
-            restype = llvm.function_return_type(nos_func)
-            if llvm.GetTypeKind(restype) == llvm.VoidTypeKind:
-                llvm.BuildRetVoid(self.builder)
-            else:
-                raise TypeError("Function {0}() must return a {1}"
-                                .format(func.func_name, func.__nos_restype__))
 
         if llvm.VerifyFunction(nos_func, llvm.PrintMessageAction):
             print self.dumps()

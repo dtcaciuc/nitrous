@@ -277,7 +277,7 @@ class ReturnTests(ModuleTest, unittest.TestCase):
         def f():
             pass
 
-        message = "Function f\(\) must return"
+        message = ">>>     pass"
         with self.assertRaisesRegexp(TypeError, message):
             self.m.build()
 
