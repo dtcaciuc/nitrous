@@ -1,5 +1,5 @@
-NOS
-===
+Nitrous
+=======
 
 [![Build Status](https://secure.travis-ci.org/dtcaciuc/nitrous.png)](http://travis-ci.org/dtcaciuc/nitrous)
 
