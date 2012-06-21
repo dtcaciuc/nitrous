@@ -49,7 +49,7 @@ if not on_rtd:
     # a valid shared library so we'll use the available facilities.
     ext_modules.append(
         Extension(
-            "nos.llvm._llvm", ["src/_llvm.cc"],
+            "nitrous.llvm._llvm", ["src/_llvm.cc"],
             include_dirs=llvm_config("--includedir"),
             extra_compile_args=llvm_config("--cxxflags"),
             define_macros=[("NOS_LLVM_VERSION", int(llvm_version.replace(".", "")))],
@@ -58,12 +58,12 @@ if not on_rtd:
         )
     )
 
-setup(name="nos",
+setup(name="nitrous",
       version="0.0.0",
       description="Run-time LLVM-based compiler for CPython functions",
       author="Dimitri Tcaciuc",
       author_email="dtcaciuc@gmail.com",
-      url="https://github.com/dtcaciuc/nos",
+      url="https://github.com/dtcaciuc/nitrous",
       license="MIT License",
       classifiers=["Development Status :: 2 - Pre-Alpha",
                    "Intended Audience :: Developers",

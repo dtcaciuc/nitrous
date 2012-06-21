@@ -1,13 +1,12 @@
 import unittest2 as unittest
-import nos
 
-from nos.util import ModuleTest
+from nitrous.types import Bool, Long, Double
+from nitrous.util import ModuleTest
 
 
 class BoolTests(ModuleTest, unittest.TestCase):
 
     def test_and(self):
-        from nos.types import Bool
 
         @self.m.function(Bool, a=Bool, b=Bool)
         def and_(a, b):
@@ -21,7 +20,6 @@ class BoolTests(ModuleTest, unittest.TestCase):
         self.assertEqual(out.and_(False, False), False)
 
     def test_or(self):
-        from nos.types import Bool
 
         @self.m.function(Bool, a=Bool, b=Bool)
         def or_(a, b):
@@ -39,7 +37,6 @@ class LongTests(ModuleTest, unittest.TestCase):
 
     def test_const(self):
         """Constant declaration."""
-        from nos.types import Double
 
         @self.m.function(Double)
         def x():
@@ -50,7 +47,7 @@ class LongTests(ModuleTest, unittest.TestCase):
         self.assertEqual(out.x(), 5.0)
 
     def test_binary(self):
-        from nos.types import Long
+
         annotate = self.m.function(Long, a=Long, b=Long)
         funcs = [annotate(f) for f in binary_funcs()]
         out = self.m.build()
@@ -64,7 +61,6 @@ class LongTests(ModuleTest, unittest.TestCase):
                                  "{0}({1}, {2})".format(f.func_name, a, b))
 
     def test_cmp(self):
-        from nos.types import Bool, Long
 
         annotate = self.m.function(Bool, a=Long, b=Long)
         funcs = [annotate(f) for f in cmp_funcs()]
@@ -82,13 +78,13 @@ class DoubleTests(ModuleTest, unittest.TestCase):
     def test_const(self):
         """Constant declaration."""
 
-        @self.m.function(nos.types.Long)
+        @self.m.function(Long)
         def x():
             a = 5
             return a
 
     def test_binary(self):
-        from nos.types import Double
+
         annotate = self.m.function(Double, a=Double, b=Double)
         funcs = [annotate(f) for f in binary_funcs()]
         out = self.m.build()
@@ -102,7 +98,7 @@ class DoubleTests(ModuleTest, unittest.TestCase):
                                        "{0}({1}, {2})".format(f.func_name, a, b))
 
     def test_cmp(self):
-        from nos.types import Bool, Double
+
         annotate = self.m.function(Bool, a=Double, b=Double)
         funcs = [annotate(f) for f in cmp_funcs()]
         out = self.m.build()

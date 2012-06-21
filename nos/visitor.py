@@ -16,9 +16,9 @@ class ExternalFunction(object):
 
     def __init__(self, name, func, restype, argtypes):
         self.func_name = name
-        self.__nos_func__ = func
-        self.__nos_restype__ = restype
-        self.__nos_argtypes__ = argtypes
+        self.__n2s_func__ = func
+        self.__n2s_restype__ = restype
+        self.__n2s_argtypes__ = argtypes
 
 
 class ScopedVars(object):
@@ -463,18 +463,18 @@ class Visitor(ast.NodeVisitor):
         args = [self.stack.pop() for _ in range(len(node.args))][::-1]
         func = self.stack.pop()
 
-        if hasattr(func, "__nos_func__"):
+        if hasattr(func, "__n2s_func__"):
             # Function is compiled; check arguments for validity (unless
             # it's a definition for an external function) and make a direct call
             if not isinstance(func, ExternalFunction):
                 _validate_function_args(func, args)
-            result = llvm.BuildCall(self.builder, func.__nos_func__,
+            result = llvm.BuildCall(self.builder, func.__n2s_func__,
                                     (llvm.ValueRef * len(args))(*args),
                                     len(args), "")
         else:
             # Function is either CPython one or an LLVM emitter.
             result = func(*args)
-            if getattr(result, "__nos_emitter__", False):
+            if getattr(result, "__n2s_emitter__", False):
                 result = result.emit(self.module, self.builder)
 
         self.stack.append(result)
@@ -505,7 +505,7 @@ class FlattenAttributes(ast.NodeTransformer):
 def emit_body(module, builder, func):
     """Emits function body IR.
 
-    Expects function already is declared and referenced as func.__nos_func__.
+    Expects function already is declared and referenced as func.__n2s_func__.
 
     """
     from .exceptions import TranslationError
@@ -523,12 +523,12 @@ def emit_body(module, builder, func):
         func_body[i] = v.visit(node)
 
     # Emit function body IR
-    v = Visitor(module, builder, func.__nos_globals__)
-    llvm.PositionBuilderAtEnd(builder, llvm.AppendBasicBlock(func.__nos_func__, "entry"))
+    v = Visitor(module, builder, func.__n2s_globals__)
+    llvm.PositionBuilderAtEnd(builder, llvm.AppendBasicBlock(func.__n2s_func__, "entry"))
 
     # Store function parameters as locals
-    for i, name in enumerate(func.__nos_args__):
-        v._store(llvm.GetParam(func.__nos_func__, i), name)
+    for i, name in enumerate(func.__n2s_args__):
+        v._store(llvm.GetParam(func.__n2s_func__, i), name)
 
     try:
         for node in func_body:
@@ -540,7 +540,7 @@ def emit_body(module, builder, func):
     last_block = llvm.GetInsertBlock(builder)
     if not llvm.IsATerminatorInst(llvm.GetLastInstruction(last_block)):
         # Last return out of a void function can be implicit.
-        restype = llvm.function_return_type(func.__nos_func__)
+        restype = llvm.function_return_type(func.__n2s_func__)
         if llvm.GetTypeKind(restype) == llvm.VoidTypeKind:
             llvm.BuildRetVoid(builder)
         else:
@@ -589,13 +589,13 @@ def _validate_function_args(func, args):
     from .types import types_equal
     import inspect
 
-    if len(args) != len(func.__nos_argtypes__):
+    if len(args) != len(func.__n2s_argtypes__):
         raise TypeError("{0}() takes exactly {1} argument(s) ({2} given)"
-                        .format(func.func_name, len(func.__nos_argtypes__), len(args)))
+                        .format(func.func_name, len(func.__n2s_argtypes__), len(args)))
 
     spec = inspect.getargspec(func)
     mask = map(types_equal,
-               (func.__nos_argtypes__[name].llvm_type for name in spec.args),
+               (func.__n2s_argtypes__[name].llvm_type for name in spec.args),
                (llvm.TypeOf(val) for val in args))
 
     if not all(mask):

@@ -1,7 +1,7 @@
 import unittest2 as unittest
 
-from nos.types import Double, Pointer
-from nos.util import ModuleTest
+from nitrous.types import Double, Pointer
+from nitrous.util import ModuleTest
 
 try:
     import numpy as np

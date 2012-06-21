@@ -1,6 +1,6 @@
-:mod:`nos.module` - Modules
-===========================
+:mod:`nitrous.module` - Modules
+===============================
 
-.. automodule:: nos.module
+.. automodule:: nitrous.module
     :members:
     :undoc-members:

@@ -2,8 +2,8 @@ class ModuleTest(object):
     """Test mixin to provide an empty NOS module as `self.m`."""
 
     def setUp(self):
-        import nos.module
-        self.m = nos.module.Module(__name__)
+        from .module import Module
+        self.m = Module(__name__)
         self.addCleanup(self.m.clean)
 
 

@@ -4,7 +4,7 @@ First Steps
 
 Some code::
 
-    from nos.module import Module
+    from nitrous.module import Module
 
     # Declare a module. This will contain one or more related functions.
     m = Module(__name__)

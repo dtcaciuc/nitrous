@@ -1,13 +1,13 @@
 import unittest2 as unittest
 
-from nos.util import ModuleTest
+from nitrous.exceptions import AnnotationError
+from nitrous.types import Long, Double, Pointer
+from nitrous.util import ModuleTest
 
 
 class AnnotationTests(ModuleTest, unittest.TestCase):
 
     def test_args_mismatch(self):
-        from nos.exceptions import AnnotationError
-        from nos.types import Double
 
         def x(y):
             pass
@@ -21,7 +21,6 @@ class SymbolTests(ModuleTest, unittest.TestCase):
 
     def test_unsupported_context(self):
         """Raise error on unsupported context (eg. `del x`)."""
-        from nos.types import Long
 
         @self.m.function(Long)
         def x():
@@ -35,12 +34,12 @@ class SymbolTests(ModuleTest, unittest.TestCase):
 
     def test_emitter(self):
         """Simple function call."""
-        import nos.types
-        import nos.lib
+        import nitrous.types
+        import nitrous.lib
 
-        @self.m.function(nos.types.Double, y=nos.types.Long)
+        @self.m.function(nitrous.types.Double, y=nitrous.types.Long)
         def x(y):
-            return nos.lib.cast(y, nos.types.Double)
+            return nitrous.lib.cast(y, nitrous.types.Double)
 
         out = self.m.build()
         rv = out.x(int(5))
@@ -50,8 +49,7 @@ class SymbolTests(ModuleTest, unittest.TestCase):
 
     def test_emitter_locals(self):
         """Simple function call; check if symbols are imported in outer scope."""
-        from nos.types import Double, Long
-        from nos.lib import cast
+        from nitrous.lib import cast
 
         @self.m.function(Double, y=Long)
         def x(y):
@@ -68,7 +66,6 @@ class LoadTests(ModuleTest, unittest.TestCase):
 
     def test_missing_symbol(self):
         """Raise error if cannot resolve a symbol."""
-        from nos.types import Double, Long
 
         @self.m.function(Double, y=Long)
         def x(y):
@@ -80,7 +77,6 @@ class LoadTests(ModuleTest, unittest.TestCase):
 
     def test_symbol_out_of_scope(self):
         """Raise error if symbol is available but not in the current scope."""
-        from nos.types import Double, Long
 
         @self.m.function(Double, y=Long)
         def x(y):
@@ -96,8 +92,7 @@ class LoadTests(ModuleTest, unittest.TestCase):
 class CastTests(ModuleTest, unittest.TestCase):
 
     def test_cast(self):
-        from nos.types import Long, Double
-        from nos.lib import cast
+        from nitrous.lib import cast
 
         @self.m.function(Long, a=Long, b=Double)
         def div_long(a, b):
@@ -113,8 +108,7 @@ class CastTests(ModuleTest, unittest.TestCase):
         self.assertEqual(out.div_double(3, 2), 1.5)
 
     def test_cast_noop(self):
-        from nos.types import Double
-        from nos.lib import cast
+        from nitrous.lib import cast
 
         @self.m.function(Double, a=Double, b=Double)
         def div_double(a, b):
@@ -128,7 +122,6 @@ class AssignTests(ModuleTest, unittest.TestCase):
 
     def test_unsupported_chain(self):
         """Raise error on chain assignment."""
-        from nos.types import Long
 
         @self.m.function(Long)
         def f():
@@ -141,7 +134,6 @@ class AssignTests(ModuleTest, unittest.TestCase):
 
     def test_unsupported_target(self):
         """Check for unsupported assignments."""
-        from nos.types import Long
 
         @self.m.function(Long, a=Long, b=Long)
         def f(a, b):
@@ -154,7 +146,6 @@ class AssignTests(ModuleTest, unittest.TestCase):
 
     def test_aug(self):
         """Augmented assignment."""
-        from nos.types import Long, Pointer
 
         @self.m.function(Long, a=Long, b=Pointer(Long))
         def f(a, b):
@@ -173,7 +164,6 @@ class AssignTests(ModuleTest, unittest.TestCase):
         self.assertEqual(b[0], 12)
 
     def test_reassign(self):
-        from nos.types import Long
 
         @self.m.function(Long, a=Long)
         def f(a):
@@ -188,7 +178,6 @@ class AssignTests(ModuleTest, unittest.TestCase):
 
     def test_assign_global_const(self):
         """Externally declared values are resolved at compile."""
-        from nos.types import Long
 
         y = 5
 
@@ -207,7 +196,6 @@ class SubscriptTests(ModuleTest, unittest.TestCase):
 
     def test_unsupported_slice(self):
         """Raise error on unsupported context (eg. `del x`)."""
-        from nos.types import Long
 
         @self.m.function(Long, y=Long)
         def x(y):
@@ -223,7 +211,6 @@ class ReturnTests(ModuleTest, unittest.TestCase):
 
     def test_if(self):
         """Return from if/else block"""
-        from nos.types import Long
 
         @self.m.function(Long, a=Long, b=Long)
         def max2(a, b):
@@ -239,7 +226,6 @@ class ReturnTests(ModuleTest, unittest.TestCase):
 
     def test_return_comparison(self):
         """Returning comparison (1-bit integer) casts it to Bool type."""
-        from nos.types import Long, Bool
 
         @self.m.function(Bool, a=Long, b=Long)
         def max(a, b):
@@ -270,7 +256,6 @@ class ReturnTests(ModuleTest, unittest.TestCase):
 
     def test_missing_return(self):
         """Raise error if no return in function with non-void return type."""
-        from nos.types import Double
 
         @self.m.function(Double)
         def f():
@@ -293,7 +278,6 @@ class ReturnTests(ModuleTest, unittest.TestCase):
 
     def test_unexpected_type(self):
         """Raise error if returning unexpected value type."""
-        from nos.types import Double
 
         @self.m.function(Double, x=Double)
         def f(x):
@@ -307,7 +291,6 @@ class ReturnTests(ModuleTest, unittest.TestCase):
 class ConditionalTests(ModuleTest, unittest.TestCase):
 
     def test_type_mismatch(self):
-        from nos.types import Bool, Long
 
         @self.m.function(Bool, x=Long)
         def f1(x):
@@ -319,7 +302,6 @@ class ConditionalTests(ModuleTest, unittest.TestCase):
 
     def test_compound_test(self):
         """Support compound conditionals such as 1 < x < 2."""
-        from nos.types import Bool, Long
 
         @self.m.function(Bool, x=Long)
         def f1(x):
@@ -333,7 +315,6 @@ class ConditionalTests(ModuleTest, unittest.TestCase):
 class IfTests(ModuleTest, unittest.TestCase):
 
     def test_if(self):
-        from nos.types import Long
 
         # if clause only
         @self.m.function(Long, a=Long, b=Long)
@@ -360,7 +341,6 @@ class IfTests(ModuleTest, unittest.TestCase):
             self.assertEqual(f(4, 1), 4)
 
     def test_if_expr(self):
-        from nos.types import Long
 
         # Simple expression
         @self.m.function(Long, a=Long, b=Long)
@@ -384,7 +364,6 @@ class IfTests(ModuleTest, unittest.TestCase):
 
     def test_if_expr_type_mismatch(self):
         """Raise error when `if` expression clause types don't match."""
-        from nos.types import Long
 
         # Simple expression
         @self.m.function(Long, a=Long, b=Long)
@@ -399,7 +378,6 @@ class IfTests(ModuleTest, unittest.TestCase):
 class MemoryTests(ModuleTest, unittest.TestCase):
 
     def test_load_element(self):
-        from nos.types import Pointer, Long
         import ctypes
 
         @self.m.function(Long, data=Pointer(Long), i=Long)
@@ -416,7 +394,6 @@ class MemoryTests(ModuleTest, unittest.TestCase):
             self.assertEqual(out.get_i(data, i), data[i])
 
     def test_store_element(self):
-        from nos.types import Pointer, Long
         import ctypes
 
         @self.m.function(Long, data=Pointer(Long), i=Long, e=Long)
@@ -443,7 +420,6 @@ class LoopTests(ModuleTest, unittest.TestCase):
 
     def test_for(self):
         """Simple for loop given range stop value."""
-        from nos.types import Pointer, Long
         import ctypes
 
         @self.m.function(Long, data=Pointer(Long), n=Long)
@@ -462,7 +438,6 @@ class LoopTests(ModuleTest, unittest.TestCase):
 
     def test_for_else(self):
         """for/else clause is not supported."""
-        from nos.types import Long
 
         @self.m.function(Long, n=Long)
         def loop_1(n):
@@ -479,7 +454,6 @@ class LoopTests(ModuleTest, unittest.TestCase):
 
     def test_for_range(self):
         """More advanced loop ranges."""
-        from nos.types import Pointer, Long
         import ctypes
 
         @self.m.function(Long, data=Pointer(Long), start=Long, end=Long)
@@ -508,7 +482,6 @@ class LoopTests(ModuleTest, unittest.TestCase):
 
     def test_for_break_continue(self):
         """Test for loop with break/continue."""
-        from nos.types import Long
 
         @self.m.function(Long, n=Long)
         def loop_1(n):
@@ -527,7 +500,6 @@ class LoopTests(ModuleTest, unittest.TestCase):
         self.assertEqual(out.loop_1(10), 4)
 
     def test_double_for(self):
-        from nos.types import Pointer, Long
         import ctypes
 
         @self.m.function(Long, data=Pointer(Long), n=Long)
@@ -557,13 +529,12 @@ class LoopTests(ModuleTest, unittest.TestCase):
 class IntrinsicTests(ModuleTest, unittest.TestCase):
 
     def test_sqrt(self):
-        from nos.types import Double
-        import nos.lib
+        import nitrous.lib
         import math
 
         @self.m.function(Double, x=Double)
         def sqrt(x):
-            return nos.lib.sqrt(x)
+            return nitrous.lib.sqrt(x)
 
         out = self.m.build()
         self.assertAlmostEqual(math.sqrt(10.0), out.sqrt(10.0))
@@ -576,7 +547,6 @@ class CallTests(ModuleTest, unittest.TestCase):
 
     def test_call(self):
         """Calling one compiled function from another."""
-        from nos.types import Long
 
         @self.m.function(Long, x=Long)
         def f1(x):
@@ -592,7 +562,6 @@ class CallTests(ModuleTest, unittest.TestCase):
         self.assertEqual(out.f2(2), 7)
 
     def test_call_wrong_arg_count(self):
-        from nos.types import Long
 
         @self.m.function(Long, x=Long)
         def f1(x):
@@ -607,7 +576,6 @@ class CallTests(ModuleTest, unittest.TestCase):
             self.m.build()
 
     def test_call_wrong_arg_type(self):
-        from nos.types import Long
 
         @self.m.function(Long, x=Long)
         def f1(x):
@@ -644,7 +612,6 @@ class ExternalCallTests(ModuleTest, unittest.TestCase):
 
     def test_shlib(self):
         """Calling functions from arbitrary shared libraries."""
-        from nos.types import Double
 
         # Test call to functions in LLVM library itself
         lib_args = dict(lib="foo", libdir=self.libdir)
@@ -661,7 +628,7 @@ class ExternalCallTests(ModuleTest, unittest.TestCase):
 class ScopedVarsTests(unittest.TestCase):
 
     def test_scope(self):
-        from nos.visitor import ScopedVars
+        from nitrous.visitor import ScopedVars
 
         # Topmost local scope.
         v = ScopedVars()

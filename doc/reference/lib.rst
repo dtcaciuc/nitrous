@@ -1,6 +1,6 @@
-:mod:`nos.lib` - Standard Library
-=================================
+:mod:`nitrous.lib` - Standard Library
+=====================================
 
-.. automodule:: nos.lib
+.. automodule:: nitrous.lib
     :members:
     :undoc-members:

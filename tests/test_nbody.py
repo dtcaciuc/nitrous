@@ -1,5 +1,5 @@
 import unittest2 as unittest
-from nos.util import ModuleTest
+from nitrous.util import ModuleTest
 
 try:
     import numpy as np
@@ -12,8 +12,8 @@ class NBodyTests(ModuleTest, unittest.TestCase):
 
     def test(self):
         """N-body benchmark adaptation from http://shootout.alioth.debian.org"""
-        from nos.types import Long, Double, Pointer
-        from nos.lib import sqrt
+        from nitrous.types import Long, Double, Pointer
+        from nitrous.lib import sqrt
 
         X, Y, Z = range(3)
 
