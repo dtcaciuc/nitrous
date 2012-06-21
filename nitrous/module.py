@@ -41,7 +41,7 @@ class Module(object):
                                                 llvm.RelocPIC,
                                                 llvm.CodeModelDefault)
 
-        self.build_dir = os.path.join(tempfile.gettempdir(), "n2s", str(uuid.uuid4()))
+        self.build_dir = os.path.join(tempfile.gettempdir(), "n2o", str(uuid.uuid4()))
 
     def __del__(self):
         llvm.DisposeTargetMachine(self.machine)
@@ -98,29 +98,29 @@ class Module(object):
             import inspect
 
             # Annotate function and remember it for later translation.
-            func.__n2s_restype__ = restype
-            func.__n2s_argtypes__ = kwargs
+            func.__n2o_restype__ = restype
+            func.__n2o_argtypes__ = kwargs
 
             # - Ordered argument name sequence
             spec = inspect.getargspec(func)
             if spec.varargs or spec.keywords:
                 raise AnnotationError("Variable and/or keyword arguments are not allowed")
-            if set(spec.args) != set(func.__n2s_argtypes__):
+            if set(spec.args) != set(func.__n2o_argtypes__):
                 raise AnnotationError("Argument type annotations don't match function arguments.")
 
-            # TODO Replace this with __n2s_argtypes__ ordered dictionary?
+            # TODO Replace this with __n2o_argtypes__ ordered dictionary?
             # For consistency, same in ExternalFunction as well.
-            func.__n2s_args__ = spec.args
+            func.__n2o_args__ = spec.args
 
             # Immutable global symbols.
-            func.__n2s_globals__ = {}
+            func.__n2o_globals__ = {}
             # - Built-ins
-            func.__n2s_globals__["range"] = range_
+            func.__n2o_globals__["range"] = range_
             # - Other symbols available at the point of function
             #   definition; try to resolve as many constants as possible.
             parent_frame = inspect.currentframe().f_back
-            func.__n2s_globals__.update(resolve_constants(parent_frame.f_globals))
-            func.__n2s_globals__.update(resolve_constants(parent_frame.f_locals))
+            func.__n2o_globals__.update(resolve_constants(parent_frame.f_globals))
+            func.__n2o_globals__.update(resolve_constants(parent_frame.f_locals))
             del parent_frame
 
             self.funcs.append(func)
@@ -146,16 +146,16 @@ class Module(object):
 
         # Translate all registered functions
         for func in self.funcs:
-            argtypes = [func.__n2s_argtypes__[name] for name in func.__n2s_args__]
-            func.__n2s_func__ = _create_function(self.module,
+            argtypes = [func.__n2o_argtypes__[name] for name in func.__n2o_args__]
+            func.__n2o_func__ = _create_function(self.module,
                                                  self._qualify(func.func_name),
-                                                 func.__n2s_restype__,
+                                                 func.__n2o_restype__,
                                                  argtypes)
 
         # Once all functions are declared, emit their contents
         for func in self.funcs:
             emit_body(self.module, self.builder, func)
-            if llvm.VerifyFunction(func.__n2s_func__, llvm.PrintMessageAction):
+            if llvm.VerifyFunction(func.__n2o_func__, llvm.PrintMessageAction):
                 raise RuntimeError("Could not compile {0}()".format(func.func_name))
 
 
@@ -179,18 +179,18 @@ class Module(object):
 
         # Compilation successful; build ctypes interface to new module.
         out_module = type(self.name, (types.ModuleType,), {})
-        out_module.__n2s_shlib__ = ctypes.cdll.LoadLibrary(so_path)
+        out_module.__n2o_shlib__ = ctypes.cdll.LoadLibrary(so_path)
 
         for func in self.funcs:
-            cfunc = getattr(out_module.__n2s_shlib__, self._qualify(func.func_name))
+            cfunc = getattr(out_module.__n2o_shlib__, self._qualify(func.func_name))
 
             argtypes = []
-            for i, arg in enumerate(func.__n2s_args__):
-                argtypes.append(func.__n2s_argtypes__[arg].c_type)
+            for i, arg in enumerate(func.__n2o_args__):
+                argtypes.append(func.__n2o_argtypes__[arg].c_type)
 
             cfunc.argtypes = argtypes
-            cfunc.restype = (func.__n2s_restype__.c_type
-                             if func.__n2s_restype__ is not None
+            cfunc.restype = (func.__n2o_restype__.c_type
+                             if func.__n2o_restype__ is not None
                              else None)
 
             setattr(out_module, func.func_name, cfunc)

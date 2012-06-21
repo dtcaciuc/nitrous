@@ -4,7 +4,7 @@ import ctypes
 
 class ValueEmitter(object):
 
-    __n2s_emitter__ = True
+    __n2o_emitter__ = True
 
     def __init__(self, func, args, kwargs):
         self.func = func
