@@ -1,7 +1,7 @@
 import unittest2 as unittest
 
 from nitrous.exceptions import AnnotationError
-from nitrous.types import Long, Double, Pointer
+from nitrous.types import Bool, Long, Double, Pointer
 from nitrous.util import ModuleTest
 
 
