@@ -8,8 +8,10 @@ from . import llvm
 
 
 class Module(object):
+    """A unit of compilation and a container for optimized functions."""
 
     def __init__(self, name):
+        """Create a new module with a *name*."""
         import uuid
 
         self.name = name
@@ -50,7 +52,11 @@ class Module(object):
     def include_function(self, name, restype, argtypes, lib=None, libdir=None):
         """Includes externally defined function for use with the module.
 
-        :param name: function name
+        Typically this is a function in an external shared or static library. C and
+        Fortran functions should be good to interface with; unfortunately C++ should
+        be kept at a distance from for the time being.
+
+        :param name: function name as it's listed in library symbols.
         :param restype: function return value type
         :param argtypes: sequence of function argument types
         :param lib: library name where function is defined and we'll link with
@@ -66,8 +72,15 @@ class Module(object):
 
         return ExternalFunction(name, func, restype, argtypes)
 
-    def function(self, result=None, **kwargs):
+    def function(self, restype=None, **kwargs):
+        """Decorate an existing function with signature type annotations.
 
+        The function gets included and will be built with the module.
+
+        *restype* is the function return type. *kwargs* key/value pairs map argument
+        names to their respective types.
+
+        """
         def resolve_constants(symbols):
             """Converts eligible values in a dictionary to LLVM constant objects."""
             from .visitor import emit_constant
@@ -85,7 +98,7 @@ class Module(object):
             import inspect
 
             # Annotate function and remember it for later translation.
-            func.__nos_restype__ = result
+            func.__nos_restype__ = restype
             func.__nos_argtypes__ = kwargs
 
             # - Ordered argument name sequence
@@ -115,13 +128,13 @@ class Module(object):
 
         return wrapper
 
-    def dumps(self):
-        return llvm.DumpModuleToString(self.module).value
-
-    def dump(self):
-        return llvm.DumpModule(self.module)
-
     def build(self):
+        """Build the module and return a handle to the resulting container.
+
+        The returned object is a Python module itself and contains wrappers under
+        the same attribute names as the original functions being wrapped.
+
+        """
         import os
         import tempfile
         import types
@@ -184,7 +197,16 @@ class Module(object):
 
         return out_module
 
+    def dumps(self):
+        """Return a string with module's LLVM IR."""
+        return llvm.DumpModuleToString(self.module).value
+
     def clean(self):
+        """Clean the temporary build products.
+
+        This gets called automatically when module is garbage collected.
+
+        """
         if os.path.isdir(self.build_dir):
             shutil.rmtree(self.build_dir)
 
