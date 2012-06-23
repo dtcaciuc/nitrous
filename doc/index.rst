@@ -27,6 +27,7 @@ API Refernce
    :maxdepth: 2
 
    reference/module
+   reference/types
    reference/lib
 
 Indices and tables
