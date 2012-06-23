@@ -526,23 +526,6 @@ class LoopTests(ModuleTest, unittest.TestCase):
         self.assertEqual(list(data), expected)
 
 
-class IntrinsicTests(ModuleTest, unittest.TestCase):
-
-    def test_sqrt(self):
-        import nitrous.lib
-        import math
-
-        @self.m.function(Double, x=Double)
-        def sqrt(x):
-            return nitrous.lib.sqrt(x)
-
-        out = self.m.build()
-        self.assertAlmostEqual(math.sqrt(10.0), out.sqrt(10.0))
-
-        ir = self.m.dumps()
-        self.assertRegexpMatches(ir, "%sqrt = call double @llvm.sqrt.f64\(double %x\)")
-
-
 class CallTests(ModuleTest, unittest.TestCase):
 
     def test_call(self):

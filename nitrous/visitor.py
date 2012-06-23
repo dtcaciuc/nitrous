@@ -475,7 +475,7 @@ class Visitor(ast.NodeVisitor):
             # Function is either CPython one or an LLVM emitter.
             result = func(*args)
             if getattr(result, "__n2o_emitter__", False):
-                result = result.emit(self.module, self.builder)
+                result = result(self.module, self.builder)
 
         self.stack.append(result)
 

@@ -1,24 +1,7 @@
+from __future__ import absolute_import
 from .. import llvm
+
 import ctypes
-
-
-class ValueEmitter(object):
-
-    __n2o_emitter__ = True
-
-    def __init__(self, func, args, kwargs):
-        self.func = func
-        self.args = args
-        self.kwargs = kwargs
-
-    def emit(self, module, builder):
-        return self.func(module, builder, *self.args, **self.kwargs)
-
-
-def value_emitter(func):
-    def wrapper(*args, **kwargs):
-        return ValueEmitter(func, args, kwargs)
-    return wrapper
 
 
 _CASTS = {
@@ -27,64 +10,91 @@ _CASTS = {
 }
 
 
-@value_emitter
-def cast(_, builder, value, target_type):
-    """Casts expression to specified type."""
-
-    value_kind = llvm.GetTypeKind(llvm.TypeOf(value))
-    target_kind = llvm.GetTypeKind(target_type.llvm_type)
-
-    # TODO support
-    # * unsigned integers
-    # * floats and integers of different width
-
-    if value_kind == target_kind:
-        return value
-
-    try:
-        op = _CASTS[(value_kind, target_kind)]
-    except KeyError:
-        raise TypeError("Cannot cast {0} to {1}".format(value, target_type))
-
-    return llvm.BuildCast(builder, op, value, target_type.llvm_type, "tmp")
+def value_emitter(func):
+    """Marks a function as one which emits LLVM value as its result."""
+    func.__n2o_emitter__ = True
+    return func
 
 
 @value_emitter
-def range_(_, builder, *args):
-    """range() intrinsic implementation.
+class IntrinsicEmitter(object):
+    """Convenicnce emitter for wrapping ``llvm.{name}`` intrinsic functions."""
 
-    Returns (start, stop, step) LLVM value tuple.
+    def __init__(self, name, *args):
+        self.name = name
+        self.args = args
+
+    def __call__(self, module, builder):
+        n_args = len(self.args)
+
+        i = llvm.INTRINSICS["llvm.{0}".format(self.name)]
+        argtypes = (llvm.TypeRef * n_args)(*map(llvm.TypeOf, self.args))
+        func = llvm.GetIntrinsicDeclaration(module, i, argtypes, n_args)
+        args = (llvm.ValueRef * n_args)(*self.args)
+
+        return llvm.BuildCall(builder, func, args, n_args, "")
+
+
+def cast(value, target_type):
+    """Casts *value* to a specified *target_type*."""
+
+    @value_emitter
+    def emit(module, builder):
+
+        value_kind = llvm.GetTypeKind(llvm.TypeOf(value))
+        target_kind = llvm.GetTypeKind(target_type.llvm_type)
+
+        # TODO support
+        # * unsigned integers
+        # * floats and integers of different width
+
+        if value_kind == target_kind:
+            return value
+
+        try:
+            op = _CASTS[(value_kind, target_kind)]
+        except KeyError:
+            raise TypeError("Cannot cast {0} to {1}".format(value, target_type))
+
+        return llvm.BuildCast(builder, op, value, target_type.llvm_type, "tmp")
+
+
+    return emit
+
+
+def _range(*args):
+    """range() built-in implementation.
+
+    Returns (start, stop, step) LLVM value tuple which is then can be used
+    by the compiler to emit the ``for`` loop code.
 
     """
-    from ..types import Long
 
-    # TODO add checks
-    #  start > stop & step > 0;
-    #  start < stop & step < 0;
-    #  step < stop - start
+    @value_emitter
+    def emit(module, builder):
+        from ..types import Long
 
-    data = [llvm.ConstInt(Long.llvm_type, 0, True),
-            llvm.ConstInt(Long.llvm_type, 0, True),
-            llvm.ConstInt(Long.llvm_type, 1, True)]
+        # TODO add checks
+        #  start > stop & step > 0;
+        #  start < stop & step < 0;
+        #  step < stop - start
 
-    if len(args) == 0:
-        raise TypeError("Range accepts at least 1 argument")
-    elif len(args) > 3:
-        raise TypeError("Range accepts at most 3 arguments")
-    elif len(args) == 1:
-        data[1] = args[0]
-    else:
-        data[0] = args[0]
-        data[1] = args[1]
-        if len(args) == 3:
-            data[2] = args[2]
+        data = [llvm.ConstInt(Long.llvm_type, 0, True),
+                llvm.ConstInt(Long.llvm_type, 0, True),
+                llvm.ConstInt(Long.llvm_type, 1, True)]
 
-    return data
+        if len(args) == 0:
+            raise TypeError("Range accepts at least 1 argument")
+        elif len(args) > 3:
+            raise TypeError("Range accepts at most 3 arguments")
+        elif len(args) == 1:
+            data[1] = args[0]
+        else:
+            data[0] = args[0]
+            data[1] = args[1]
+            if len(args) == 3:
+                data[2] = args[2]
 
+        return data
 
-@value_emitter
-def sqrt(module, builder, value):
-    func = llvm.GetIntrinsicDeclaration(module,
-                                        llvm.INTRINSICS["llvm.sqrt"],
-                                        ctypes.byref(llvm.TypeOf(value)), 1)
-    return llvm.BuildCall(builder, func, ctypes.byref(value), 1, "sqrt")
+    return emit

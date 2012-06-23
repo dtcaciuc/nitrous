@@ -13,7 +13,7 @@ class NBodyTests(ModuleTest, unittest.TestCase):
     def test(self):
         """N-body benchmark adaptation from http://shootout.alioth.debian.org"""
         from nitrous.types import Long, Double, Pointer
-        from nitrous.lib import sqrt
+        from nitrous.lib.math import sqrt
 
         X, Y, Z = range(3)
 

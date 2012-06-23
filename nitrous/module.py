@@ -67,8 +67,11 @@ class Module(object):
 
         func = _create_function(self.module, name, restype, argtypes)
 
-        self.libs.append(lib)
-        self.libdirs.append(libdir)
+        if lib is not None:
+            self.libs.append(lib)
+
+        if libdir is not None:
+            self.libdirs.append(libdir)
 
         return ExternalFunction(name, func, restype, argtypes)
 
@@ -94,7 +97,7 @@ class Module(object):
 
         def wrapper(func):
             from .exceptions import AnnotationError
-            from .lib import range_
+            from .lib import _range
             import inspect
 
             # Annotate function and remember it for later translation.
@@ -115,7 +118,7 @@ class Module(object):
             # Immutable global symbols.
             func.__n2o_globals__ = {}
             # - Built-ins
-            func.__n2o_globals__["range"] = range_
+            func.__n2o_globals__["range"] = _range
             # - Other symbols available at the point of function
             #   definition; try to resolve as many constants as possible.
             parent_frame = inspect.currentframe().f_back
