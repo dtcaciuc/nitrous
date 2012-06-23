@@ -9,7 +9,7 @@
 {% set page_width = '940px' %}
 {% set sidebar_width = '220px' %}
  
-@import url(http://fonts.googleapis.com/css?family=Open+Sans+Condensed:300,700|Open+Sans:400,600);
+@import url(http://fonts.googleapis.com/css?family=Open+Sans:400,600);
 @import url("basic.css");
  
 /* -- page layout ----------------------------------------------------------- */
@@ -89,7 +89,7 @@ div.sphinxsidebar {
 }
 
 div.sphinxsidebarwrapper {
-    padding: 10px 0 0 0;
+    padding: 5px 0 0 0;
     text-align: right;
 }
 
@@ -101,7 +101,7 @@ div.sphinxsidebarwrapper p.logo {
  
 div.sphinxsidebar h3,
 div.sphinxsidebar h4 {
-    font-family: 'Open Sans Condensed', 'Helvetica Neue', 'Helvetica', sans-serif;
+    font-family: 'Helvetica Neue', 'Helvetica', sans-serif;
     color: #444;
     font-size: 24px;
     font-weight: bold;
@@ -135,6 +135,10 @@ div.sphinxsidebar ul {
     color: #000;
     line-height: 1.6em;
 }
+
+div.sphinxsidebar ul li {
+    list-style: none;
+}
  
 div.sphinxsidebar input {
     border: 1px solid #ccc;
@@ -160,7 +164,7 @@ div.body h3,
 div.body h4,
 div.body h5,
 div.body h6 {
-    font-family: 'Open Sans Condensed', 'Helvetica Neue', 'Helvetica', sans-serif;
+    font-family: 'Helvetica Neue', 'Helvetica', sans-serif;
     font-weight: bold;
     margin: 30px 0px 10px 0px;
     padding: 0;
@@ -174,7 +178,7 @@ div.indexwrapper h1 {
 }
 {% endif %}
  
-div.body h1 { margin-top: 0; padding-top: 0; font-size: 240%; }
+div.body h1 { margin-top: 0; padding-top: 0; font-size: 230%; }
 div.body h2 { font-size: 180%; }
 div.body h3 { font-size: 150%; }
 div.body h4 { font-size: 130%; }
@@ -257,16 +261,19 @@ p.admonition-title:after {
 }
 
 pre, tt {
-    font-family: 'Consolas', 'Menlo', 'Deja Vu Sans Mono', 'Bitstream Vera Sans Mono', monospace;
-    font-size: 0.9em;
-    /* box-shadow: 1px 1px 1px #888888; */
+    /* font-family: 'Consolas', 'Menlo', 'Deja Vu Sans Mono', 'Bitstream Vera Sans Mono', monospace; */
+}
+
+pre {
+    box-shadow: 1px 1px 1px #888888;
+    /* font-size: 0.9em; */
 }
 
 img.screenshot {
 }
 
 tt.descname, tt.descclassname {
-    font-size: 0.95em;
+    /* font-size: 0.95em */;
 }
 
 tt.descname {
