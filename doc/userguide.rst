@@ -51,11 +51,11 @@ The absolute timing number will vary between machines and is not really importan
     # 9227465 0.0859870910645
 
 1. The library symbols reside in ``nitrous`` package.
-2. Declare a :class:`~nitrous.module.Module` object. Modules are the top level containers for the optimized functions and provide access point to them after compilation. The name is not really important, but should be unique. Usually, there's one of these per Python module, so we can use it's name.
+2. Declare a :class:`~nitrous.module.Module` object. Modules are the top level containers for the optimized functions and provide a way to build them. The name is not really important, but should be unique. Usually, there's one of these per Python module, so we can use it's name.
 3. Annotate the function with result and argument types. Here, we'll use :class:`~nitrous.types.Long` type, which is equivalent to C ``long int`` or Python ``int``. Nitrous follows ``ctypes`` convention and names its types after their matching C counterparts of the same width/precision.
 4. The last step in the process is to actually build the module. This might take a bit of time, however since normally performed at the top level and is done only once per program run.
 5. The original function is not modified and can be still used as before.
-6. The build result is actually another python module which contains the optimized version of our function under the same attribute name.
+6. The build result is a new python module object which contains the optimized version of our function under the same attribute name.
 
 The second timed interval is clearly shorter and yields the same result, which is what we want. The :meth:`~nitrous.module.Module.function` decorator instructed the library to parse ``fib()`` into a syntax tree, then translate it LLVM IR. That, in turn,  got sent through range of available LLVM optimizers, translated to native machine code and loaded back into Python as a shared library using ``ctypes``.
 
