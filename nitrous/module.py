@@ -157,9 +157,10 @@ class Module(object):
 
         # Once all functions are declared, emit their contents
         for func in self.funcs:
-            # Update globals with local function objects, including ourselves
+            # Update globals with local function objects, including
+            # ourselves; this allows for declaration order-independent
+            # visibility and recursive calls.
             for other_func in self.funcs:
-                other_func.func_name not in func.__n2o_globals__,
                 func.__n2o_globals__[other_func.func_name] = other_func
 
             emit_body(self.module, self.builder, func)
