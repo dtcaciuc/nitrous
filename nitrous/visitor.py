@@ -101,11 +101,16 @@ class Visitor(ast.NodeVisitor):
         llvm.BuildStore(self.builder, value, v)
         return v
 
-    def _load(self, node):
-        # TODO pretty awkward, passing node only for line number used in raising error.
+    def _load(self, name):
+        """Loads/returns contents of a symbol.
+
+        In case of local variable, a load instruction is generated and result is
+        returned. Global constants and functions/emitters are returned directly.
+
+        """
         try:
             # Try variables; they are all LLVM values and stack pointers.
-            v = self.locals[node.id]
+            v = self.locals[name]
             # Stack variables are pointers and carry _ptr prefix;
             # drop it when loading the value.
             name = llvm.GetValueName(v).rstrip("_ptr")
@@ -113,13 +118,13 @@ class Visitor(ast.NodeVisitor):
         except KeyError:
             try:
                 # Constant values or emitter functions declared externally.
-                return self.globals[node.id]
+                return self.globals[name]
             except KeyError:
                 # Last thing to try is {module 1}...{module n}.{symbol} import.
                 try:
-                    modulename, attrname = node.id.rsplit(".", 1)
+                    modulename, attrname = name.rsplit(".", 1)
                 except ValueError:
-                    raise NameError("{0} is undefined or unavailable in current scope".format(node.id))
+                    raise NameError("{0} is undefined or unavailable in current scope".format(name))
                 return getattr(__import__(modulename, {}, {}, [attrname]), attrname)
 
     def visit(self, node):
@@ -141,7 +146,7 @@ class Visitor(ast.NodeVisitor):
 
     def visit_Name(self, node):
         if isinstance(node.ctx, ast.Load):
-            self.stack.append(self._load(node))
+            self.stack.append(self._load(node.id))
         elif isinstance(node.ctx, ast.Store):
             self.stack.append(node.id)
         else:
@@ -198,7 +203,7 @@ class Visitor(ast.NodeVisitor):
         if isinstance(node.target, ast.Name):
             # foo += rhs
             name = self.stack.pop()
-            lhs = self._load(node.target)
+            lhs = self._load(node.target.id)
             rhs = emit_binary_op(self.builder, node.op, lhs, rhs)
             self._store(value=rhs, name=name)
         elif isinstance(node.target, ast.Subscript):
