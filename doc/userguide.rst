@@ -9,7 +9,7 @@ The easiest way is to download precompiled binaries from http://llvm.org/release
 First Steps
 ===========
 
-Let's write a customary semi-useful function which gives an overview of what the project is all about::
+Let's write a customary semi-useful function which may take an appreciable amount of time to run::
 
     from time import time
 
@@ -60,8 +60,10 @@ The absolute timing number will vary between machines and is not really importan
 The second timed interval is clearly shorter and yields the same result, which is what we want. The :meth:`~nitrous.module.Module.function` decorator instructed the library to parse ``fib()`` into a syntax tree, then translate it LLVM IR. That, in turn,  got sent through range of available LLVM optimizers, translated to native machine code and loaded back into Python as a shared library using ``ctypes``.
 
 
-Feature Overview
-================
+Language Constraints
+====================
+
+TODO
 
 Assignments
 -----------
@@ -104,3 +106,62 @@ Variable lifetime and visibility is limited to the innermost enclosing condition
     x = z               # OK, z is in the current scope
     x = y               # Error, y scope is limited to `if` block
 
+Types
+=====
+
+TODO
+
+Functions
+=========
+
+TODO
+
+External Functions
+==================
+
+The :meth:`~nitrous.module.Module.include_function` method can be used to call functions defined in external static or shared libraries alongside the natively defined ones::
+
+    _atol = m.include_function("atol", Long, [Pointer(Char)], lib="c")
+
+    @m.function(Long, s=Pointer(Char))
+    def atol(s):
+        return _atol(s)
+
+    assert out.atol(ctypes.c_char_p("42")) == 42
+
+Note that, currently, included functions can be called from functions in Nitrous mode, however they don't automatically get a Python interface and thus cannot be called by themselves without a wrapper like the one above.
+
+Extending the Framework
+=======================
+
+More on Types
+-------------
+
+TODO
+
+Metafunctions and Emitters
+--------------------------
+
+Another type of callable that usually appears in a Nitrous code is a *metafunction*. These are native Python routines that get executed at module compile time and emit code which goes into the compiled binary.
+
+The :func:`~nitrous.lib.cast` is one example of such functions::
+
+    x = cast(y, Double)
+
+The challenge here is that the cast (an the majority of other metafunctions) needs access to the function builder object to actually produce the IR. However, these sort of objects should be invisible to whoever's writing the code and it would be incredibly tacky to pass them around everywhere.
+
+For that reason, metafunctions return *emitters* as their result. Emitters are callables which accept two arguments: LLVM :class:`~nitrous.llvm.ModuleRef` and :class:`~nitrous.llvm.BuilderRef` instances. Because not every call results in an emitter, Nitrous recognizes them by reading the `__n2o_emitter__` magic attribute on the result object. If so, the compiler silently inserts another call which actually results in final IR::
+
+    def cast(value, target_type):
+        """Casts *value* to a specified *target_type*."""
+
+        @value_emitter                                                         # 1
+        def emit(module, builder):
+            target_type_ = target_type.llvm_type
+            cast_op = _get_cast(llvm.TypeOf(value), target_type_)              # 2
+            return llvm.BuildCast(builder, cast_op, value, target_type_, "")
+
+        return emit
+
+1. :func:`~nitrous.lib.value_emitter` decorates a function with the magic emitter attribute.
+2. Emitter is a closure that captures the metafunction arguments and uses them when it is called by Nitrous compiler.
