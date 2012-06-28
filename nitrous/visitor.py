@@ -117,15 +117,9 @@ class Visitor(ast.NodeVisitor):
             return llvm.BuildLoad(self.builder, v, name)
         except KeyError:
             try:
-                # Constant values or emitter functions declared externally.
                 return self.globals[name]
             except KeyError:
-                # Last thing to try is {module 1}...{module n}.{symbol} import.
-                try:
-                    modulename, attrname = name.rsplit(".", 1)
-                except ValueError:
-                    raise NameError("{0} is undefined or unavailable in current scope".format(name))
-                return getattr(__import__(modulename, {}, {}, [attrname]), attrname)
+                raise NameError("{0} is undefined or unavailable in current scope".format(name))
 
     def visit(self, node):
         from .exceptions import TranslationError
@@ -151,6 +145,15 @@ class Visitor(ast.NodeVisitor):
             self.stack.append(node.id)
         else:
             raise NotImplementedError("Unknown Name context {0!s}".format(type(node.ctx)))
+
+    def visit_Attribute(self, node):
+        if not isinstance(node.ctx, ast.Load):
+            raise NotImplementedError("Setting attributes not supported")
+
+        self.generic_visit(node)
+
+        owner = self.stack.pop()
+        self.stack.append(getattr(owner, node.attr))
 
     def visit_Subscript(self, node):
         """Label subscript of form `var_expr[index_expr]`.
@@ -485,28 +488,6 @@ class Visitor(ast.NodeVisitor):
         self.stack.append(result)
 
 
-class FlattenAttributes(ast.NodeTransformer):
-    """Flattens attributes into name nodes.
-
-    Eg. Attribute(value=Attribute("a"), attr="b") -> Name(id="a.b")
-
-    """
-
-    def __init__(self, builder):
-        self.builder = builder
-        self.stack = []
-
-    def visit_Attribute(self, node):
-        if not isinstance(node.ctx, ast.Load):
-            raise NotImplementedError("Setting attributes not supported")
-
-        node = ast.NodeTransformer.generic_visit(self, node)
-        assert isinstance(node.value, ast.Name)
-
-        return ast.Name(id=node.value.id + "." + node.attr, ctx=ast.Load())
-
-
-
 def emit_body(module, builder, func):
     """Emits function body IR.
 
@@ -517,15 +498,9 @@ def emit_body(module, builder, func):
     from .util import remove_indent
     from inspect import getsourcelines
 
-    # AST preprocessing
     # ast.parse returns us a module, first function there is what we're parsing.
     func_source = remove_indent(getsourcelines(func))
     func_body = ast.parse(func_source).body[0].body
-
-    # - Flattening chained attribute nodes for easier lookup.
-    v = FlattenAttributes(builder)
-    for i, node in enumerate(func_body):
-        func_body[i] = v.visit(node)
 
     # Emit function body IR
     v = Visitor(module, builder, func.__n2o_globals__)
