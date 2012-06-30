@@ -17,9 +17,6 @@ class MathTests(ModuleTest, unittest.TestCase):
         out = self.m.build()
         self.assertAlmostEqual(math.sqrt(10.0), out.sqrt(10.0))
 
-        ir = self.m.dumps()
-        self.assertRegexpMatches(ir, "%1 = call double @llvm.sqrt.f64\(double %x\)")
-
     def test_exp(self):
 
         @self.m.function(Double, x=Double)
