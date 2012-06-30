@@ -261,6 +261,27 @@ _func("TargetMachineEmitToFile", Bool, [TargetMachineRef, ModuleRef,
                                         ctypes.c_char_p, ctypes.c_int,
                                         ctypes.POINTER(ctypes.c_char_p)])
 
+# Pass Managers
+class OpaquePassManager(ctypes.Structure):
+    pass
+
+class OpaquePassManagerBuilder(ctypes.Structure):
+    pass
+
+PassManagerRef = ctypes.POINTER(OpaquePassManager)
+PassManagerBuilderRef = ctypes.POINTER(OpaquePassManagerBuilder)
+
+_func("CreatePassManager", PassManagerRef, [])
+_func("DisposePassManager", None, [PassManagerRef])
+_func("RunPassManager", Bool, [PassManagerRef, ModuleRef])
+
+_func("PassManagerBuilderCreate", PassManagerBuilderRef, [])
+_func("PassManagerBuilderDispose", None, [PassManagerBuilderRef])
+
+_func("PassManagerBuilderSetOptLevel", None, [PassManagerBuilderRef, ctypes.c_uint])
+_func("PassManagerBuilderPopulateModulePassManager", None,
+      [PassManagerBuilderRef, PassManagerRef])
+
 
 def build_py_idiv(builder, a, b, name):
     """Build expression for floor integer division.

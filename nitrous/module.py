@@ -167,6 +167,16 @@ class Module(object):
             if llvm.VerifyFunction(func.__n2o_func__, llvm.PrintMessageAction):
                 raise RuntimeError("Could not compile {0}()".format(func.func_name))
 
+        # IR optimizations; currently at default opt level.
+        pm = llvm.CreatePassManager()
+        pm_builder = llvm.PassManagerBuilderCreate()
+        llvm.PassManagerBuilderPopulateModulePassManager(pm_builder, pm)
+
+        if not llvm.RunPassManager(pm, self.module):
+            raise RuntimeError("Could not run IR optimization passes")
+
+        llvm.PassManagerBuilderDispose(pm_builder)
+        llvm.DisposePassManager(pm)
 
         # Path to output shared library.
         so_path = format(os.path.join(self.build_dir, self.name))
@@ -185,6 +195,10 @@ class Module(object):
 
             if call(("clang", "-shared", "-o", so_path, tmp_s.name) + libs + libdirs):
                 raise RuntimeError("Could not build target extension")
+
+            # Debug
+            # if call(("otool", "-tv", so_path)):
+            #     raise RuntimeError("Could not disassemble target extension")
 
         # Compilation successful; build ctypes interface to new module.
         out_module = type(self.name, (types.ModuleType,), {})

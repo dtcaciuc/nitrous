@@ -27,7 +27,7 @@ def llvm_config(*args):
 def link_args():
     # System-specific link flags for LLVM shared library.
     system = platform.system()
-    llvm_libs = llvm_config("--libs", "native") + ["-lLLVMExecutionEngine"]
+    llvm_libs = llvm_config("--libs", "native", "ipo", "jit")
     args = llvm_config("--ldflags")
 
     if system == "Linux":
