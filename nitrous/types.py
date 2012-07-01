@@ -95,11 +95,14 @@ class Pointer(object):
 
     @property
     def c_type(self):
-        # Ctypes requires an object with from_param() method.
-        return self
+        return ctypes.POINTER(self.element_type.c_type)
 
-    def from_param(self, p):
+    def convert(self, p):
         import array
+
+        # TODO it would be nice to just see if the object
+        # supports buffer access interface, however it seems that
+        # neither array.array nor ctypes byref() results support that.
 
         pointer_type = ctypes.POINTER(self.element_type.c_type)
 

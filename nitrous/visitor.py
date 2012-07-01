@@ -11,6 +11,31 @@ BOOL_INST = {
 }
 
 
+class Function(object):
+
+    @classmethod
+    def wrap(class_, func, cfunc):
+        # Arrange type dictionary into their respective positions.
+        argtypes = [func.__n2o_argtypes__[arg] for arg in func.__n2o_args__]
+
+        cfunc.argtypes = [t.c_type for t in argtypes]
+        cfunc.restype = (func.__n2o_restype__.c_type
+                         if func.__n2o_restype__ is not None
+                         else None)
+
+        return class_(cfunc, argtypes)
+
+    def __init__(self, cfunc, argtypes):
+        self.cfunc = cfunc
+        self.converters = [
+            t.convert if hasattr(t, "convert") else lambda a: a
+            for t in argtypes
+        ]
+
+    def __call__(self, *args):
+        return self.cfunc(*(c(a) for c, a in zip(self.converters, args)))
+
+
 class ExternalFunction(object):
     """Stores information about externally defined function included in the module."""
 

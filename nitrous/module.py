@@ -143,7 +143,7 @@ class Module(object):
         import types
 
         from subprocess import call
-        from .visitor import emit_body
+        from .visitor import Function, emit_body
 
         os.makedirs(self.build_dir)
 
@@ -206,17 +206,7 @@ class Module(object):
 
         for func in self.funcs:
             cfunc = getattr(out_module.__n2o_shlib__, self._qualify(func.func_name))
-
-            argtypes = []
-            for i, arg in enumerate(func.__n2o_args__):
-                argtypes.append(func.__n2o_argtypes__[arg].c_type)
-
-            cfunc.argtypes = argtypes
-            cfunc.restype = (func.__n2o_restype__.c_type
-                             if func.__n2o_restype__ is not None
-                             else None)
-
-            setattr(out_module, func.func_name, cfunc)
+            setattr(out_module, func.func_name, Function.wrap(func, cfunc))
 
         return out_module
 
@@ -236,6 +226,7 @@ class Module(object):
     def _qualify(self, symbol):
         """Qualifies symbol with parent module name."""
         return "__".join((self.name, symbol))
+
 
 
 def _create_function(module, name, restype, argtypes):
