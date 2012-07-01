@@ -81,6 +81,7 @@ class CTypesPointerTests(ModuleTest, unittest.TestCase):
         self.assertEqual(out.f(ctypes.byref(ctypes.c_long(5))), 5)
         self.assertEqual(out.f(ctypes.pointer(ctypes.c_long(5))), 5)
         self.assertEqual(out.f((ctypes.c_long * 1)(5)), 5)
+
         # ctypes automatically takes pointer of an object if target type is a pointer.
         self.assertEqual(out.f(ctypes.c_long(5)), 5)
 
@@ -90,7 +91,7 @@ class CTypesPointerTests(ModuleTest, unittest.TestCase):
 
         # Integral type, but different width
         with self.assertRaises(ctypes.ArgumentError):
-            out.f(ctypes.byref(ctypes.c_int(5)))
+            out.f(ctypes.byref(ctypes.c_byte(5)))
 
         # Different type altogether
         with self.assertRaises(ctypes.ArgumentError):
