@@ -107,44 +107,52 @@ class Visitor(ast.NodeVisitor):
         # Value stack used to assemble LLVM IR as the syntax tree is traversed.
         self.stack = []
 
-    def _store(self, value, name):
-        """Stores *value* on the stack under *name*.
+    def store(self, addr, value):
+        """Stores *value* on the stack under *addr*.
 
-        Allocates stack space if *name* is not an existing variable. Returns
+        *addr* can be either a variable name or a GEP value.
+
+        Allocates stack space if *addr* is not an existing variable. Returns
         the pointer to allocated space.
 
         """
-        try:
-            v = self.locals[name]
-        except KeyError:
-            # First time storing the variable; allocate stack space
-            # and register with most nested scope.
-            func = llvm.GetBasicBlockParent(llvm.GetInsertBlock(self.builder))
-            v = entry_alloca(func, llvm.TypeOf(value), name + "_ptr")
-            self.locals[name] = v
+        if isinstance(addr, basestring):
+            name = addr
+            try:
+                addr = self.locals[name]
+            except KeyError:
+                # First time storing the variable; allocate stack space
+                # and register with most nested scope.
+                func = llvm.GetBasicBlockParent(llvm.GetInsertBlock(self.builder))
+                addr = entry_alloca(func, llvm.TypeOf(value), "")
+                self.locals[name] = addr
 
-        llvm.BuildStore(self.builder, value, v)
-        return v
+        assert llvm.GetTypeKind(llvm.TypeOf(addr)) == llvm.PointerTypeKind
+        llvm.BuildStore(self.builder, value, addr)
 
-    def _load(self, name):
+        return addr
+
+    def load(self, name):
         """Loads/returns contents of a symbol.
+
+        *name* can either be a variable name or GEP value.
 
         In case of local variable, a load instruction is generated and result is
         returned. Global constants and functions/emitters are returned directly.
 
         """
-        try:
-            # Try variables; they are all LLVM values and stack pointers.
-            v = self.locals[name]
-            # Stack variables are pointers and carry _ptr prefix;
-            # drop it when loading the value.
-            name = llvm.GetValueName(v).rstrip("_ptr")
-            return llvm.BuildLoad(self.builder, v, name)
-        except KeyError:
+        if isinstance(name, llvm.ValueRef):
+            assert llvm.GetTypeKind(llvm.TypeOf(name)) == llvm.PointerTypeKind
+            return llvm.BuildLoad(self.builder, name, "")
+        else:
             try:
-                return self.globals[name]
+                # Try variables; they are all LLVM values and stack pointers.
+                return llvm.BuildLoad(self.builder, self.locals[name], "")
             except KeyError:
-                raise NameError("{0} is undefined or unavailable in current scope".format(name))
+                try:
+                    return self.globals[name]
+                except KeyError:
+                    raise NameError("{0} is undefined or unavailable in current scope".format(name))
 
     def visit(self, node):
         from .exceptions import TranslationError
@@ -165,7 +173,7 @@ class Visitor(ast.NodeVisitor):
 
     def visit_Name(self, node):
         if isinstance(node.ctx, ast.Load):
-            self.stack.append(self._load(node.id))
+            self.stack.append(self.load(node.id))
         elif isinstance(node.ctx, ast.Store):
             self.stack.append(node.id)
         else:
@@ -214,12 +222,10 @@ class Visitor(ast.NodeVisitor):
         ast.NodeVisitor.generic_visit(self, node)
         rhs = self.stack.pop()
 
-        if isinstance(target, ast.Name):
-            # foo = rhs
-            self._store(value=rhs, name=self.stack.pop())
-        elif isinstance(target, ast.Subscript):
-            # foo[i] = rhs; foo[i] is the GEP, previous pushed by visit_Subscript
-            llvm.BuildStore(self.builder, rhs, self.stack.pop())
+        if isinstance(target, (ast.Name, ast.Subscript)):
+            # foo = rhs or foo[i] = rhs where foo[i] is the GEP,
+            # previous pushed by visit_Subscript
+            self.store(self.stack.pop(), rhs)
         else:
             raise NotImplementedError("Unsupported assignment target {0}"
                                       .format(node.targets[0]))
@@ -228,18 +234,12 @@ class Visitor(ast.NodeVisitor):
         ast.NodeVisitor.generic_visit(self, node)
         rhs = self.stack.pop()
 
-        if isinstance(node.target, ast.Name):
-            # foo += rhs
-            name = self.stack.pop()
-            lhs = self._load(node.target.id)
-            rhs = emit_binary_op(self.builder, node.op, lhs, rhs)
-            self._store(value=rhs, name=name)
-        elif isinstance(node.target, ast.Subscript):
-            # foo[i] += rhs; foo[i] is the GEP, previous pushed by visit_Subscript
+        if isinstance(node.target, (ast.Name, ast.Subscript)):
+            # lhs += rhs or lhs[i] += rhs, where foo[i] is the GEP,
+            # previous pushed by visit_Subscript
             lhs_addr = self.stack.pop()
-            lhs = llvm.BuildLoad(self.builder, lhs_addr, "element")
-            rhs = emit_binary_op(self.builder, node.op, lhs, rhs)
-            llvm.BuildStore(self.builder, rhs, lhs_addr)
+            rhs = emit_binary_op(self.builder, node.op, self.load(lhs_addr), rhs)
+            self.store(lhs_addr, rhs)
         else:
             raise NotImplementedError("Unsupported augmented assignment target {0}"
                                       .format(node.target))
@@ -450,7 +450,7 @@ class Visitor(ast.NodeVisitor):
         start, stop, step = self.stack.pop()
 
         # Loop counter
-        i_ptr = self._store(start, target)
+        i_ptr = self.store(target, start)
         llvm.BuildBr(self.builder, test_bb)
 
         # Loop test
@@ -533,7 +533,7 @@ def emit_body(module, builder, func):
 
     # Store function parameters as locals
     for i, name in enumerate(func.__n2o_args__):
-        v._store(llvm.GetParam(func.__n2o_func__, i), name)
+        v.store(name, llvm.GetParam(func.__n2o_func__, i))
 
     try:
         for node in func_body:
