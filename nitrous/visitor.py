@@ -127,30 +127,27 @@ class Visitor(ast.NodeVisitor):
                 addr = entry_alloca(func, llvm.TypeOf(value), "")
                 self.locals[name] = addr
 
-        assert llvm.GetTypeKind(llvm.TypeOf(addr)) == llvm.PointerTypeKind
         llvm.BuildStore(self.builder, value, addr)
-
         return addr
 
-    def load(self, name):
+    def load(self, addr):
         """Loads/returns contents of a symbol.
 
-        *name* can either be a variable name or GEP value.
+        *addr* can either be a variable name or GEP value.
 
         In case of local variable, a load instruction is generated and result is
         returned. Global constants and functions/emitters are returned directly.
 
         """
-        if isinstance(name, llvm.ValueRef):
-            assert llvm.GetTypeKind(llvm.TypeOf(name)) == llvm.PointerTypeKind
-            return llvm.BuildLoad(self.builder, name, "")
+        if isinstance(addr, llvm.ValueRef):
+            return llvm.BuildLoad(self.builder, addr, "")
         else:
             try:
                 # Try variables; they are all LLVM values and stack pointers.
-                return llvm.BuildLoad(self.builder, self.locals[name], "")
+                return llvm.BuildLoad(self.builder, self.locals[addr], "")
             except KeyError:
                 try:
-                    return self.globals[name]
+                    return self.globals[addr]
                 except KeyError:
                     raise NameError("{0} is undefined or unavailable in current scope".format(name))
 
