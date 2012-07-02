@@ -199,6 +199,7 @@ _func("BuildAlloca", ValueRef, [BuilderRef, TypeRef, ctypes.c_char_p])
 _func("BuildArrayAlloca", ValueRef, [BuilderRef, TypeRef, ValueRef, ctypes.c_char_p])
 
 # Casting
+Trunc = 30
 ZExt = 31
 FPToSI = 34
 SIToFP = 36

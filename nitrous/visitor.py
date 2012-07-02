@@ -312,7 +312,7 @@ class Visitor(ast.NodeVisitor):
         from .types import types_equal
 
         self.visit(node.test)
-        test_expr = self.stack.pop()
+        test_expr = truncate_bool(self.builder, self.stack.pop())
 
         func = llvm.GetBasicBlockParent(llvm.GetInsertBlock(self.builder))
         if_branch_bb = llvm.AppendBasicBlock(func, "if")
@@ -350,7 +350,7 @@ class Visitor(ast.NodeVisitor):
 
     def visit_If(self, node):
         self.visit(node.test)
-        test_expr = self.stack.pop()
+        test_expr = truncate_bool(self.builder, self.stack.pop())
 
         func = llvm.GetBasicBlockParent(llvm.GetInsertBlock(self.builder))
         if_branch_bb = llvm.AppendBasicBlock(func, "if")
@@ -566,10 +566,13 @@ def entry_alloca(func, type_, name):
 
 def emit_constant(value):
     """Emit constant IR for known value types."""
-    from .types import Long, Double
+    from .types import Bool, Long, Double
 
     if isinstance(value, float):
         return llvm.ConstReal(Double.llvm_type, value)
+    elif isinstance(value, bool):
+        # Check bool before integer since bool is also an int
+        return llvm.ConstInt(Bool.llvm_type, value, True)
     elif isinstance(value, int):
         return llvm.ConstInt(Long.llvm_type, value, True)
     else:
@@ -588,6 +591,17 @@ def emit_binary_op(builder, op, lhs, rhs):
         builder, lhs, rhs, type(op).__name__.lower()
     )
 
+def truncate_bool(builder, v):
+    """Truncate Bool value for use in conditional comparison"""
+    t = llvm.TypeOf(v)
+    if llvm.GetTypeKind(t) == llvm.IntegerTypeKind:
+        width = llvm.GetIntTypeWidth(t)
+        if width == 8:
+            return llvm.BuildCast(builder, llvm.Trunc, v, llvm.IntType(1), "")
+        elif width == 1:
+            return v
+
+    raise TypeError("Not a boolean variable")
 
 def _validate_function_args(func, args):
     """Raises TypeError if if *args* do not match annotated function signature."""

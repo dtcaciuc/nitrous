@@ -642,3 +642,33 @@ class ScopedVarsTests(unittest.TestCase):
         self.assertEqual(v["a"], 1)
         with self.assertRaises(KeyError):
             v["b"]
+
+
+class OptimizationTests(ModuleTest, unittest.TestCase):
+
+    def test_branch_elimination(self):
+
+        add_5 = False
+        add_any = True
+
+        @self.m.function(Long, a=Long, b=Bool)
+        def f1(a, b):
+            if add_any and b:
+                a += 5
+            return a
+
+        @self.m.function(Long, a=Long)
+        def f2(a):
+            if add_any and add_5:
+                a += 5
+            return a
+
+        out = self.m.build()
+        ir = " ".join(self.m.dumps().split("\n"))
+
+        # In first function, conditional depends on a parameter
+        self.assertRegexpMatches(ir, "f1.+\{.+icmp.+\}")
+
+        # In second, entire conditional is resolved at
+        # compile time and optimized away
+        self.assertNotRegexpMatches(ir, "f2.+\{.+icmp.+\}")
