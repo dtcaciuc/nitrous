@@ -525,7 +525,7 @@ def emit_body(module, builder, func):
     func_body = ast.parse(func_source).body[0].body
 
     # Emit function body IR
-    v = Visitor(module, builder, func.__n2o_globals__)
+    v = Visitor(module, builder, dict(resolve_constants(func.__n2o_globals__)))
     llvm.PositionBuilderAtEnd(builder, llvm.AppendBasicBlock(func.__n2o_func__, "entry"))
 
     # Store function parameters as locals
@@ -574,6 +574,16 @@ def emit_constant(value):
         return llvm.ConstInt(Long.llvm_type, value, True)
     else:
         raise TypeError("Unknown Number type {0!s}".format(type(value)))
+
+
+def resolve_constants(symbols):
+    """Converts eligible values in a dictionary to LLVM constant objects."""
+    for k, v in symbols.iteritems():
+        try:
+            yield k, emit_constant(v)
+        except TypeError:
+            # Not a constant, something else will handle this.
+            yield k, v
 
 
 def emit_binary_op(builder, op, lhs, rhs):

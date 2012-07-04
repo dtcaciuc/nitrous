@@ -84,17 +84,6 @@ class Module(object):
         names to their respective types.
 
         """
-        def resolve_constants(symbols):
-            """Converts eligible values in a dictionary to LLVM constant objects."""
-            from .function import emit_constant
-
-            for k, v in symbols.iteritems():
-                try:
-                    yield k, emit_constant(v)
-                except TypeError:
-                    # Not a constant, something else will handle this.
-                    yield k, v
-
         def wrapper(func):
             from .exceptions import AnnotationError
             from .lib import _range
@@ -122,8 +111,8 @@ class Module(object):
             # - Other symbols available at the point of function
             #   definition; try to resolve as many constants as possible.
             parent_frame = inspect.currentframe().f_back
-            func.__n2o_globals__.update(resolve_constants(parent_frame.f_globals))
-            func.__n2o_globals__.update(resolve_constants(parent_frame.f_locals))
+            func.__n2o_globals__.update(parent_frame.f_globals)
+            func.__n2o_globals__.update(parent_frame.f_locals)
             del parent_frame
 
             self.funcs.append(func)
