@@ -149,7 +149,7 @@ class Visitor(ast.NodeVisitor):
                 try:
                     return self.globals[addr]
                 except KeyError:
-                    raise NameError("{0} is undefined or unavailable in current scope".format(name))
+                    raise NameError("{0} is undefined or unavailable in current scope".format(addr))
 
     def visit(self, node):
         from .exceptions import TranslationError
