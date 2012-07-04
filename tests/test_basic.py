@@ -611,7 +611,7 @@ class ExternalCallTests(ModuleTest, unittest.TestCase):
 class ScopedVarsTests(unittest.TestCase):
 
     def test_scope(self):
-        from nitrous.visitor import ScopedVars
+        from nitrous.function import ScopedVars
 
         # Topmost local scope.
         v = ScopedVars()

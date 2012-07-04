@@ -63,7 +63,7 @@ class Module(object):
         :param libdir: directory where library is located
 
         """
-        from .visitor import ExternalFunction
+        from .function import ExternalFunction
 
         func = _create_function(self.module, name, restype, argtypes)
 
@@ -86,7 +86,7 @@ class Module(object):
         """
         def resolve_constants(symbols):
             """Converts eligible values in a dictionary to LLVM constant objects."""
-            from .visitor import emit_constant
+            from .function import emit_constant
 
             for k, v in symbols.iteritems():
                 try:
@@ -143,7 +143,7 @@ class Module(object):
         import types
 
         from subprocess import call
-        from .visitor import Function, emit_body
+        from .function import Function, emit_body
 
         os.makedirs(self.build_dir)
 
