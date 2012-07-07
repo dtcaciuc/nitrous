@@ -90,6 +90,8 @@ class Visitor(ast.NodeVisitor):
         self.module = module
         self.builder = builder
 
+        self.types = {}
+
         # Global immutable symbols
         self.globals = globals_
         # Scoped local symbols (including parameters)
@@ -107,7 +109,7 @@ class Visitor(ast.NodeVisitor):
         # Value stack used to assemble LLVM IR as the syntax tree is traversed.
         self.stack = []
 
-    def store(self, addr, value):
+    def store(self, addr, value, type_=None):
         """Stores *value* on the stack under *addr*.
 
         *addr* can be either a variable name or a GEP value.
@@ -126,6 +128,9 @@ class Visitor(ast.NodeVisitor):
                 func = llvm.GetBasicBlockParent(llvm.GetInsertBlock(self.builder))
                 addr = entry_alloca(func, llvm.TypeOf(value), "")
                 self.locals[name] = addr
+                # Register value type, if supplied
+                if type_ is not None:
+                    self.types[name] = type_
 
         llvm.BuildStore(self.builder, value, addr)
         return addr
@@ -151,6 +156,23 @@ class Visitor(ast.NodeVisitor):
                 except KeyError:
                     raise NameError("{0} is undefined or unavailable in current scope".format(addr))
 
+    def push(self, v, t=None):
+        self.stack.append(v)
+        if t is not None:
+            name = llvm.GetValueName(v)
+            assert isinstance(v, llvm.ValueRef)
+            assert name not in self.types
+            self.types[name] = t
+
+    def pop(self):
+        return self.stack.pop()
+
+    def typeof(self, v):
+        name = (llvm.GetValueName(v)
+                if isinstance(v, llvm.ValueRef)
+                else v)
+        return self.types[name]
+
     def visit(self, node):
         from .exceptions import TranslationError
 
@@ -166,13 +188,13 @@ class Visitor(ast.NodeVisitor):
             self.node_stack.pop()
 
     def visit_Num(self, node):
-        self.stack.append(emit_constant(node.n))
+        self.push(emit_constant(node.n))
 
     def visit_Name(self, node):
         if isinstance(node.ctx, ast.Load):
-            self.stack.append(self.load(node.id))
+            self.push(self.load(node.id))
         elif isinstance(node.ctx, ast.Store):
-            self.stack.append(node.id)
+            self.push(node.id)
         else:
             raise NotImplementedError("Unknown Name context {0!s}".format(type(node.ctx)))
 
@@ -182,8 +204,8 @@ class Visitor(ast.NodeVisitor):
 
         self.generic_visit(node)
 
-        owner = self.stack.pop()
-        self.stack.append(getattr(owner, node.attr))
+        owner = self.pop()
+        self.push(getattr(owner, node.attr))
 
     def visit_Subscript(self, node):
         """Label subscript of form `var_expr[index_expr]`.
@@ -194,14 +216,14 @@ class Visitor(ast.NodeVisitor):
 
         """
         ast.NodeVisitor.generic_visit(self, node)
-        i = self.stack.pop()
-        v = self.stack.pop()
+        i = self.pop()
+        v = self.pop()
 
         addr = llvm.BuildGEP(self.builder, v, ctypes.byref(i), 1, "addr")
         if isinstance(node.ctx, ast.Load):
-            self.stack.append(llvm.BuildLoad(self.builder, addr, "element"))
+            self.push(llvm.BuildLoad(self.builder, addr, "element"))
         elif isinstance(node.ctx, ast.Store):
-            self.stack.append(addr)
+            self.push(addr)
         else:
             raise NotImplementedError("Unsupported subscript context {0}".format(node.ctx))
 
@@ -217,24 +239,24 @@ class Visitor(ast.NodeVisitor):
             raise NotImplementedError("Chained assignment is not supported")
 
         ast.NodeVisitor.generic_visit(self, node)
-        rhs = self.stack.pop()
+        rhs = self.pop()
 
         if isinstance(target, (ast.Name, ast.Subscript)):
             # foo = rhs or foo[i] = rhs where foo[i] is the GEP,
             # previous pushed by visit_Subscript
-            self.store(self.stack.pop(), rhs)
+            self.store(self.pop(), rhs)
         else:
             raise NotImplementedError("Unsupported assignment target {0}"
                                       .format(node.targets[0]))
 
     def visit_AugAssign(self, node):
         ast.NodeVisitor.generic_visit(self, node)
-        rhs = self.stack.pop()
+        rhs = self.pop()
 
         if isinstance(node.target, (ast.Name, ast.Subscript)):
             # lhs += rhs or lhs[i] += rhs, where foo[i] is the GEP,
             # previous pushed by visit_Subscript
-            lhs_addr = self.stack.pop()
+            lhs_addr = self.pop()
             rhs = emit_binary_op(self.builder, node.op, self.load(lhs_addr), rhs)
             self.store(lhs_addr, rhs)
         else:
@@ -256,7 +278,7 @@ class Visitor(ast.NodeVisitor):
             llvm.BuildRetVoid(self.builder)
 
         else:
-            v = self.stack.pop()
+            v = self.pop()
             t = llvm.TypeOf(v)
             # Special case; if we're returning boolean, cast to i8
             # FIXME Move this to Bool.emit_cast_to or similar?
@@ -270,19 +292,19 @@ class Visitor(ast.NodeVisitor):
 
     def visit_BinOp(self, node):
         ast.NodeVisitor.generic_visit(self, node)
-        rhs = self.stack.pop()
-        lhs = self.stack.pop()
+        rhs = self.pop()
+        lhs = self.pop()
 
         v = emit_binary_op(self.builder, node.op, lhs, rhs)
-        self.stack.append(v)
+        self.push(v)
 
     def visit_BoolOp(self, node):
         ast.NodeVisitor.generic_visit(self, node)
-        rhs = self.stack.pop()
-        lhs = self.stack.pop()
+        rhs = self.pop()
+        lhs = self.pop()
 
         v = BOOL_INST[type(node.op)](self.builder, lhs, rhs, "tmp")
-        self.stack.append(v)
+        self.push(v)
 
     def visit_Compare(self, node):
         from .types import COMPARE_INST, type_key, types_equal
@@ -291,8 +313,8 @@ class Visitor(ast.NodeVisitor):
             raise NotImplementedError("Only simple `if` expressions are supported")
 
         ast.NodeVisitor.generic_visit(self, node)
-        rhs = self.stack.pop()
-        lhs = self.stack.pop()
+        rhs = self.pop()
+        lhs = self.pop()
         op = node.ops[0]
 
         ty = llvm.TypeOf(lhs)
@@ -303,13 +325,13 @@ class Visitor(ast.NodeVisitor):
         inst, ops = COMPARE_INST[type_key(ty)]
         v = inst(self.builder, ops[type(op)], lhs, rhs, "tmp")
 
-        self.stack.append(v)
+        self.push(v)
 
     def visit_IfExp(self, node):
         from .types import types_equal
 
         self.visit(node.test)
-        test_expr = truncate_bool(self.builder, self.stack.pop())
+        test_expr = truncate_bool(self.builder, self.pop())
 
         func = llvm.GetBasicBlockParent(llvm.GetInsertBlock(self.builder))
         if_branch_bb = llvm.AppendBasicBlock(func, "if")
@@ -320,7 +342,7 @@ class Visitor(ast.NodeVisitor):
 
         llvm.PositionBuilderAtEnd(self.builder, if_branch_bb)
         self.visit(node.body)
-        if_expr = self.stack.pop()
+        if_expr = self.pop()
         llvm.BuildBr(self.builder, merge_bb)
 
         # Getting updated insertion block in case of nested conditionals
@@ -328,7 +350,7 @@ class Visitor(ast.NodeVisitor):
 
         llvm.PositionBuilderAtEnd(self.builder, else_branch_bb)
         self.visit(node.orelse)
-        else_expr = self.stack.pop()
+        else_expr = self.pop()
         llvm.BuildBr(self.builder, merge_bb)
 
         # Getting updated insertion block in case of nested conditionals
@@ -343,11 +365,11 @@ class Visitor(ast.NodeVisitor):
         llvm.AddIncoming(phi, ctypes.byref(if_expr), ctypes.byref(if_branch_bb), 1)
         llvm.AddIncoming(phi, ctypes.byref(else_expr), ctypes.byref(else_branch_bb), 1)
 
-        self.stack.append(phi)
+        self.push(phi)
 
     def visit_If(self, node):
         self.visit(node.test)
-        test_expr = truncate_bool(self.builder, self.stack.pop())
+        test_expr = truncate_bool(self.builder, self.pop())
 
         func = llvm.GetBasicBlockParent(llvm.GetInsertBlock(self.builder))
         if_branch_bb = llvm.AppendBasicBlock(func, "if")
@@ -441,10 +463,10 @@ class Visitor(ast.NodeVisitor):
         llvm.PositionBuilderAtEnd(self.builder, start_bb)
 
         self.visit(node.target)
-        target = self.stack.pop()
+        target = self.pop()
 
         self.visit(node.iter)
-        start, stop, step = self.stack.pop()
+        start, stop, step = self.pop()
 
         # Loop counter
         i_ptr = self.store(target, start)
@@ -490,8 +512,8 @@ class Visitor(ast.NodeVisitor):
 
     def visit_Call(self, node):
         ast.NodeVisitor.generic_visit(self, node)
-        args = [self.stack.pop() for _ in range(len(node.args))][::-1]
-        func = self.stack.pop()
+        args = [self.pop() for _ in range(len(node.args))][::-1]
+        func = self.pop()
 
         if hasattr(func, "__n2o_func__"):
             # Function is compiled; check arguments for validity (unless
@@ -507,7 +529,7 @@ class Visitor(ast.NodeVisitor):
             if getattr(result, "__n2o_emitter__", False):
                 result = result(self.module, self.builder)
 
-        self.stack.append(result)
+        self.push(result)
 
 
 def emit_body(module, builder, func):
@@ -530,7 +552,8 @@ def emit_body(module, builder, func):
 
     # Store function parameters as locals
     for i, name in enumerate(func.__n2o_args__):
-        v.store(name, llvm.GetParam(func.__n2o_func__, i))
+        v.store(name, llvm.GetParam(func.__n2o_func__, i),
+                func.__n2o_argtypes__[name])
 
     try:
         for node in func_body:
