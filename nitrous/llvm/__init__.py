@@ -44,6 +44,14 @@ class owned_c_char_p(ctypes.c_char_p):
 
 Bool = ctypes.c_int
 
+# Context
+class OpaqueContext(ctypes.Structure):
+    pass
+
+ContextRef = ctypes.POINTER(OpaqueContext)
+
+_func("GetGlobalContext", ContextRef);
+
 
 # Module
 class OpaqueModule(ctypes.Structure):
@@ -127,6 +135,15 @@ if "GetIntrinsicCount__" in globals():
 
 (ExternalLinkage,) = range(1)
 
+# Structure Types
+_func("StructType", TypeRef, [ctypes.POINTER(TypeRef), ctypes.c_uint, ctypes.c_bool])
+_func("StructCreateNamed", TypeRef, [ContextRef, ctypes.c_char_p])
+_func("StructSetBody", None, [TypeRef,
+                              ctypes.POINTER(TypeRef),
+                              ctypes.c_uint, ctypes.c_bool]);
+
+_func("GetStructName", ctypes.c_char_p, [TypeRef])
+
 
 # Blocks
 class OpaqueBasicBlock(ctypes.Structure):
@@ -195,6 +212,7 @@ _func("BuildStore", ValueRef, [BuilderRef, ValueRef, ValueRef])
 _func("BuildGEP", ValueRef, [BuilderRef, ValueRef,
                              ctypes.POINTER(ValueRef), ctypes.c_uint,
                              ctypes.c_char_p])
+_func("BuildStructGEP", ValueRef, [BuilderRef, ValueRef, ctypes.c_uint, ctypes.c_char_p])
 _func("BuildAlloca", ValueRef, [BuilderRef, TypeRef, ctypes.c_char_p])
 _func("BuildArrayAlloca", ValueRef, [BuilderRef, TypeRef, ValueRef, ctypes.c_char_p])
 

@@ -126,7 +126,7 @@ class Visitor(ast.NodeVisitor):
                 # First time storing the variable; allocate stack space
                 # and register with most nested scope.
                 func = llvm.GetBasicBlockParent(llvm.GetInsertBlock(self.builder))
-                addr = entry_alloca(func, llvm.TypeOf(value), "")
+                addr = entry_alloca(func, llvm.TypeOf(value), "v")
                 self.locals[name] = addr
                 # Register value type, if supplied
                 if type_ is not None:
@@ -145,11 +145,11 @@ class Visitor(ast.NodeVisitor):
 
         """
         if isinstance(addr, llvm.ValueRef):
-            return llvm.BuildLoad(self.builder, addr, "")
+            return llvm.BuildLoad(self.builder, addr, "v")
         else:
             try:
                 # Try variables; they are all LLVM values and stack pointers.
-                return llvm.BuildLoad(self.builder, self.locals[addr], "")
+                return llvm.BuildLoad(self.builder, self.locals[addr], "v")
             except KeyError:
                 try:
                     return self.globals[addr]
@@ -157,6 +157,7 @@ class Visitor(ast.NodeVisitor):
                     raise NameError("{0} is undefined or unavailable in current scope".format(addr))
 
     def push(self, v, t=None):
+        """Pushes a value on expression value stack, with optional type."""
         self.stack.append(v)
         if t is not None:
             name = llvm.GetValueName(v)
@@ -165,13 +166,18 @@ class Visitor(ast.NodeVisitor):
             self.types[name] = t
 
     def pop(self):
+        """Pops top value from expression value stack."""
         return self.stack.pop()
 
     def typeof(self, v):
-        name = (llvm.GetValueName(v)
-                if isinstance(v, llvm.ValueRef)
-                else v)
-        return self.types[name]
+        """Returns nitrous type for value *v*.
+
+        Returns None if *v* has no known type association. *v* can be
+        either an LLVM value or value name.
+
+        """
+        name = llvm.GetValueName(v) if isinstance(v, llvm.ValueRef) else v
+        return self.types.get(name, None)
 
     def visit(self, node):
         from .exceptions import TranslationError
@@ -192,20 +198,33 @@ class Visitor(ast.NodeVisitor):
 
     def visit_Name(self, node):
         if isinstance(node.ctx, ast.Load):
-            self.push(self.load(node.id))
+            self.push(self.load(node.id), self.typeof(node.id))
         elif isinstance(node.ctx, ast.Store):
             self.push(node.id)
         else:
             raise NotImplementedError("Unknown Name context {0!s}".format(type(node.ctx)))
 
     def visit_Attribute(self, node):
-        if not isinstance(node.ctx, ast.Load):
-            raise NotImplementedError("Setting attributes not supported")
+        from .types import Reference
 
         self.generic_visit(node)
 
         owner = self.pop()
-        self.push(getattr(owner, node.attr))
+        owner_type = self.typeof(owner)
+
+        if isinstance(self.typeof(owner), Reference):
+            if isinstance(node.ctx, ast.Load):
+                self.push(*owner_type.value_type.emit_getattr(self.builder, owner, node.attr))
+            elif isinstance(node.ctx, ast.Store):
+                self.push(*owner_type.value_type.emit_setattr(self.builder, owner, node.attr))
+            else:
+                raise NotImplementedError("Unsupported attribute context {0}".format(node.ctx))
+        else:
+            if isinstance(node.ctx, ast.Load):
+                self.push(getattr(owner, node.attr), None)
+            else:
+                raise NotImplementedError("Unsupported attribute context {0}".format(node.ctx))
+
 
     def visit_Subscript(self, node):
         """Label subscript of form `var_expr[index_expr]`.
@@ -215,15 +234,24 @@ class Visitor(ast.NodeVisitor):
         about the source data will complete the instruction.
 
         """
+        from .types import Structure, Reference
+
         ast.NodeVisitor.generic_visit(self, node)
         i = self.pop()
         v = self.pop()
 
         addr = llvm.BuildGEP(self.builder, v, ctypes.byref(i), 1, "addr")
         if isinstance(node.ctx, ast.Load):
-            self.push(llvm.BuildLoad(self.builder, addr, "element"))
+            element_type = self.typeof(v).element_type
+            if isinstance(element_type, Structure):
+                self.push(addr, Reference(element_type))
+            else:
+                element = llvm.BuildLoad(self.builder, addr, "v")
+                self.push(element, element_type)
+
         elif isinstance(node.ctx, ast.Store):
             self.push(addr)
+
         else:
             raise NotImplementedError("Unsupported subscript context {0}".format(node.ctx))
 
@@ -241,10 +269,9 @@ class Visitor(ast.NodeVisitor):
         ast.NodeVisitor.generic_visit(self, node)
         rhs = self.pop()
 
-        if isinstance(target, (ast.Name, ast.Subscript)):
-            # foo = rhs or foo[i] = rhs where foo[i] is the GEP,
-            # previous pushed by visit_Subscript
-            self.store(self.pop(), rhs)
+        if isinstance(target, (ast.Name, ast.Subscript, ast.Attribute)):
+            # Handled cases: lhs = rhs, *lhs_gep = rhs
+            self.store(self.pop(), rhs, self.typeof(rhs))
         else:
             raise NotImplementedError("Unsupported assignment target {0}"
                                       .format(node.targets[0]))
@@ -258,6 +285,7 @@ class Visitor(ast.NodeVisitor):
             # previous pushed by visit_Subscript
             lhs_addr = self.pop()
             rhs = emit_binary_op(self.builder, node.op, self.load(lhs_addr), rhs)
+            # No need to store type, since the target already exists
             self.store(lhs_addr, rhs)
         else:
             raise NotImplementedError("Unsupported augmented assignment target {0}"
@@ -522,7 +550,7 @@ class Visitor(ast.NodeVisitor):
                 _validate_function_args(func, args)
             result = llvm.BuildCall(self.builder, func.__n2o_func__,
                                     (llvm.ValueRef * len(args))(*args),
-                                    len(args), "")
+                                    len(args), "v")
         else:
             # Function is either CPython one or an LLVM emitter.
             result = func(*args)
@@ -552,8 +580,9 @@ def emit_body(module, builder, func):
 
     # Store function parameters as locals
     for i, name in enumerate(func.__n2o_args__):
-        v.store(name, llvm.GetParam(func.__n2o_func__, i),
-                func.__n2o_argtypes__[name])
+        param = llvm.GetParam(func.__n2o_func__, i)
+        llvm.SetValueName(param, name)
+        v.store(name, param, func.__n2o_argtypes__[name])
 
     try:
         for node in func_body:
@@ -627,7 +656,7 @@ def truncate_bool(builder, v):
     if llvm.GetTypeKind(t) == llvm.IntegerTypeKind:
         width = llvm.GetIntTypeWidth(t)
         if width == 8:
-            return llvm.BuildCast(builder, llvm.Trunc, v, llvm.IntType(1), "")
+            return llvm.BuildCast(builder, llvm.Trunc, v, llvm.IntType(1), "v")
         elif width == 1:
             return v
 

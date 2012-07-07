@@ -118,3 +118,50 @@ class Pointer(object):
             return ctypes.cast(addr, pointer_type)
 
         return p
+
+
+class Structure(object):
+
+    FIELD_NAME, FIELD_TYPE = range(2)
+
+    # TODO add packing flag
+
+    def __init__(self, name, *fields):
+
+        self.name = name
+        self.fields = fields
+
+        self.c_type = type(name + "_CType",
+                           (ctypes.Structure,),
+                           {"_fields_": [(f, t.c_type) for f, t in fields]})
+
+        # TODO check if name exists or does it unique it automatically?
+        self.llvm_type = llvm.StructCreateNamed(llvm.GetGlobalContext(), name)
+        llvm_fields = (llvm.TypeRef * len(fields))(*(t.llvm_type for f, t in fields))
+        llvm.StructSetBody(self.llvm_type, llvm_fields, len(fields), False)
+
+    def emit_getattr(self, builder, ref, attr):
+        """IR: Emits attribute value load from structure reference."""
+        gep, t = self._field_gep(builder, ref, attr)
+        return llvm.BuildLoad(builder, gep, "v"), t
+
+    def emit_setattr(self, builder, ref, attr):
+        """IR: Emits GEP used to set the attribute value."""
+        gep, t = self._field_gep(builder, ref, attr)
+        return gep, Reference(t)
+
+    def _field_gep(self, builder, p, field):
+        """Returns GEP and type for a *field*"""
+        for i, (f, t) in enumerate(self.fields):
+            if f == field:
+                gep = llvm.BuildStructGEP(builder, p, i, "gep")
+                return gep, self.fields[i][self.FIELD_TYPE]
+
+        raise KeyError(field)
+
+
+class Reference(object):
+    """Special type to denote reference to an aggregate value / vector."""
+
+    def __init__(self, value_type):
+        self.value_type = value_type
