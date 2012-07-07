@@ -90,6 +90,9 @@ class Visitor(ast.NodeVisitor):
         self.module = module
         self.builder = builder
 
+        # Map of value names to their nitrous types. Currently,
+        # this is important only for arrays of aggregate values
+        # to facilitate correct reference mechanics.
         self.types = {}
 
         # Global immutable symbols
@@ -156,14 +159,19 @@ class Visitor(ast.NodeVisitor):
                 except KeyError:
                     raise NameError("{0} is undefined or unavailable in current scope".format(addr))
 
-    def push(self, v, t=None):
-        """Pushes a value on expression value stack, with optional type."""
-        self.stack.append(v)
-        if t is not None:
-            name = llvm.GetValueName(v)
-            assert isinstance(v, llvm.ValueRef)
+    def push(self, value, type_=None):
+        """Pushes a value on expression value stack.
+
+        Optionally, associates nitrous *type_* with the value, which
+        can later be requested with ``typeof()``.
+
+        """
+        self.stack.append(value)
+        if type_ is not None:
+            name = llvm.GetValueName(value)
+            assert isinstance(value, llvm.ValueRef)
             assert name not in self.types
-            self.types[name] = t
+            self.types[name] = type_
 
     def pop(self):
         """Pops top value from expression value stack."""
@@ -209,22 +217,26 @@ class Visitor(ast.NodeVisitor):
 
         self.generic_visit(node)
 
-        owner = self.pop()
-        owner_type = self.typeof(owner)
+        v = self.pop()
+        vt = self.typeof(v)
 
-        if isinstance(self.typeof(owner), Reference):
+        if isinstance(vt, Reference):
+            # References to structures
+            vt = vt.value_type
             if isinstance(node.ctx, ast.Load):
-                self.push(*owner_type.value_type.emit_getattr(self.builder, owner, node.attr))
+                a, at = vt.emit_getattr(self.builder, v, node.attr)
             elif isinstance(node.ctx, ast.Store):
-                self.push(*owner_type.value_type.emit_setattr(self.builder, owner, node.attr))
+                a, at = vt.emit_setattr(self.builder, v, node.attr)
             else:
                 raise NotImplementedError("Unsupported attribute context {0}".format(node.ctx))
         else:
+            # Assume regular python object
             if isinstance(node.ctx, ast.Load):
-                self.push(getattr(owner, node.attr), None)
+                a, at = getattr(v, node.attr), None
             else:
                 raise NotImplementedError("Unsupported attribute context {0}".format(node.ctx))
 
+        self.push(a, at)
 
     def visit_Subscript(self, node):
         """Label subscript of form `var_expr[index_expr]`.
@@ -280,9 +292,8 @@ class Visitor(ast.NodeVisitor):
         ast.NodeVisitor.generic_visit(self, node)
         rhs = self.pop()
 
-        if isinstance(node.target, (ast.Name, ast.Subscript)):
-            # lhs += rhs or lhs[i] += rhs, where foo[i] is the GEP,
-            # previous pushed by visit_Subscript
+        if isinstance(node.target, (ast.Name, ast.Subscript, ast.Attribute)):
+            # Handled cases: lhs = rhs, *lhs_gep = rhs
             lhs_addr = self.pop()
             rhs = emit_binary_op(self.builder, node.op, self.load(lhs_addr), rhs)
             # No need to store type, since the target already exists

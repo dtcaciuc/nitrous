@@ -87,3 +87,28 @@ class StructureTests(ModuleTest, unittest.TestCase):
             self.assertAlmostEqual(a[1].x, 4)
             self.assertAlmostEqual(a[1].y, 5)
             self.assertAlmostEqual(a[1].z, 6)
+
+    def test_aug_assign(self):
+        """Augmented attribute assignment"""
+
+        @self.m.function(None, a=Pointer(Coord), i=Long, j=Long)
+        def add_i(a, i, j):
+            a[i].x += a[j].x
+            a[i].y += a[j].y
+            a[i].z += a[j].z
+
+        a = (Coord.c_type * 2)(
+            (1, 2, 3),
+            (4, 5, 6)
+        )
+
+        out = self.m.build()
+        out.add_i(a, 0, 1)
+
+        self.assertAlmostEqual(a[0].x, 5)
+        self.assertAlmostEqual(a[0].y, 7)
+        self.assertAlmostEqual(a[0].z, 9)
+
+        self.assertAlmostEqual(a[1].x, 4)
+        self.assertAlmostEqual(a[1].y, 5)
+        self.assertAlmostEqual(a[1].z, 6)
