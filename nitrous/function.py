@@ -561,7 +561,9 @@ class Visitor(ast.NodeVisitor):
                 _validate_function_args(func, args)
             result = llvm.BuildCall(self.builder, func.__n2o_func__,
                                     (llvm.ValueRef * len(args))(*args),
-                                    len(args), "v")
+                                    len(args), "")
+            if func.__n2o_restype__ is not None:
+                llvm.SetValueName(result, "v")
         else:
             # Function is either CPython one or an LLVM emitter.
             result = func(*args)

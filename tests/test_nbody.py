@@ -28,30 +28,6 @@ class NBodyTests(ModuleTest, unittest.TestCase):
         # - Uranus
         # - Neptune
 
-        xyz = np.array([
-            [0.0, 0.0, 0.0],
-            [4.84143144246472090e+00, -1.16032004402742839e+00, -1.03622044471123109e-01],
-            [8.34336671824457987e+00, 4.12479856412430479e+00, -4.03523417114321381e-01],
-            [1.28943695621391310e+01, -1.51111514016986312e+01, -2.23307578892655734e-01],
-            [1.53796971148509165e+01, -2.59193146099879641e+01, 1.79258772950371181e-01]
-        ], dtype=np.float64)
-
-        vxyz = np.array([
-            [0.0, 0.0, 0.0],
-            [1.66007664274403694e-03, 7.69901118419740425e-03, -6.90460016972063023e-05],
-            [-2.76742510726862411e-03, 4.99852801234917238e-03, 2.30417297573763929e-05],
-            [2.96460137564761618e-03, 2.37847173959480950e-03, -2.96589568540237556e-05],
-            [2.68067772490389322e-03, 1.62824170038242295e-03, -9.51592254519715870e-05],
-        ], dtype=np.float64) * DAYS_PER_YEAR
-
-        mass = np.array([
-            1.0,
-            9.54791938424326609e-04,
-            2.85885980666130812e-04,
-            4.36624404335156298e-05,
-            5.15138902046611451e-05,
-        ], dtype=np.float64) * SOLAR_MASS
-
         common_args = {
             "xyz": Pointer(Double),
             "vxyz": Pointer(Double),
@@ -59,8 +35,8 @@ class NBodyTests(ModuleTest, unittest.TestCase):
             "n_bodies": Long
         }
 
-        @self.m.function(Double, **common_args)
-        def offset_momentum(xyz, vxyz, mass, n_bodies):
+        @self.m.function(vxyz=Pointer(Double), mass=Pointer(Double), n_bodies=Long)
+        def offset_momentum(vxyz, mass, n_bodies):
             px = 0.0
             py = 0.0
             pz = 0.0
@@ -73,8 +49,6 @@ class NBodyTests(ModuleTest, unittest.TestCase):
             vxyz[X] = px / SOLAR_MASS
             vxyz[Y] = py / SOLAR_MASS
             vxyz[Z] = pz / SOLAR_MASS
-
-            return 0.0
 
         @self.m.function(Double, **common_args)
         def energy(xyz, vxyz, mass, n_bodies):
@@ -98,7 +72,7 @@ class NBodyTests(ModuleTest, unittest.TestCase):
 
             return e
 
-        @self.m.function(Double, dt=Double, **common_args)
+        @self.m.function(dt=Double, **common_args)
         def advance(xyz, vxyz, mass, n_bodies, dt):
             for i in range(n_bodies):
                 for j in range(i + 1, n_bodies):
@@ -122,17 +96,18 @@ class NBodyTests(ModuleTest, unittest.TestCase):
                 xyz[i * 3 + Y] += dt * vxyz[i * 3 + Y]
                 xyz[i * 3 + Z] += dt * vxyz[i * 3 + Z]
 
-            return 0.0
-
-        @self.m.function(Double, n_steps=Long, **common_args)
+        @self.m.function(n_steps=Long, **common_args)
         def loop(xyz, vxyz, mass, n_bodies, n_steps):
             for i in range(n_steps):
                 advance(xyz, vxyz, mass, n_bodies, 0.01)
-            return 0.0
 
         out = self.m.build()
 
-        out.offset_momentum(xyz, vxyz, mass, 5)
+        xyz = np.genfromtxt("tests/data/nbody-position")
+        vxyz = np.genfromtxt("tests/data/nbody-velocity") * DAYS_PER_YEAR
+        mass = np.genfromtxt("tests/data/nbody-mass") * SOLAR_MASS
+
+        out.offset_momentum(vxyz, mass, 5)
 
         # from time import time
         # t0 = time()
