@@ -269,7 +269,7 @@ class Visitor(ast.NodeVisitor):
         # Index is a nd tuple
         t = self.typeof(v)
         if len(i) != len(t.shape):
-            raise TypeError("Index and pointer shapes don't match")
+            raise TypeError("Index and pointer shapes don't match ({0} != {1})".format(len(i), len(t.shape)))
 
         # TODO check const shape dimension values?
 
