@@ -207,6 +207,27 @@ class SubscriptTests(ModuleTest, unittest.TestCase):
             self.m.build()
 
 
+class IndexTests(ModuleTest, unittest.TestCase):
+
+    def test_nd_index(self):
+        import ctypes
+
+        @self.m.function(Long, y=Pointer(Long, shape=(2, 3, 2)), i=Long, j=Long, k=Long)
+        def x(y, i, j, k):
+            return y[i, j, k]
+
+        out = self.m.build()
+
+        dtype = (((ctypes.c_long * 2) * 3) * 2)
+        data = dtype(((1, 2), (3, 4), (5, 6)), ((7, 8), (9, 10), (11, 12)))
+        c_data = ctypes.cast(data, Pointer(Long).c_type)
+
+        for i in range(2):
+            for j in range(3):
+                for k in range(2):
+                    self.assertEqual(out.x(c_data, i, j, k), data[i][j][k])
+
+
 class ReturnTests(ModuleTest, unittest.TestCase):
 
     def test_if(self):

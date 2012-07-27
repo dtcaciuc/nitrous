@@ -79,15 +79,11 @@ COMPARE_INST = {
 
 
 class Pointer(object):
-    """Pointer to memory block, each element of type `element_type`.
+    """Pointer to memory block, each element of type `element_type`."""
 
-    Does not provide any dimensionality information; user must
-    take care of tracking access index bounds.
-
-    """
-
-    def __init__(self, element_type):
+    def __init__(self, element_type, shape=(None,)):
         self.element_type = element_type
+        self.shape = shape
 
     @property
     def llvm_type(self):

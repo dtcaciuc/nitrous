@@ -238,6 +238,20 @@ class Visitor(ast.NodeVisitor):
 
         self.push(a, at)
 
+    def visit_Tuple(self, node):
+        ast.NodeVisitor.generic_visit(self, node)
+        v = tuple([self.pop() for _ in node.elts][::-1])
+        self.push(v)
+
+    def visit_Index(self, node):
+        if isinstance(node.value, ast.Tuple):
+            # Tuple visitor will push the value onto the stack itself
+            ast.NodeVisitor.generic_visit(self, node)
+        else:
+            # Assume everything else will produce a single index value.
+            ast.NodeVisitor.generic_visit(self, node)
+            self.push((self.pop(),))
+
     def visit_Subscript(self, node):
         """Label subscript of form `var_expr[index_expr]`.
 
@@ -246,13 +260,25 @@ class Visitor(ast.NodeVisitor):
         about the source data will complete the instruction.
 
         """
-        from .types import Structure, Reference
+        from .types import Structure, Reference, Long
 
         ast.NodeVisitor.generic_visit(self, node)
         i = self.pop()
         v = self.pop()
 
-        addr = llvm.BuildGEP(self.builder, v, ctypes.byref(i), 1, "addr")
+        # Index is a nd tuple
+        t = self.typeof(v)
+        if len(i) != len(t.shape):
+            raise TypeError("Index and pointer shapes don't match")
+
+        # TODO check const shape dimension values?
+
+        # Build conversion from ND-index to flat memory offset
+        # FIXME currently assumes row-major memory alignment, first dimension can vary
+        const_shape = [llvm.ConstInt(Long.llvm_type, d, True) for d in t.shape[1:]]
+        ii = flatten_index(self.builder, i, const_shape)
+
+        addr = llvm.BuildGEP(self.builder, v, ctypes.byref(ii), 1, "addr")
         if isinstance(node.ctx, ast.Load):
             element_type = self.typeof(v).element_type
             if isinstance(element_type, Structure):
@@ -674,6 +700,37 @@ def truncate_bool(builder, v):
             return v
 
     raise TypeError("Not a boolean variable")
+
+
+def flatten_index(builder, index, const_shape):
+    """Converts N-dimensional index into 1-dimensional one.
+
+    index is of a form ``(i0, i1, ... iN)``, where *i* is ValueRefs
+    holding individual dimension indices.
+
+    First dimension is considered to be variable. Given array shape
+    ``(d0, d1, ... dN)``, *const_shape* contains ``(d1, d2, ... dN)``.
+
+    If array is 1-dimensional, *const_shape* is an empty tuple.
+
+    """
+    from .types import Long
+
+    int_ = lambda x: llvm.ConstInt(Long.llvm_type, x, True)
+    mul_ = lambda x, y: llvm.BuildMul(builder, x, y, "v")
+
+    # out = 0
+    out = int_(0)
+
+    for i in range(0, len(const_shape)):
+        # out += index[i-1] * reduce(mul, const_shape[i:], 1)
+        tmp = reduce(mul_, const_shape[i:], int_(1))
+        rhs = llvm.BuildMul(builder, index[i], tmp, "v")
+        out = llvm.BuildAdd(builder, out, rhs, "v")
+
+    # return out + index[-1]
+    return llvm.BuildAdd(builder, out, index[-1], "v")
+
 
 def _validate_function_args(func, args):
     """Raises TypeError if if *args* do not match annotated function signature."""
