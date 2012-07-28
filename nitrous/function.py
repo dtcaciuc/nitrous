@@ -260,38 +260,21 @@ class Visitor(ast.NodeVisitor):
         about the source data will complete the instruction.
 
         """
-        from .types import Structure, Reference, Long
-
         ast.NodeVisitor.generic_visit(self, node)
         i = self.pop()
         v = self.pop()
 
         # Index is a nd tuple
-        t = self.typeof(v)
-        if len(i) != len(t.shape):
-            raise TypeError("Index and pointer shapes don't match ({0} != {1})".format(len(i), len(t.shape)))
+        vt = self.typeof(v)
 
-        # TODO check const shape dimension values?
-
-        # Build conversion from ND-index to flat memory offset
-        # FIXME currently assumes row-major memory alignment, first dimension can vary
-        const_shape = [llvm.ConstInt(Long.llvm_type, d, True) for d in t.shape[1:]]
-        ii = flatten_index(self.builder, i, const_shape)
-
-        addr = llvm.BuildGEP(self.builder, v, ctypes.byref(ii), 1, "addr")
         if isinstance(node.ctx, ast.Load):
-            element_type = self.typeof(v).element_type
-            if isinstance(element_type, Structure):
-                self.push(addr, Reference(element_type))
-            else:
-                element = llvm.BuildLoad(self.builder, addr, "v")
-                self.push(element, element_type)
-
+            e, et = vt.emit_getitem(self.builder, v, i)
         elif isinstance(node.ctx, ast.Store):
-            self.push(addr)
-
+            e, et = vt.emit_setitem(self.builder, v, i)
         else:
             raise NotImplementedError("Unsupported subscript context {0}".format(node.ctx))
+
+        self.push(e, et)
 
     def visit_Slice(self, node):
         raise NotImplementedError("Slices are not supported")
@@ -700,36 +683,6 @@ def truncate_bool(builder, v):
             return v
 
     raise TypeError("Not a boolean variable")
-
-
-def flatten_index(builder, index, const_shape):
-    """Converts N-dimensional index into 1-dimensional one.
-
-    index is of a form ``(i0, i1, ... iN)``, where *i* is ValueRefs
-    holding individual dimension indices.
-
-    First dimension is considered to be variable. Given array shape
-    ``(d0, d1, ... dN)``, *const_shape* contains ``(d1, d2, ... dN)``.
-
-    If array is 1-dimensional, *const_shape* is an empty tuple.
-
-    """
-    from .types import Long
-
-    int_ = lambda x: llvm.ConstInt(Long.llvm_type, x, True)
-    mul_ = lambda x, y: llvm.BuildMul(builder, x, y, "v")
-
-    # out = 0
-    out = int_(0)
-
-    for i in range(0, len(const_shape)):
-        # out += index[i-1] * reduce(mul, const_shape[i:], 1)
-        tmp = reduce(mul_, const_shape[i:], int_(1))
-        rhs = llvm.BuildMul(builder, index[i], tmp, "v")
-        out = llvm.BuildAdd(builder, out, rhs, "v")
-
-    # return out + index[-1]
-    return llvm.BuildAdd(builder, out, index[-1], "v")
 
 
 def _validate_function_args(func, args):
