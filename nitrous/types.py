@@ -157,6 +157,11 @@ class Structure(object):
         llvm_fields = (llvm.TypeRef * len(fields))(*(t.llvm_type for f, t in fields))
         llvm.StructSetBody(self.llvm_type, llvm_fields, len(fields), False)
 
+    @property
+    def argtype(self):
+        # Pass by reference if directly used as argument type.
+        return Reference(self)
+
     def emit_getattr(self, builder, ref, attr):
         """IR: Emits attribute value load from structure reference."""
         gep, t = self._field_gep(builder, ref, attr)
@@ -182,6 +187,14 @@ class Reference(object):
 
     def __init__(self, value_type):
         self.value_type = value_type
+
+    @property
+    def c_type(self):
+        return ctypes.POINTER(self.value_type.c_type)
+
+    @property
+    def llvm_type(self):
+        return llvm.PointerType(self.value_type.llvm_type, 0)
 
 
 def flatten_index(builder, index, const_shape):

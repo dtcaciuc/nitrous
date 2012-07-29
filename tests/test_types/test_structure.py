@@ -112,3 +112,21 @@ class StructureTests(ModuleTest, unittest.TestCase):
         self.assertAlmostEqual(a[1].x, 4)
         self.assertAlmostEqual(a[1].y, 5)
         self.assertAlmostEqual(a[1].z, 6)
+
+    def test_value_arg(self):
+        """Passing structure argument by value"""
+        from nitrous.lib.math import sqrt
+
+        @self.m.function(Double, a=Coord)
+        def _norm(a):
+            return sqrt(a.x * a.x + a.y * a.y + a.z * a.z)
+
+        @self.m.function(Double, a=Coord)
+        def norm(a):
+            # Test passing by-value to inner compiled function.
+            return _norm(a)
+
+        out = self.m.build()
+
+        c = Coord.c_type(1, 2, 3)
+        self.assertAlmostEqual(out.norm(c), 3.741657386)

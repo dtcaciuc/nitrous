@@ -91,7 +91,13 @@ class Module(object):
 
             # Annotate function and remember it for later translation.
             func.__n2o_restype__ = restype
-            func.__n2o_argtypes__ = kwargs
+            # Types can provide a susbtitution if they're used directly
+            # as an argument type (eg. Structure needs to be implicitly
+            # passed as Reference() to said structure.
+            func.__n2o_argtypes__ = dict(
+                (k, t.argtype if hasattr(t, "argtype") else t)
+                for k, t in kwargs.items()
+            )
 
             # - Ordered argument name sequence
             spec = inspect.getargspec(func)
