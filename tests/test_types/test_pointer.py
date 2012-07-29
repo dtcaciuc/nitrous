@@ -4,11 +4,10 @@ import ctypes
 from nitrous.types import Double, Pointer
 from nitrous.util import ModuleTest
 
-# try:
-#     import numpy as np
-# except ImportError:
-#     np = None
-import numpy as np
+try:
+    import numpy as np
+except ImportError:
+    np = None
 
 
 class ConverterTests(ModuleTest, unittest.TestCase):
