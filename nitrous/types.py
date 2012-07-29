@@ -182,6 +182,70 @@ class Structure(object):
         raise KeyError(field)
 
 
+class Array(Structure):
+    # Wraps incoming np.array or ctypes array into a structure
+    # with standard shape/number-of-dimensions attributes that can be
+    # used from compiled function.
+    #
+    # The resulting structure supports getitem/setitem so that there's
+    # no need to address it's `data` attribute.
+
+    def __init__(self, element_type, ndim=1):
+        self.element_type = element_type
+        self.ndim = ndim
+
+        super(Array, self).__init__(
+            # TODO better way to generate structure name
+            "Array" + str(id(self)),
+            ("data", Pointer(element_type)),
+            ("shape", Pointer(Long)),
+            ("ndim", Long)
+        )
+
+    def convert(self, p):
+        pointer_type = ctypes.POINTER(self.element_type.c_type)
+        # FIXME conversions are unsafe, since they force-cast
+        # anything to pointer to element_type.
+
+        try:
+            import numpy as np
+            if isinstance(p, np.ndarray):
+                return self.c_type(p.ctypes.data_as(pointer_type),
+                                   (Long.c_type * len(p.shape))(*p.shape),
+                                   p.ndim)
+        except ImportError:
+            pass
+
+        shape = ctypes_shape(p)
+        conv_p = ctypes.cast(p, pointer_type)
+        return self.c_type(conv_p, (Long.c_type * len(shape))(*shape), self.ndim)
+
+    def emit_getitem(self, builder, v, i):
+        gep = self._item_gep(builder, v, i)
+        if isinstance(self.element_type, Structure):
+            return gep, Reference(self.element_type)
+        else:
+            return llvm.BuildLoad(builder, gep, "v"), self.element_type
+
+    def emit_setitem(self, builder, v, i):
+        return self._item_gep(builder, v, i), Reference(self.element_type)
+
+    def _item_gep(self, builder, v, i):
+        # Get array shape from struct value
+        shape_value, shape_type = self.emit_getattr(builder, v, "shape")
+        data_value, data_type = self.emit_getattr(builder, v, "data")
+        emit_dimension = lambda d: \
+            shape_type.emit_getitem(builder,
+                                    shape_value,
+                                    (llvm.ConstInt(Long.llvm_type, d, True),))[0]
+
+        const_shape = [emit_dimension(d) for d in range(1, self.ndim)]
+        # Build conversion from ND-index to flat memory offset
+        # FIXME currently assumes row-major memory alignment, first dimension can vary
+        ii = flatten_index(builder, i, const_shape)
+        return llvm.BuildGEP(builder, data_value, ctypes.byref(ii), 1, "addr")
+
+
 class Reference(object):
     """Special type to denote reference to an aggregate value / vector."""
 
@@ -195,6 +259,11 @@ class Reference(object):
     @property
     def llvm_type(self):
         return llvm.PointerType(self.value_type.llvm_type, 0)
+
+    def convert(self, v):
+        return ctypes.byref(self.value_type.convert(v)
+                            if hasattr(self.value_type, "convert")
+                            else v)
 
 
 def flatten_index(builder, index, const_shape):
@@ -225,3 +294,12 @@ def flatten_index(builder, index, const_shape):
 
     # return out + index[-1]
     return llvm.BuildAdd(builder, out, index[-1], "v")
+
+
+def ctypes_shape(x):
+    """Infer shape of a ctypes array."""
+    try:
+        dim = x._length_
+        return (dim,) + ctypes_shape(x[0])
+    except AttributeError:
+        return ()

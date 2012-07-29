@@ -260,12 +260,17 @@ class Visitor(ast.NodeVisitor):
         about the source data will complete the instruction.
 
         """
+        from .types import Reference
+
         ast.NodeVisitor.generic_visit(self, node)
         i = self.pop()
         v = self.pop()
 
         # Index is a nd tuple
         vt = self.typeof(v)
+
+        if isinstance(vt, Reference):
+            vt = vt.value_type
 
         if isinstance(node.ctx, ast.Load):
             e, et = vt.emit_getitem(self.builder, v, i)
