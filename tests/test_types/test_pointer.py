@@ -4,10 +4,11 @@ import ctypes
 from nitrous.types import Double, Pointer
 from nitrous.util import ModuleTest
 
-try:
-    import numpy as np
-except ImportError:
-    np = None
+# try:
+#     import numpy as np
+# except ImportError:
+#     np = None
+import numpy as np
 
 
 class ConverterTests(ModuleTest, unittest.TestCase):
@@ -38,8 +39,6 @@ class ConverterTests(ModuleTest, unittest.TestCase):
 
     def test_invalid_param(self):
         """Raise error if an incompatible data structure is supplied"""
-        import ctypes
-
         out = self.m.build()
         with self.assertRaises(ctypes.ArgumentError):
             out.f([1])
