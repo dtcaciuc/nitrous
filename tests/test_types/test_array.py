@@ -1,7 +1,7 @@
 import unittest2 as unittest
 import ctypes
 
-from nitrous.types import Double, Pointer, Array, Long
+from nitrous.types import Array, Long
 from nitrous.util import ModuleTest
 
 try:
@@ -28,7 +28,6 @@ class ArrayTests(ModuleTest, unittest.TestCase):
             return m
 
     def test_array(self):
-
         out = self.m.build()
 
         A = (((ctypes.c_long * 2) * 3) * 2)
