@@ -294,10 +294,18 @@ class Visitor(ast.NodeVisitor):
 
         ast.NodeVisitor.generic_visit(self, node)
         rhs = self.pop()
+        lhs = self.pop()
 
         if isinstance(target, (ast.Name, ast.Subscript, ast.Attribute)):
             # Handled cases: lhs = rhs, *lhs_gep = rhs
-            self.store(self.pop(), rhs, self.typeof(rhs))
+            self.store(lhs, rhs, self.typeof(rhs))
+        elif isinstance(target, ast.Tuple) and isinstance(rhs, tuple):
+            # TODO Currently only supports tuple to tuple repacking
+            if len(lhs) == len(rhs):
+                for x, y in zip(lhs, rhs):
+                    self.store(x, y, self.typeof(y))
+            else:
+                raise ValueError("Cannot unpack {0} values into {1}".format(len(rhs), len(lhs)))
         else:
             raise NotImplementedError("Unsupported assignment target {0}"
                                       .format(node.targets[0]))

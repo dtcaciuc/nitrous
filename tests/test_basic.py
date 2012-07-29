@@ -693,3 +693,27 @@ class OptimizationTests(ModuleTest, unittest.TestCase):
         # In second, entire conditional is resolved at
         # compile time and optimized away
         self.assertNotRegexpMatches(ir, "f2.+\{.+icmp.+\}")
+
+
+class UnpackTests(ModuleTest, unittest.TestCase):
+
+    def test_unpack(self):
+
+        @self.m.function(Long, a=Long, b=Long)
+        def foo(a, b):
+            b, a = a, b
+            return b * 10 + a * 100
+
+        out = self.m.build()
+        self.assertEqual(out.foo(5, 6), 650)
+
+    def test_shape_mismatch(self):
+        """Raise error if packed/unpacked tuple lengths differ"""
+
+        @self.m.function(Long, a=Long, b=Long)
+        def foo(a, b):
+            b, = a, b
+
+        message = "Cannot unpack 2 values into 1"
+        with self.assertRaisesRegexp(ValueError, message):
+            self.m.build()
