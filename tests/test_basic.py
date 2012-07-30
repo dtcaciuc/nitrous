@@ -361,6 +361,42 @@ class IfTests(ModuleTest, unittest.TestCase):
             self.assertEqual(f(2, 3), 3)
             self.assertEqual(f(4, 1), 4)
 
+    def test_elif_else(self):
+
+        @self.m.function(Long, a=Long, b=Long)
+        def f(a, b):
+            c = 0
+            if a > b:
+                c = a
+            elif a < b:
+                c = b
+            else:
+                c = 0
+            return c
+
+        out = self.m.build()
+
+        self.assertEqual(out.f(2, 3), 3)
+        self.assertEqual(out.f(3, 2), 3)
+        self.assertEqual(out.f(2, 2), 0)
+
+    def test_elif(self):
+
+        @self.m.function(Long, a=Long, b=Long)
+        def f(a, b):
+            c = 0
+            if a > b:
+                c = a
+            elif a < b:
+                c = b
+            return c
+
+        out = self.m.build()
+
+        self.assertEqual(out.f(2, 3), 3)
+        self.assertEqual(out.f(3, 2), 3)
+        self.assertEqual(out.f(2, 2), 0)
+
     def test_if_expr(self):
 
         # Simple expression
@@ -394,6 +430,7 @@ class IfTests(ModuleTest, unittest.TestCase):
         message = ">>>     return 1.0 if a > b else 0"
         with self.assertRaisesRegexp(TypeError, message):
             self.m.build()
+
 
 
 class MemoryTests(ModuleTest, unittest.TestCase):
