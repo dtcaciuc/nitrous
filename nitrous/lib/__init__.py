@@ -32,7 +32,7 @@ class IntrinsicEmitter(object):
         func = llvm.GetIntrinsicDeclaration(module, i, argtypes, n_args)
         args = (llvm.ValueRef * n_args)(*self.args)
 
-        return llvm.BuildCall(builder, func, args, n_args, "")
+        return llvm.BuildCall(builder, func, args, n_args, ""), None
 
 
 def cast(value, target_type):
@@ -49,14 +49,14 @@ def cast(value, target_type):
         # * floats and integers of different width
 
         if value_kind == target_kind:
-            return value
+            return value, None
 
         try:
             op = _CASTS[(value_kind, target_kind)]
         except KeyError:
             raise TypeError("Cannot cast {0} to {1}".format(value, target_type))
 
-        return llvm.BuildCast(builder, op, value, target_type.llvm_type, "tmp")
+        return llvm.BuildCast(builder, op, value, target_type.llvm_type, "tmp"), None
 
 
     return emit
@@ -95,6 +95,6 @@ def _range(*args):
             if len(args) == 3:
                 data[2] = args[2]
 
-        return data
+        return data, None
 
     return emit

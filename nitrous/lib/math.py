@@ -17,11 +17,11 @@ def log(x, base=None):
 
     @value_emitter
     def emit(module, builder):
-        n = IntrinsicEmitter("log", x)(module, builder)
+        n, n_ty = IntrinsicEmitter("log", x)(module, builder)
         if base is not None:
-            d = IntrinsicEmitter("log", base)
-            n = llvm.BuildFDiv(builder, n, d(module, builder), "")
-        return n
+            d, _ = IntrinsicEmitter("log", base)(module, builder)
+            n = llvm.BuildFDiv(builder, n, d, "")
+        return n, n_ty
 
     return emit
 

@@ -576,6 +576,8 @@ class FunctionBuilder(ast.NodeVisitor):
         args = [self.pop() for _ in range(len(node.args))][::-1]
         func = self.pop()
 
+        result_type = None
+
         if hasattr(func, "__n2o_func__"):
             # Function is compiled; check arguments for validity (unless
             # it's a definition for an external function) and make a direct call
@@ -590,9 +592,9 @@ class FunctionBuilder(ast.NodeVisitor):
             # Function is either CPython one or an LLVM emitter.
             result = func(*args)
             if getattr(result, "__n2o_emitter__", False):
-                result = result(self.module, self.builder)
+                result, result_type = result(self.module, self.builder)
 
-        self.push(result)
+        self.push(result, result_type)
 
 
 def emit_body(module, builder, func):
