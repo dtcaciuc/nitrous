@@ -84,7 +84,7 @@ class ScopedVars(object):
         self.__vars.pop()
 
 
-class Visitor(ast.NodeVisitor):
+class FunctionBuilder(ast.NodeVisitor):
 
     def __init__(self, module, builder, globals_):
         self.module = module
@@ -192,7 +192,7 @@ class Visitor(ast.NodeVisitor):
 
         try:
             self.node_stack.append(node)
-            super(Visitor, self).visit(node)
+            super(FunctionBuilder, self).visit(node)
         except (NameError, ValueError, TypeError, NotImplementedError), e:
             # Use translation error tag the exception with line number and
             # carry it upwards to translation routine where the traceback is reported.
@@ -610,18 +610,18 @@ def emit_body(module, builder, func):
     func_body = ast.parse(func_source).body[0].body
 
     # Emit function body IR
-    v = Visitor(module, builder, dict(resolve_constants(func.__n2o_globals__)))
+    b = FunctionBuilder(module, builder, dict(resolve_constants(func.__n2o_globals__)))
     llvm.PositionBuilderAtEnd(builder, llvm.AppendBasicBlock(func.__n2o_func__, "entry"))
 
     # Store function parameters as locals
     for i, name in enumerate(func.__n2o_args__):
         param = llvm.GetParam(func.__n2o_func__, i)
         llvm.SetValueName(param, name)
-        v.store(name, param, func.__n2o_argtypes__[name])
+        b.store(name, param, func.__n2o_argtypes__[name])
 
     try:
         for node in func_body:
-            v.visit(node)
+            b.visit(node)
 
     except TranslationError, e:
         raise _unpack_translation_error(func.func_name, func_source, e.args)
