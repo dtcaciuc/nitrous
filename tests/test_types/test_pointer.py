@@ -96,3 +96,34 @@ class CTypesPointerTests(ModuleTest, unittest.TestCase):
             out.f(ctypes.byref(ctypes.c_float(5)))
         with self.assertRaises(ctypes.ArgumentError):
             out.f(ctypes.c_float(5))
+
+
+class AllocTests(ModuleTest, unittest.TestCase):
+
+    def test_alloc(self):
+        """Stack allocation of a fixed size array by calling its type"""
+        from nitrous.types import Double, Pointer
+
+        Mat2d = Pointer(Double, shape=(2, 2))
+
+        @self.m.function(Double)
+        def f():
+
+            m = Mat2d()
+            a = 0.0
+
+            m[0, 0] = 2.0
+            m[0, 1] = 11.0
+            m[1, 0] = 13.0
+            m[1, 1] = 17.0
+
+            for i in range(2):
+                for j in range(2):
+                    a += m[i, j]
+
+            return a
+
+        out = self.m.build()
+
+        x = (Double.c_type * 4)()
+        self.assertEqual(out.f(x), 43.0)

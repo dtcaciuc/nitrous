@@ -213,8 +213,13 @@ _func("BuildGEP", ValueRef, [BuilderRef, ValueRef,
                              ctypes.POINTER(ValueRef), ctypes.c_uint,
                              ctypes.c_char_p])
 _func("BuildStructGEP", ValueRef, [BuilderRef, ValueRef, ctypes.c_uint, ctypes.c_char_p])
+
 _func("BuildAlloca", ValueRef, [BuilderRef, TypeRef, ctypes.c_char_p])
 _func("BuildArrayAlloca", ValueRef, [BuilderRef, TypeRef, ValueRef, ctypes.c_char_p])
+
+_func("BuildMalloc", ValueRef, [BuilderRef, TypeRef, ctypes.c_char_p])
+_func("BuildArrayMalloc", ValueRef, [BuilderRef, TypeRef, ValueRef, ctypes.c_char_p])
+
 
 # Casting
 Trunc = 30

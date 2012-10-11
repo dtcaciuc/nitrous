@@ -89,7 +89,22 @@ COMPARE_INST = {
 
 
 class Pointer(object):
-    """Pointer to memory block, each element of type `element_type`."""
+    """Pointer to memory block, each element of type `element_type`.
+
+    Fixed-size blocks can be allocated by calling the type object inside
+    a compiled function::
+
+        from nitrous import Float, Pointer
+
+        Vec3f = Pointer(Float, shape=(3,))
+
+        @m.function(e0=Float)
+        def func(e0):
+
+            v = Vec3f()
+            v[0] = e0
+
+    """
 
     def __init__(self, element_type, shape=(None,)):
         self.element_type = element_type
@@ -124,6 +139,24 @@ class Pointer(object):
             return ctypes.cast(addr, pointer_type)
 
         return p
+
+    def __call__(self):
+        from .lib import value_emitter
+        from .function import entry_array_alloca
+        from operator import mul
+
+        if None in self.shape:
+            raise ValueError("Type must have fixed dimensions")
+
+        @value_emitter
+        def emit(module, builder):
+            func = llvm.GetBasicBlockParent(llvm.GetInsertBlock(builder))
+            # Total number of elements across all dimensions.
+            n = llvm.ConstInt(Long.llvm_type, reduce(mul, self.shape, 1), True)
+            a = entry_array_alloca(func, self.element_type.llvm_type, n, "")
+            return a, self
+
+        return emit
 
     def emit_getitem(self, builder, v, i):
         gep = self._item_gep(builder, v, i)

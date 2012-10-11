@@ -644,8 +644,22 @@ def entry_alloca(func, type_, name):
     """Reserves stack space for a variable at function entry point."""
     entry = llvm.GetEntryBasicBlock(func)
     builder = llvm.CreateBuilder()
+
     llvm.PositionBuilder(builder, entry, llvm.GetFirstInstruction(entry))
     a = llvm.BuildAlloca(builder, type_, name)
+
+    llvm.DisposeBuilder(builder)
+    return a
+
+
+def entry_array_alloca(func, element_type, n, name):
+    """Reserves stack space for an array of size *n* at function entry point."""
+    entry = llvm.GetEntryBasicBlock(func)
+    builder = llvm.CreateBuilder()
+
+    llvm.PositionBuilder(builder, entry, llvm.GetFirstInstruction(entry))
+    a = llvm.BuildArrayAlloca(builder, element_type, n, "")
+
     llvm.DisposeBuilder(builder)
     return a
 
