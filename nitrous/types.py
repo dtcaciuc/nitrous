@@ -30,6 +30,8 @@ ScalarType = namedtuple("ScalarType", ("c_type", "llvm_type"))
 
 Double = ScalarType(ctypes.c_double, llvm.DoubleType())
 
+Float = ScalarType(ctypes.c_float, llvm.FloatType())
+
 Long = ScalarType(ctypes.c_long, llvm.IntType(ctypes.sizeof(ctypes.c_long) * 8))
 
 Int = ScalarType(ctypes.c_int, llvm.IntType(ctypes.sizeof(ctypes.c_int) * 8))
@@ -37,13 +39,17 @@ Int = ScalarType(ctypes.c_int, llvm.IntType(ctypes.sizeof(ctypes.c_int) * 8))
 Bool = ScalarType(ctypes.c_bool, llvm.IntType(8))
 
 
+_FLOATING_BINARY_INST = {
+    ast.Add: llvm.BuildFAdd,
+    ast.Sub: llvm.BuildFSub,
+    ast.Mult: llvm.BuildFMul,
+    ast.Div: llvm.BuildFDiv,
+}
+
+
 BINARY_INST = {
-    type_key(Double.llvm_type): {
-        ast.Add: llvm.BuildFAdd,
-        ast.Sub: llvm.BuildFSub,
-        ast.Mult: llvm.BuildFMul,
-        ast.Div: llvm.BuildFDiv,
-    },
+    type_key(Double.llvm_type): _FLOATING_BINARY_INST,
+    type_key(Float.llvm_type): _FLOATING_BINARY_INST,
     type_key(Long.llvm_type): {
         ast.Add: llvm.BuildAdd,
         ast.Sub: llvm.BuildSub,
@@ -54,17 +60,21 @@ BINARY_INST = {
 }
 
 
+_FLOATING_COMPARE_INST = (
+    llvm.BuildFCmp, {
+        ast.Eq: llvm.RealUEQ,
+        ast.Gt: llvm.RealUGT,
+        ast.GtE: llvm.RealUGE,
+        ast.Lt: llvm.RealULT,
+        ast.LtE: llvm.RealULE,
+        ast.NotEq: llvm.RealUNE,
+    }
+)
+
+
 COMPARE_INST = {
-    type_key(Double.llvm_type): (
-        llvm.BuildFCmp, {
-            ast.Eq: llvm.RealUEQ,
-            ast.Gt: llvm.RealUGT,
-            ast.GtE: llvm.RealUGE,
-            ast.Lt: llvm.RealULT,
-            ast.LtE: llvm.RealULE,
-            ast.NotEq: llvm.RealUNE,
-        }
-    ),
+    type_key(Double.llvm_type): _FLOATING_COMPARE_INST,
+    type_key(Float.llvm_type): _FLOATING_COMPARE_INST,
     type_key(Long.llvm_type): (
         llvm.BuildICmp,  {
             ast.Eq: llvm.IntEQ,

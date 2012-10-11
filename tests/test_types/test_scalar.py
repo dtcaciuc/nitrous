@@ -1,6 +1,6 @@
 import unittest2 as unittest
 
-from nitrous.types import Bool, Long, Double
+from nitrous.types import Bool, Long, Float, Double
 from nitrous.util import ModuleTest
 
 
@@ -38,13 +38,13 @@ class LongTests(ModuleTest, unittest.TestCase):
     def test_const(self):
         """Constant declaration."""
 
-        @self.m.function(Double)
+        @self.m.function(Long)
         def x():
-            a = 5.0
+            a = 5
             return a
 
         out = self.m.build()
-        self.assertEqual(out.x(), 5.0)
+        self.assertEqual(out.x(), 5)
 
     def test_binary(self):
 
@@ -73,19 +73,11 @@ class LongTests(ModuleTest, unittest.TestCase):
             self.assertEqual(cf(5, 6), f(5, 6))
 
 
-class DoubleTests(ModuleTest, unittest.TestCase):
-
-    def test_const(self):
-        """Constant declaration."""
-
-        @self.m.function(Long)
-        def x():
-            a = 5
-            return a
+class FloatingTests(ModuleTest):
 
     def test_binary(self):
 
-        annotate = self.m.function(Double, a=Double, b=Double)
+        annotate = self.m.function(self.Type, a=self.Type, b=self.Type)
         funcs = [annotate(f) for f in binary_funcs()]
         out = self.m.build()
 
@@ -94,12 +86,12 @@ class DoubleTests(ModuleTest, unittest.TestCase):
         for f in funcs:
             cf = getattr(out, f.func_name)
             for a, b in values:
-                self.assertAlmostEqual(cf(a, b), f(a, b), 9,
+                self.assertAlmostEqual(cf(a, b), f(a, b), self.digits,
                                        "{0}({1}, {2})".format(f.func_name, a, b))
 
     def test_cmp(self):
 
-        annotate = self.m.function(Bool, a=Double, b=Double)
+        annotate = self.m.function(Bool, a=self.Type, b=self.Type)
         funcs = [annotate(f) for f in cmp_funcs()]
         out = self.m.build()
 
@@ -108,6 +100,31 @@ class DoubleTests(ModuleTest, unittest.TestCase):
             self.assertEqual(cf(6.0, 5.0), f(6.0, 5.0))
             self.assertEqual(cf(5.0, 5.0), f(5.0, 5.0))
             self.assertEqual(cf(5.0, 6.0), f(5.0, 6.0))
+
+
+class FloatTests(FloatingTests, unittest.TestCase):
+
+    Type = Float
+    digits = 7
+
+    # TODO test_const when we can do `x = Float(5.0)`
+
+
+class DoubleTests(FloatingTests, unittest.TestCase):
+
+    Type = Double
+    digits = 9
+
+    def test_const(self):
+        """Constant declaration."""
+
+        @self.m.function(self.Type)
+        def x():
+            a = 5.0
+            return a
+
+        out = self.m.build()
+        self.assertEqual(out.x(), 5.0)
 
 
 def binary_funcs():
