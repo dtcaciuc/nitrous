@@ -88,6 +88,9 @@ COMPARE_INST = {
 }
 
 
+Dynamic = object()
+
+
 class Pointer(object):
     """Pointer to memory block, each element of type `element_type`.
 
@@ -225,7 +228,17 @@ class Structure(object):
         raise KeyError(field)
 
 
-class Array(Structure):
+def array(element_type, shape, *args, **kwargs):
+    t = DynamicArray if Dynamic in shape else StaticArray
+    return t(shape, *args, **kwargs)
+
+
+class StaticArray(Pointer):
+    # TODO
+    pass
+
+
+class DynamicArray(Structure):
     # Wraps incoming np.array or ctypes array into a structure
     # with standard shape/number-of-dimensions attributes that can be
     # used from compiled function.
@@ -233,11 +246,12 @@ class Array(Structure):
     # The resulting structure supports getitem/setitem so that there's
     # no need to address it's `data` attribute.
 
-    def __init__(self, element_type, ndim=1):
+    def __init__(self, element_type, shape=(Dynamic,)):
         self.element_type = element_type
-        self.ndim = ndim
+        # TODO make use of static dimensions to speed up indexing
+        self.ndim = len(shape)
 
-        super(Array, self).__init__(
+        super(DynamicArray, self).__init__(
             # TODO better way to generate structure name
             "Array" + str(id(self)),
             ("data", Pointer(element_type)),

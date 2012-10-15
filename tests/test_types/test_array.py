@@ -1,7 +1,7 @@
 import unittest2 as unittest
 import ctypes
 
-from nitrous.types import Array, Long
+from nitrous.types import DynamicArray, StaticArray, Long, Dynamic
 from nitrous.util import ModuleTest
 
 try:
@@ -10,14 +10,17 @@ except ImportError:
     np = None
 
 
-class ArrayTests(ModuleTest, unittest.TestCase):
+class DynamicArrayTests(ModuleTest, unittest.TestCase):
 
     def setUp(self):
-        super(ArrayTests, self).setUp()
+        super(DynamicArrayTests, self).setUp()
 
         X, Y, Z = range(3)
 
-        @self.m.function(Long, a=Array(Long, 3), b=Array(Long))
+        A = DynamicArray(Long, (Dynamic,) * 3)
+        B = DynamicArray(Long)
+
+        @self.m.function(Long, a=A, b=B)
         def f(a, b):
             m = 0
             for i in range(a.shape[X]):
