@@ -39,6 +39,16 @@ Int = ScalarType(ctypes.c_int, llvm.IntType(ctypes.sizeof(ctypes.c_int) * 8))
 Bool = ScalarType(ctypes.c_bool, llvm.IntType(8))
 
 
+# Akin to size_t in C, this is used for all memory accessing operations.
+# TODO switch this to Int by default?
+Index = Long
+
+
+def const_index(v):
+    """Creates a new constant index value."""
+    return llvm.ConstInt(Index.llvm_type, v, True)
+
+
 _FLOATING_BINARY_INST = {
     ast.Add: llvm.BuildFAdd,
     ast.Sub: llvm.BuildFSub,
@@ -155,7 +165,7 @@ class Pointer(object):
         def emit(module, builder):
             func = llvm.GetBasicBlockParent(llvm.GetInsertBlock(builder))
             # Total number of elements across all dimensions.
-            n = llvm.ConstInt(Long.llvm_type, reduce(mul, self.shape, 1), True)
+            n = const_index(reduce(mul, self.shape, 1))
             a = entry_array_alloca(func, self.element_type.llvm_type, n, "")
             return a, self
 
@@ -180,7 +190,7 @@ class Pointer(object):
 
         # Build conversion from ND-index to flat memory offset
         # FIXME currently assumes row-major memory alignment, first dimension can vary
-        const_shape = [llvm.ConstInt(Long.llvm_type, d, True) for d in self.shape[1:]]
+        const_shape = [const_index(d) for d in self.shape[1:]]
         ii = flatten_index(builder, i, const_shape)
         return llvm.BuildGEP(builder, v, ctypes.byref(ii), 1, "addr")
 
@@ -239,11 +249,8 @@ class StaticArray(Pointer):
     def emit_getattr(self, module, builder, ref, attr):
         from .function import entry_alloca
 
-        # TODO move this out and use everywhere as `const_index`
-        _long = lambda v: llvm.ConstInt(Long.llvm_type, v, True)
-
         if attr == "ndim":
-            return _long(len(self.shape)), None
+            return const_index(len(self.shape)), None
 
         elif attr == "shape":
             # First time, initialize a global constant array
@@ -253,8 +260,8 @@ class StaticArray(Pointer):
 
             if not shape:
                 n_dims = len(self.shape)
-                dims = (llvm.ValueRef * n_dims)(*(_long(d) for d in self.shape))
-                shape_init = llvm.ConstArray(Long.llvm_type, dims, n_dims)
+                dims = (llvm.ValueRef * n_dims)(*(const_index(d) for d in self.shape))
+                shape_init = llvm.ConstArray(Index.llvm_type, dims, n_dims)
 
                 shape = llvm.AddGlobal(module, llvm.TypeOf(shape_init), shape_name)
                 llvm.SetInitializer(shape, shape_init)
@@ -263,11 +270,11 @@ class StaticArray(Pointer):
             # XXX even though BuildPointerCast has a name, the resulting
             # value doensn't? Returning a temporary instead fixes that.
             func = llvm.GetBasicBlockParent(llvm.GetInsertBlock(builder))
-            cast = llvm.BuildPointerCast(builder, shape, Pointer(Long).llvm_type, "")
-            cast_shape = entry_alloca(func, Pointer(Long).llvm_type, "")
+            cast = llvm.BuildPointerCast(builder, shape, Pointer(Index).llvm_type, "")
+            cast_shape = entry_alloca(func, Pointer(Index).llvm_type, "")
             llvm.BuildStore(builder, cast, cast_shape)
 
-            return llvm.BuildLoad(builder, cast_shape, "shape"), Pointer(Long)
+            return llvm.BuildLoad(builder, cast_shape, "shape"), Pointer(Index)
 
         else:
             raise AttributeError(attr)
@@ -304,8 +311,8 @@ class DynamicArray(Structure):
             # TODO better way to generate structure name
             "Array" + str(id(self)),
             ("data", Pointer(element_type)),
-            ("shape", Pointer(Long)),
-            ("ndim", Long)
+            ("shape", Pointer(Index)),
+            ("ndim", Index)
         )
 
     def convert(self, p):
@@ -317,14 +324,14 @@ class DynamicArray(Structure):
             import numpy as np
             if isinstance(p, np.ndarray):
                 return self.c_type(p.ctypes.data_as(pointer_type),
-                                   (Long.c_type * len(p.shape))(*p.shape),
+                                   (Index.c_type * len(p.shape))(*p.shape),
                                    p.ndim)
         except ImportError:
             pass
 
         shape = ctypes_shape(p)
         conv_p = ctypes.cast(p, pointer_type)
-        return self.c_type(conv_p, (Long.c_type * len(shape))(*shape), self.ndim)
+        return self.c_type(conv_p, (Index.c_type * len(shape))(*shape), self.ndim)
 
     def emit_getitem(self, builder, v, i):
         gep = self._item_gep(builder, v, i)
@@ -344,7 +351,7 @@ class DynamicArray(Structure):
         emit_dimension = lambda d: \
             shape_type.emit_getitem(builder,
                                     shape_value,
-                                    (llvm.ConstInt(Long.llvm_type, d, True),))[0]
+                                    (llvm.ConstInt(Index.llvm_type, d, True),))[0]
 
         const_shape = [emit_dimension(d) for d in range(1, self.ndim)]
         # Build conversion from ND-index to flat memory offset
@@ -385,17 +392,14 @@ def flatten_index(builder, index, const_shape):
     If array is 1-dimensional, *const_shape* is an empty tuple.
 
     """
-    from .types import Long
-
-    int_ = lambda x: llvm.ConstInt(Long.llvm_type, x, True)
     mul_ = lambda x, y: llvm.BuildMul(builder, x, y, "v")
 
     # out = 0
-    out = int_(0)
+    out = const_index(0)
 
     for i in range(0, len(const_shape)):
         # out += index[i-1] * reduce(mul, const_shape[i:], 1)
-        tmp = reduce(mul_, const_shape[i:], int_(1))
+        tmp = reduce(mul_, const_shape[i:], const_index(1))
         rhs = llvm.BuildMul(builder, index[i], tmp, "v")
         out = llvm.BuildAdd(builder, out, rhs, "v")
 

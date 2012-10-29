@@ -497,8 +497,7 @@ class FunctionBuilder(ast.NodeVisitor):
         so that nested blocks can resolve break/continue statements.
 
         """
-        # FIXME hardcoded Long type for loop variable
-        from .types import Long
+        from .types import const_index
 
         if len(node.orelse) != 0:
             raise NotImplementedError("`else` in a `for` statement is not supported")
@@ -561,8 +560,7 @@ class FunctionBuilder(ast.NodeVisitor):
 
         # Loop exit; decrement the counter for consistency with python interpreter.
         llvm.PositionBuilderAtEnd(self.builder, exit_bb)
-        one = llvm.ConstInt(Long.llvm_type, 1, True)
-        i_final = llvm.BuildSub(self.builder, i, one, "loop_{0}_final".format(target))
+        i_final = llvm.BuildSub(self.builder, i, const_index(1), "loop_{0}_final".format(target))
         llvm.BuildStore(self.builder, i_final, i_ptr)
 
     def visit_Continue(self, node):
