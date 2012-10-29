@@ -153,24 +153,6 @@ class Pointer(object):
 
         return p
 
-    def __call__(self):
-        from .lib import value_emitter
-        from .function import entry_array_alloca
-        from operator import mul
-
-        if None in self.shape:
-            raise ValueError("Type must have fixed dimensions")
-
-        @value_emitter
-        def emit(module, builder):
-            func = llvm.GetBasicBlockParent(llvm.GetInsertBlock(builder))
-            # Total number of elements across all dimensions.
-            n = const_index(reduce(mul, self.shape, 1))
-            a = entry_array_alloca(func, self.element_type.llvm_type, n, "")
-            return a, self
-
-        return emit
-
     def emit_getitem(self, builder, v, i):
         gep = self._item_gep(builder, v, i)
         if isinstance(self.element_type, Structure):
@@ -244,7 +226,8 @@ def array(element_type, shape, *args, **kwargs):
 
 
 class StaticArray(Pointer):
-    # FIXME abstract element access interface into a mixin?
+    # TODO add a guard against None/Dynamic dimensions
+    # TODO abstract element access interface into a mixin?
 
     def emit_getattr(self, module, builder, ref, attr):
         from .function import entry_alloca
@@ -292,6 +275,21 @@ class StaticArray(Pointer):
             pass
 
         return ctypes.cast(p, pointer_type)
+
+    def __call__(self):
+        from .lib import value_emitter
+        from .function import entry_array_alloca
+        from operator import mul
+
+        @value_emitter
+        def emit(module, builder):
+            func = llvm.GetBasicBlockParent(llvm.GetInsertBlock(builder))
+            # Total number of elements across all dimensions.
+            n = const_index(reduce(mul, self.shape, 1))
+            a = entry_array_alloca(func, self.element_type.llvm_type, n, "")
+            return a, self
+
+        return emit
 
 
 class DynamicArray(Structure):
