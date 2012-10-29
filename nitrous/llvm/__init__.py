@@ -43,6 +43,9 @@ class owned_c_char_p(ctypes.c_char_p):
 
 
 Bool = ctypes.c_int
+FALSE = 0
+TRUE = 1
+
 
 # Context
 class OpaqueContext(ctypes.Structure):
@@ -99,15 +102,27 @@ ValueRef = ctypes.POINTER(OpaqueValue)
 _func("TypeOf", TypeRef, [ValueRef])
 _func("SetValueName", None, [ValueRef, ctypes.c_char_p])
 _func("GetValueName", ctypes.c_char_p, [ValueRef])
+_func("DumpValue", None, [ValueRef])
 
 # Operations on scalar constants
 _func("ConstNull", ValueRef, [TypeRef])
 _func("ConstInt", ValueRef, [TypeRef, ctypes.c_ulonglong, Bool])
 _func("ConstReal", ValueRef, [TypeRef, ctypes.c_double])
 
+_func("ConstArray", ValueRef, [TypeRef, ctypes.POINTER(ValueRef), ctypes.c_uint])
+
 _func("IsATerminatorInst", ValueRef, [ValueRef])
 
 Opcode = ctypes.c_int
+
+
+# Globals
+_func("AddGlobal", ValueRef, [ModuleRef, TypeRef, ctypes.c_char_p])
+_func("GetNamedGlobal", ValueRef, [ModuleRef, ctypes.c_char_p])
+_func("SetInitializer", None, [ValueRef, ValueRef]);
+_func("SetGlobalConstant", None, [ValueRef, Bool])
+
+
 
 # Functions
 _func("FunctionType", TypeRef, [TypeRef, ctypes.POINTER(TypeRef), ctypes.c_uint, ctypes.c_int])
@@ -228,6 +243,7 @@ FPToSI = 34
 SIToFP = 36
 
 _func("BuildCast", ValueRef, [BuilderRef, Opcode, ValueRef, TypeRef, ctypes.c_char_p])
+_func("BuildPointerCast", ValueRef, [BuilderRef, ValueRef, TypeRef, ctypes.c_char_p])
 
 # Misc
 _func("BuildPhi", ValueRef, [BuilderRef, TypeRef, ctypes.c_char_p])

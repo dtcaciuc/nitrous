@@ -208,12 +208,12 @@ class Structure(object):
         # Pass by reference if directly used as argument type.
         return Reference(self)
 
-    def emit_getattr(self, builder, ref, attr):
+    def emit_getattr(self, module, builder, ref, attr):
         """IR: Emits attribute value load from structure reference."""
         gep, t = self._field_gep(builder, ref, attr)
         return llvm.BuildLoad(builder, gep, "v"), t
 
-    def emit_setattr(self, builder, ref, attr):
+    def emit_setattr(self, module, builder, ref, attr):
         """IR: Emits GEP used to set the attribute value."""
         gep, t = self._field_gep(builder, ref, attr)
         return gep, Reference(t)
@@ -234,8 +234,57 @@ def array(element_type, shape, *args, **kwargs):
 
 
 class StaticArray(Pointer):
-    # TODO
-    pass
+    # FIXME abstract element access interface into a mixin?
+
+    def emit_getattr(self, module, builder, ref, attr):
+        from .function import entry_alloca
+
+        # TODO move this out and use everywhere as `const_index`
+        _long = lambda v: llvm.ConstInt(Long.llvm_type, v, True)
+
+        if attr == "ndim":
+            return _long(len(self.shape)), None
+
+        elif attr == "shape":
+            # First time, initialize a global constant array
+            # and then use it on every access.
+            shape_name = "StaticArray{0}".format(id(self))
+            shape = llvm.GetNamedGlobal(module, shape_name)
+
+            if not shape:
+                n_dims = len(self.shape)
+                dims = (llvm.ValueRef * n_dims)(*(_long(d) for d in self.shape))
+                shape_init = llvm.ConstArray(Long.llvm_type, dims, n_dims)
+
+                shape = llvm.AddGlobal(module, llvm.TypeOf(shape_init), shape_name)
+                llvm.SetInitializer(shape, shape_init)
+                llvm.SetGlobalConstant(shape, llvm.TRUE)
+
+            # XXX even though BuildPointerCast has a name, the resulting
+            # value doensn't? Returning a temporary instead fixes that.
+            func = llvm.GetBasicBlockParent(llvm.GetInsertBlock(builder))
+            cast = llvm.BuildPointerCast(builder, shape, Pointer(Long).llvm_type, "")
+            cast_shape = entry_alloca(func, Pointer(Long).llvm_type, "")
+            llvm.BuildStore(builder, cast, cast_shape)
+
+            return llvm.BuildLoad(builder, cast_shape, "shape"), Pointer(Long)
+
+        else:
+            raise AttributeError(attr)
+
+    def convert(self, p):
+        pointer_type = ctypes.POINTER(self.element_type.c_type)
+        # FIXME conversions are unsafe, since they force-cast
+        # anything to pointer to element_type.
+
+        try:
+            import numpy as np
+            if isinstance(p, np.ndarray):
+                return p.ctypes.data_as(pointer_type)
+        except ImportError:
+            pass
+
+        return ctypes.cast(p, pointer_type)
 
 
 class DynamicArray(Structure):
@@ -289,8 +338,9 @@ class DynamicArray(Structure):
 
     def _item_gep(self, builder, v, i):
         # Get array shape from struct value
-        shape_value, shape_type = self.emit_getattr(builder, v, "shape")
-        data_value, data_type = self.emit_getattr(builder, v, "data")
+        # TODO first arg is module instance
+        shape_value, shape_type = self.emit_getattr(None, builder, v, "shape")
+        data_value, data_type = self.emit_getattr(None, builder, v, "data")
         emit_dimension = lambda d: \
             shape_type.emit_getitem(builder,
                                     shape_value,

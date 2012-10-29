@@ -10,17 +10,14 @@ except ImportError:
     np = None
 
 
-class DynamicArrayTests(ModuleTest, unittest.TestCase):
+class ArrayTests(object):
 
     def setUp(self):
-        super(DynamicArrayTests, self).setUp()
+        super(ArrayTests, self).setUp()
 
         X, Y, Z = range(3)
 
-        A = DynamicArray(Long, (Dynamic,) * 3)
-        B = DynamicArray(Long)
-
-        @self.m.function(Long, a=A, b=B)
+        @self.m.function(Long, a=self.A, b=self.B)
         def f(a, b):
             m = 0
             for i in range(a.shape[X]):
@@ -60,3 +57,15 @@ class DynamicArrayTests(ModuleTest, unittest.TestCase):
 
         self.assertEqual(m, 12)
         self.assertEqual(list(b), range(1, 13))
+
+
+class DynamicArrayTests(ArrayTests, ModuleTest, unittest.TestCase):
+
+    A = DynamicArray(Long, (Dynamic,) * 3)
+    B = DynamicArray(Long)
+
+
+class StaticArrayTests(ArrayTests, ModuleTest, unittest.TestCase):
+
+    A = StaticArray(Long, (2, 3, 2))
+    B = StaticArray(Long, (12,))
