@@ -100,3 +100,59 @@ class StatiicAllocTests(ModuleTest, unittest.TestCase):
 
         x = (Double.c_type * 4)()
         self.assertEqual(out.f(x), 43.0)
+
+
+
+class IndexTests(ModuleTest, unittest.TestCase):
+
+    def setUp(self):
+        super(IndexTests, self).setUp()
+        self.data = (((Long.c_type * 3) * 3) * 3)(
+            ((0, 1, 2), (3, 4, 5), (6, 7, 8)),
+            ((18, 19, 20), (21, 22, 23), (24, 25, 26)),
+            ((9, 10, 11), (12, 13, 14), (15, 16, 17)),
+        )
+
+    def test_static_dimension(self):
+        """Replace access to known dimensions with direct constants"""
+
+        D = DynamicArray(Long, shape=(Dynamic, 3, 3))
+        X, Y, Z = range(3)
+
+        @self.m.function(Long, a=D)
+        def f(a):
+            return a[2, 1, 2]
+
+        out = self.m.build()
+        # All indices should be resolved at run-time, so there should be no multiplications.
+        self.assertNotRegexpMatches(self.m.dumps(), "mul")
+        self.assertEqual(out.f(self.data), 14)
+
+    def test_all_dynamic_dimension(self):
+        """All dimensions are dynamic, no indices can be resolved at runtime"""
+        D = DynamicArray(Long, shape=(Dynamic, Dynamic, Dynamic))
+        X, Y, Z = range(3)
+
+        @self.m.function(Long, a=D)
+        def f(a):
+            return a[2, 1, 2]
+
+        out = self.m.build()
+        # Should have run-time multiplications during index flattening.
+        self.assertRegexpMatches(self.m.dumps(), "mul")
+        self.assertEqual(out.f(self.data), 14)
+
+    def test_mixed_dynamic_dimension(self):
+        """Some dimensions are dynamic, other than major one"""
+
+        D = DynamicArray(Long, shape=(Dynamic, 3, Dynamic))
+        X, Y, Z = range(3)
+
+        @self.m.function(Long, a=D)
+        def f(a):
+            return a[2, 1, 2]
+
+        out = self.m.build()
+        # Should have run-time multiplications during index flattening.
+        self.assertRegexpMatches(self.m.dumps(), "mul")
+        self.assertEqual(out.f(self.data), 14)

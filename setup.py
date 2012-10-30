@@ -52,7 +52,6 @@ if not on_rtd:
             "nitrous.llvm._llvm", ["src/_llvm.cc"],
             include_dirs=llvm_config("--includedir"),
             extra_compile_args=llvm_config("--cxxflags"),
-            define_macros=[("NOS_LLVM_VERSION", int(llvm_version.replace(".", "")))],
             library_dirs=llvm_config("--libdir"),
             extra_link_args=link_args()
         )

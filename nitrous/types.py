@@ -302,6 +302,7 @@ class DynamicArray(Structure):
 
     def __init__(self, element_type, shape=(Dynamic,)):
         self.element_type = element_type
+        self.shape = shape
         # TODO make use of static dimensions to speed up indexing
         self.ndim = len(shape)
 
@@ -346,14 +347,18 @@ class DynamicArray(Structure):
         # TODO first arg is module instance
         shape_value, shape_type = self.emit_getattr(None, builder, v, "shape")
         data_value, data_type = self.emit_getattr(None, builder, v, "data")
-        emit_dimension = lambda d: \
-            shape_type.emit_getitem(builder,
-                                    shape_value,
-                                    (llvm.ConstInt(Index.llvm_type, d, True),))[0]
 
-        const_shape = [emit_dimension(d) for d in range(1, self.ndim)]
+        def emit_dimension(i):
+            # Use direct constants, if possible; otherwise load from actual shape array.
+            if self.shape[i] == Dynamic:
+                dim, _ = shape_type.emit_getitem(builder, shape_value, (const_index(i),))
+            else:
+                dim = const_index(self.shape[i])
+            return dim
+
         # Build conversion from ND-index to flat memory offset
         # FIXME currently assumes row-major memory alignment, first dimension can vary
+        const_shape = [emit_dimension(d) for d in range(1, self.ndim)]
         ii = flatten_index(builder, i, const_shape)
         return llvm.BuildGEP(builder, data_value, ctypes.byref(ii), 1, "addr")
 
