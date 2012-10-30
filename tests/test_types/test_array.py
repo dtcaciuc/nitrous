@@ -71,7 +71,7 @@ class StaticArrayTests(ArrayTests, ModuleTest, unittest.TestCase):
     B = StaticArray(Long, (12,))
 
 
-class StatiicAllocTests(ModuleTest, unittest.TestCase):
+class StaticAllocTests(ModuleTest, unittest.TestCase):
 
     def test_alloc(self):
         """Stack allocation of a fixed size array by calling its type"""
@@ -100,7 +100,6 @@ class StatiicAllocTests(ModuleTest, unittest.TestCase):
 
         x = (Double.c_type * 4)()
         self.assertEqual(out.f(x), 43.0)
-
 
 
 class IndexTests(ModuleTest, unittest.TestCase):

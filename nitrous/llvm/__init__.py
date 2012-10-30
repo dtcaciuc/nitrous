@@ -322,6 +322,10 @@ _func("PassManagerBuilderSetOptLevel", None, [PassManagerBuilderRef, ctypes.c_ui
 _func("PassManagerBuilderPopulateModulePassManager", None,
       [PassManagerBuilderRef, PassManagerRef])
 
+# Command line options
+_func("ParseEnvironmentOptions", None, [ctypes.c_char_p, ctypes.c_char_p, ctypes.c_char_p])
+ParseEnvironmentOptions("nitrous", "NITROUS_LLVM_OPTS", None)
+
 
 def build_py_idiv(builder, a, b, name):
     """Build expression for floor integer division.

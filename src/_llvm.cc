@@ -7,6 +7,7 @@
 #include <llvm-c/TargetMachine.h>
 
 #include <llvm/Intrinsics.h>
+#include <llvm/Support/CommandLine.h>
 #include <llvm/Support/Host.h>
 #include <llvm/Support/TargetSelect.h>
 #include <llvm/Support/TargetRegistry.h>
@@ -17,6 +18,11 @@
 
 
 extern "C" {
+
+    void
+    LLVMParseEnvironmentOptions(const char * Program, const char * Var, const char * Overview) {
+        llvm::cl::ParseEnvironmentOptions(Program, Var, Overview);
+    }
 
     char *
     LLVMDumpModuleToString(LLVMModuleRef M) {
@@ -91,4 +97,5 @@ extern "C" {
         }
         return llvm::wrap(target);
     }
+
 }
