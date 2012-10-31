@@ -1,5 +1,5 @@
 from nitrous.util import ModuleTest
-from nitrous.types import Double
+from nitrous.types import Double, Long
 import nitrous.lib.math
 import math
 
@@ -45,3 +45,71 @@ class MathTests(ModuleTest, unittest.TestCase):
         out = self.m.build()
         self.assertAlmostEqual(math.log(10.0, 4.0), out.log(10.0, 4.0))
         self.assertAlmostEqual(math.log(1.0, 4.0), out.log(1.0, 4.0))
+
+
+class CastTests(ModuleTest, unittest.TestCase):
+
+    def test_cast(self):
+        from nitrous.lib import cast
+
+        @self.m.function(Long, a=Long, b=Double)
+        def div_long(a, b):
+            return a / cast(b, Long)
+
+        @self.m.function(Double, a=Long, b=Double)
+        def div_double(a, b):
+            return cast(a, Double) / b
+
+        out = self.m.build()
+
+        self.assertEqual(out.div_long(3, 2), 1)
+        self.assertEqual(out.div_double(3, 2), 1.5)
+
+    def test_cast_noop(self):
+        from nitrous.lib import cast
+
+        @self.m.function(Double, a=Double, b=Double)
+        def div_double(a, b):
+            return cast(a, Double) / b
+
+        out = self.m.build()
+        self.assertEqual(out.div_double(3, 2), 1.5)
+
+    def test_cast_int_to_long(self):
+        """Cast between narrower and wider integer"""
+        from nitrous.lib import cast
+        from nitrous.types import Int
+
+        @self.m.function(Long, a=Int)
+        def int_to_long(a):
+            return cast(a, Long)
+
+        out = self.m.build()
+        self.assertEqual(out.int_to_long(3), 3)
+        self.assertRegexpMatches(self.m.dumps(), "zext")
+
+    def test_cast_long_to_int(self):
+        """Cast between narrower and wider integer"""
+        from nitrous.lib import cast
+        from nitrous.types import Int
+
+        @self.m.function(Int, a=Long)
+        def int_to_long(a):
+            return cast(a, Int)
+
+        out = self.m.build()
+        self.assertEqual(out.int_to_long(3), 3)
+        self.assertRegexpMatches(self.m.dumps(), "trunc")
+
+    def test_invalid_cast(self):
+        from nitrous.lib import cast
+        from nitrous.types import Structure
+
+        S = Structure("S", ("x", Long))
+
+        @self.m.function(Long, a=S)
+        def int_to_long(a):
+            return cast(a, Long)
+
+        with self.assertRaisesRegexp(TypeError, "Cannot cast"):
+            self.m.build()

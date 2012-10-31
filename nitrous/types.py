@@ -82,19 +82,23 @@ _FLOATING_COMPARE_INST = (
 )
 
 
+_INTEGRAL_COMPARE_INST = (
+    llvm.BuildICmp, {
+        ast.Eq: llvm.IntEQ,
+        ast.Gt: llvm.IntSGT,
+        ast.GtE: llvm.IntSGE,
+        ast.Lt: llvm.IntSLT,
+        ast.LtE: llvm.IntSLE,
+        ast.NotEq: llvm.IntNE
+    }
+)
+
+
 COMPARE_INST = {
     type_key(Double.llvm_type): _FLOATING_COMPARE_INST,
     type_key(Float.llvm_type): _FLOATING_COMPARE_INST,
-    type_key(Long.llvm_type): (
-        llvm.BuildICmp,  {
-            ast.Eq: llvm.IntEQ,
-            ast.Gt: llvm.IntSGT,
-            ast.GtE: llvm.IntSGE,
-            ast.Lt: llvm.IntSLT,
-            ast.LtE: llvm.IntSLE,
-            ast.NotEq: llvm.IntNE
-        }
-    )
+    type_key(Long.llvm_type): _INTEGRAL_COMPARE_INST,
+    type_key(Int.llvm_type): _INTEGRAL_COMPARE_INST
 }
 
 

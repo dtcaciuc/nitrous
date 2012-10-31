@@ -5,8 +5,10 @@ import ctypes
 
 
 _CASTS = {
+    (llvm.FloatTypeKind, llvm.IntegerTypeKind): llvm.FPToSI,
     (llvm.DoubleTypeKind, llvm.IntegerTypeKind): llvm.FPToSI,
     (llvm.IntegerTypeKind, llvm.DoubleTypeKind): llvm.SIToFP,
+    (llvm.IntegerTypeKind, llvm.FloatTypeKind): llvm.SIToFP,
 }
 
 
@@ -40,24 +42,43 @@ def cast(value, target_type):
 
     @value_emitter
     def emit(module, builder):
-
-        value_kind = llvm.GetTypeKind(llvm.TypeOf(value))
-        target_kind = llvm.GetTypeKind(target_type.llvm_type)
+        from ..types import type_key
 
         # TODO support
         # * unsigned integers
-        # * floats and integers of different width
 
-        if value_kind == target_kind:
+        # No-op if type is the same
+        value_type = llvm.TypeOf(value)
+        if type_key(target_type.llvm_type) == type_key(value_type):
             return value, None
 
-        try:
-            op = _CASTS[(value_kind, target_kind)]
-        except KeyError:
+        value_kind = llvm.GetTypeKind(value_type)
+        target_kind = llvm.GetTypeKind(target_type.llvm_type)
+
+        def build_cast(op):
+            return llvm.BuildCast(builder, op, value, target_type.llvm_type, "cast"), None
+
+        if len(set((value_kind, target_kind))) == 2:
+            # Casting between two different kinds of types
+            try:
+                return build_cast(_CASTS[(value_kind, target_kind)])
+            except KeyError:
+                raise TypeError("Cannot cast {0} to {1}".format(value, target_type))
+
+        elif target_kind == llvm.IntegerTypeKind:
+            # Same kind, but different(?) integer width
+            value_width = llvm.GetIntTypeWidth(value_type)
+            target_width = llvm.GetIntTypeWidth(target_type.llvm_type)
+
+            if target_width > value_width:
+                return build_cast(llvm.ZExt)
+            elif target_width < value_width:
+                return build_cast(llvm.Trunc)
+            else:
+                return value, None
+
+        else:
             raise TypeError("Cannot cast {0} to {1}".format(value, target_type))
-
-        return llvm.BuildCast(builder, op, value, target_type.llvm_type, "tmp"), None
-
 
     return emit
 

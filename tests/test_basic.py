@@ -89,35 +89,6 @@ class LoadTests(ModuleTest, unittest.TestCase):
             self.m.build()
 
 
-class CastTests(ModuleTest, unittest.TestCase):
-
-    def test_cast(self):
-        from nitrous.lib import cast
-
-        @self.m.function(Long, a=Long, b=Double)
-        def div_long(a, b):
-            return a / cast(b, Long)
-
-        @self.m.function(Double, a=Long, b=Double)
-        def div_double(a, b):
-            return cast(a, Double) / b
-
-        out = self.m.build()
-
-        self.assertEqual(out.div_long(3, 2), 1)
-        self.assertEqual(out.div_double(3, 2), 1.5)
-
-    def test_cast_noop(self):
-        from nitrous.lib import cast
-
-        @self.m.function(Double, a=Double, b=Double)
-        def div_double(a, b):
-            return cast(a, Double) / b
-
-        out = self.m.build()
-        self.assertEqual(out.div_double(3, 2), 1.5)
-
-
 class AssignTests(ModuleTest, unittest.TestCase):
 
     def test_unsupported_chain(self):
@@ -430,7 +401,6 @@ class IfTests(ModuleTest, unittest.TestCase):
         message = ">>>     return 1.0 if a > b else 0"
         with self.assertRaisesRegexp(TypeError, message):
             self.m.build()
-
 
 
 class MemoryTests(ModuleTest, unittest.TestCase):
