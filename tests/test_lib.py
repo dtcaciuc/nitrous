@@ -1,6 +1,8 @@
 from nitrous.util import ModuleTest
-from nitrous.types import Double, Long
+from nitrous.types import Double, Long, ScalarType
+from nitrous import llvm
 import nitrous.lib.math
+import ctypes
 import math
 
 import unittest2 as unittest
@@ -49,6 +51,8 @@ class MathTests(ModuleTest, unittest.TestCase):
 
 class CastTests(ModuleTest, unittest.TestCase):
 
+    Byte = ScalarType(ctypes.c_byte, llvm.IntType(8))
+
     def test_cast(self):
         from nitrous.lib import cast
 
@@ -75,27 +79,27 @@ class CastTests(ModuleTest, unittest.TestCase):
         out = self.m.build()
         self.assertEqual(out.div_double(3, 2), 1.5)
 
-    def test_cast_int_to_long(self):
+    def test_cast_byte_to_int(self):
         """Cast between narrower and wider integer"""
         from nitrous.lib import cast
         from nitrous.types import Int
 
-        @self.m.function(Long, a=Int)
+        @self.m.function(Int, a=self.Byte)
         def int_to_long(a):
-            return cast(a, Long)
+            return cast(a, Int)
 
         out = self.m.build()
         self.assertEqual(out.int_to_long(3), 3)
         self.assertRegexpMatches(self.m.dumps(), "zext")
 
     def test_cast_long_to_int(self):
-        """Cast between narrower and wider integer"""
+        """Cast between wider and narrower integer"""
         from nitrous.lib import cast
         from nitrous.types import Int
 
-        @self.m.function(Int, a=Long)
+        @self.m.function(self.Byte, a=Int)
         def int_to_long(a):
-            return cast(a, Int)
+            return cast(a, self.Byte)
 
         out = self.m.build()
         self.assertEqual(out.int_to_long(3), 3)
