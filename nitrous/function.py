@@ -86,9 +86,10 @@ class ScopedVars(object):
 
 class FunctionBuilder(ast.NodeVisitor):
 
-    def __init__(self, module, builder, globals_):
+    def __init__(self, module, builder, globals_, opts):
         self.module = module
         self.builder = builder
+        self.opts = opts
 
         # Map of value names to their nitrous types. Currently,
         # this is important only for arrays of aggregate values
@@ -319,7 +320,7 @@ class FunctionBuilder(ast.NodeVisitor):
         if isinstance(node.target, (ast.Name, ast.Subscript, ast.Attribute)):
             # Handled cases: lhs = rhs, *lhs_gep = rhs
             lhs_addr = self.pop()
-            rhs = emit_binary_op(self.builder, node.op, self.load(lhs_addr), rhs)
+            rhs = emit_binary_op(self.builder, node.op, self.load(lhs_addr), rhs, self.opts["cdiv"])
             # No need to store type, since the target already exists
             self.store(lhs_addr, rhs)
         else:
@@ -358,7 +359,7 @@ class FunctionBuilder(ast.NodeVisitor):
         rhs = self.pop()
         lhs = self.pop()
 
-        v = emit_binary_op(self.builder, node.op, lhs, rhs)
+        v = emit_binary_op(self.builder, node.op, lhs, rhs, self.opts["cdiv"])
         self.push(v)
 
     def visit_BoolOp(self, node):
@@ -612,7 +613,7 @@ def emit_body(module, builder, func):
     func_body = ast.parse(func_source).body[0].body
 
     # Emit function body IR
-    b = FunctionBuilder(module, builder, dict(resolve_constants(func.__n2o_globals__)))
+    b = FunctionBuilder(module, builder, dict(resolve_constants(func.__n2o_globals__)), func.__n2o_options__)
     llvm.PositionBuilderAtEnd(builder, llvm.AppendBasicBlock(func.__n2o_func__, "entry"))
 
     # Store function parameters as locals
@@ -689,7 +690,7 @@ def resolve_constants(symbols):
             yield k, v
 
 
-def emit_binary_op(builder, op, lhs, rhs):
+def emit_binary_op(builder, op, lhs, rhs, cdiv):
     from .types import BINARY_INST, type_key, types_equal
 
     ty = llvm.TypeOf(lhs)
@@ -697,9 +698,13 @@ def emit_binary_op(builder, op, lhs, rhs):
         raise TypeError("Conflicting operand types for {0}: {1} and {2}"
                         .format(op, lhs, rhs))
 
-    return BINARY_INST[type_key(ty)][type(op)](
-        builder, lhs, rhs, type(op).__name__.lower()
-    )
+    if isinstance(op, ast.Div) and llvm.GetTypeKind(ty) == llvm.IntegerTypeKind:
+        inst = llvm.BuildSDiv if cdiv else llvm.build_py_idiv
+    else:
+        inst = BINARY_INST[type_key(ty)][type(op)]
+
+    return inst(builder, lhs, rhs, type(op).__name__.lower())
+
 
 def truncate_bool(builder, v):
     """Truncate Bool value for use in conditional comparison"""

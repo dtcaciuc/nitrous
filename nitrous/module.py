@@ -121,9 +121,23 @@ class Module(object):
             func.__n2o_globals__.update(parent_frame.f_locals)
             del parent_frame
 
+            # Options
+            func.__n2o_options__ = dict(cdiv=False)
+
             self.funcs.append(func)
             return func
 
+        return wrapper
+
+    def options(self, cdiv=False):
+        """Set behavioural options which affect the generated code.
+
+        :param cdiv: Set ``True`` to match C behaviour when performing integer division.
+
+        """
+        def wrapper(func):
+            func.__n2o_options__["cdiv"] = cdiv
+            return func
         return wrapper
 
     def build(self):
@@ -221,7 +235,6 @@ class Module(object):
     def _qualify(self, symbol):
         """Qualifies symbol with parent module name."""
         return "__".join((self.name, symbol))
-
 
 
 def _create_function(module, name, restype, argtypes):

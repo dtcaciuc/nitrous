@@ -72,6 +72,24 @@ class LongTests(ModuleTest, unittest.TestCase):
             self.assertEqual(cf(5, 5), f(5, 5))
             self.assertEqual(cf(5, 6), f(5, 6))
 
+    def test_cdiv(self):
+        """Switch to enable C-style integer division"""
+
+        @self.m.function(Long, a=Long, b=Long)
+        def pydiv(a, b):
+            return a / b
+
+        @self.m.options(cdiv=True)
+        @self.m.function(Long, a=Long, b=Long)
+        def cdiv(a, b):
+            return a / b
+
+        out = self.m.build()
+
+        self.assertEqual(-5 / 2, -3)
+        self.assertEqual(out.pydiv(-5, 2), -3)
+        self.assertEqual(out.cdiv(-5, 2), -2)
+
 
 class FloatingTests(ModuleTest):
 
