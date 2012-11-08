@@ -93,16 +93,15 @@ def _range(*args):
 
     @value_emitter
     def emit(module, builder):
-        from ..types import Long
+        from ..types import const_index
 
         # TODO add checks
         #  start > stop & step > 0;
         #  start < stop & step < 0;
         #  step < stop - start
 
-        data = [llvm.ConstInt(Long.llvm_type, 0, True),
-                llvm.ConstInt(Long.llvm_type, 0, True),
-                llvm.ConstInt(Long.llvm_type, 1, True)]
+        # [start, stop, step]
+        data = [const_index(0), const_index(0), const_index(1)]
 
         if len(args) == 0:
             raise TypeError("Range accepts at least 1 argument")

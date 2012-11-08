@@ -38,6 +38,8 @@ Int = ScalarType(ctypes.c_int, llvm.IntType(ctypes.sizeof(ctypes.c_int) * 8))
 
 Bool = ScalarType(ctypes.c_bool, llvm.IntType(8))
 
+Byte = ScalarType(ctypes.c_byte, llvm.IntType(8))
+
 
 # Akin to size_t in C, this is used for all memory accessing operations.
 # TODO switch this to Int by default?
@@ -56,17 +58,19 @@ _FLOATING_BINARY_INST = {
     ast.Div: llvm.BuildFDiv,
 }
 
+_INTEGRAL_BINARY_INST = {
+    ast.Add: llvm.BuildAdd,
+    ast.Sub: llvm.BuildSub,
+    ast.Mult: llvm.BuildMul,
+    # Integer division is consciously left out and
+    # handled in function.py/emit_binary_op
+}
 
 BINARY_INST = {
     type_key(Double.llvm_type): _FLOATING_BINARY_INST,
     type_key(Float.llvm_type): _FLOATING_BINARY_INST,
-    type_key(Long.llvm_type): {
-        ast.Add: llvm.BuildAdd,
-        ast.Sub: llvm.BuildSub,
-        ast.Mult: llvm.BuildMul,
-        # Integer division is consciously left out and
-        # handled in function.py/emit_binary_op
-    }
+    type_key(Long.llvm_type): _INTEGRAL_BINARY_INST,
+    type_key(Byte.llvm_type): _INTEGRAL_BINARY_INST,
 }
 
 
@@ -98,7 +102,8 @@ COMPARE_INST = {
     type_key(Double.llvm_type): _FLOATING_COMPARE_INST,
     type_key(Float.llvm_type): _FLOATING_COMPARE_INST,
     type_key(Long.llvm_type): _INTEGRAL_COMPARE_INST,
-    type_key(Int.llvm_type): _INTEGRAL_COMPARE_INST
+    type_key(Int.llvm_type): _INTEGRAL_COMPARE_INST,
+    type_key(Byte.llvm_type): _INTEGRAL_COMPARE_INST
 }
 
 
