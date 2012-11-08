@@ -59,11 +59,19 @@ def cast(value, target_type):
             return llvm.BuildCast(builder, op, value, target_type.llvm_type, "cast"), None
 
         if len(set((value_kind, target_kind))) == 2:
-            # Casting between two different kinds of types
+            # TODO mixing integer and float handling; need to make this nicer.
             try:
+                # Casting between two different kinds of types
                 return build_cast(_CASTS[(value_kind, target_kind)])
             except KeyError:
-                raise TypeError("Cannot cast {0} to {1}".format(value, target_type))
+                if value_kind == llvm.DoubleTypeKind and target_kind == llvm.FloatTypeKind:
+                    # double -> float
+                    return build_cast(llvm.FPTrunc)
+                elif value_kind == llvm.FloatTypeKind and target_kind == llvm.DoubleTypeKind:
+                    # float -> double
+                    return build_cast(llvm.FPExt)
+                else:
+                    raise TypeError("Cannot cast {0} to {1}".format(value, target_type))
 
         elif target_kind == llvm.IntegerTypeKind:
             # Same kind, but different(?) integer width

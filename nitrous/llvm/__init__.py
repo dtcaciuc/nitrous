@@ -241,6 +241,9 @@ Trunc = 30
 ZExt = 31
 FPToSI = 34
 SIToFP = 36
+FPTrunc = 37
+FPExt = 38
+
 
 _func("BuildCast", ValueRef, [BuilderRef, Opcode, ValueRef, TypeRef, ctypes.c_char_p])
 _func("BuildPointerCast", ValueRef, [BuilderRef, ValueRef, TypeRef, ctypes.c_char_p])

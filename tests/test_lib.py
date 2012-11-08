@@ -105,6 +105,32 @@ class CastTests(ModuleTest, unittest.TestCase):
         self.assertEqual(out.int_to_long(3), 3)
         self.assertRegexpMatches(self.m.dumps(), "trunc")
 
+    def test_cast_double_to_float(self):
+        """Cast between wider and narrower float"""
+        from nitrous.lib import cast
+        from nitrous.types import Float
+
+        @self.m.function(Float, a=Double)
+        def double_to_float(a):
+            return cast(a, Float)
+
+        out = self.m.build()
+        self.assertEqual(out.double_to_float(1.0), 1.0)
+        self.assertRegexpMatches(self.m.dumps(), "trunc")
+
+    def test_cast_float_to_double(self):
+        """Cast between narrower and wider float"""
+        from nitrous.lib import cast
+        from nitrous.types import Float
+
+        @self.m.function(Double, a=Float)
+        def float_to_double(a):
+            return cast(a, Double)
+
+        out = self.m.build()
+        self.assertEqual(out.float_to_double(1.0), 1.0)
+        self.assertRegexpMatches(self.m.dumps(), "ext")
+
     def test_invalid_cast(self):
         from nitrous.lib import cast
         from nitrous.types import Structure
