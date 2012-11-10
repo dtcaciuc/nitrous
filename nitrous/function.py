@@ -659,7 +659,7 @@ def entry_array_alloca(func, element_type, n, name):
     builder = llvm.CreateBuilder()
 
     llvm.PositionBuilder(builder, entry, llvm.GetFirstInstruction(entry))
-    a = llvm.BuildArrayAlloca(builder, element_type, n, "")
+    a = llvm.BuildArrayAlloca(builder, element_type, n, name)
 
     llvm.DisposeBuilder(builder)
     return a

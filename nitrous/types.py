@@ -295,7 +295,7 @@ class StaticArray(Pointer):
             func = llvm.GetBasicBlockParent(llvm.GetInsertBlock(builder))
             # Total number of elements across all dimensions.
             n = const_index(reduce(mul, self.shape, 1))
-            a = entry_array_alloca(func, self.element_type.llvm_type, n, "")
+            a = entry_array_alloca(func, self.element_type.llvm_type, n, "v")
             return a, self
 
         return emit

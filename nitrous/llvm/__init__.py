@@ -15,7 +15,6 @@ try:
     _llvm = ctypes.cdll.LoadLibrary(os.path.join(os.path.dirname(__file__), "_llvm.so"))
     _libc = ctypes.cdll.LoadLibrary(ctypes.util.find_library("c"))
 
-
     def _func(func_name, restype, argtypes=[]):
         """Creates ctypes wrapper for an LLVM API function.
 
@@ -53,7 +52,7 @@ class OpaqueContext(ctypes.Structure):
 
 ContextRef = ctypes.POINTER(OpaqueContext)
 
-_func("GetGlobalContext", ContextRef);
+_func("GetGlobalContext", ContextRef)
 
 
 # Module
@@ -119,9 +118,8 @@ Opcode = ctypes.c_int
 # Globals
 _func("AddGlobal", ValueRef, [ModuleRef, TypeRef, ctypes.c_char_p])
 _func("GetNamedGlobal", ValueRef, [ModuleRef, ctypes.c_char_p])
-_func("SetInitializer", None, [ValueRef, ValueRef]);
+_func("SetInitializer", None, [ValueRef, ValueRef])
 _func("SetGlobalConstant", None, [ValueRef, Bool])
-
 
 
 # Functions
@@ -130,6 +128,7 @@ _func("AddFunction", ValueRef, [ModuleRef, ctypes.c_char_p, TypeRef])
 _func("SetLinkage", None, [ValueRef, ctypes.c_int])
 _func("GetParam", ValueRef, [ValueRef, ctypes.c_uint])
 _func("GetReturnType", TypeRef, [TypeRef])
+
 
 def function_return_type(func):
     """Gets the return type directly from a function object."""
@@ -155,7 +154,7 @@ _func("StructType", TypeRef, [ctypes.POINTER(TypeRef), ctypes.c_uint, ctypes.c_b
 _func("StructCreateNamed", TypeRef, [ContextRef, ctypes.c_char_p])
 _func("StructSetBody", None, [TypeRef,
                               ctypes.POINTER(TypeRef),
-                              ctypes.c_uint, ctypes.c_bool]);
+                              ctypes.c_uint, ctypes.c_bool])
 
 _func("GetStructName", ctypes.c_char_p, [TypeRef])
 
