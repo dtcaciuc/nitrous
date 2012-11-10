@@ -724,3 +724,18 @@ class UnpackTests(ModuleTest, unittest.TestCase):
         message = "Cannot unpack 2 values into 1"
         with self.assertRaisesRegexp(ValueError, message):
             self.m.build()
+
+
+class InlineTests(ModuleTest, unittest.TestCase):
+
+    def test(self):
+
+        @self.m.options(inline=True)
+        @self.m.function(Long, a=Long, b=Long)
+        def foo(a, b):
+            return a + b
+
+        self.m.build()
+
+        ir = self.m.dumps()
+        self.assertRegexpMatches(ir, "alwaysinline")

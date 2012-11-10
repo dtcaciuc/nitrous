@@ -122,21 +122,22 @@ class Module(object):
             del parent_frame
 
             # Options
-            func.__n2o_options__ = dict(cdiv=False)
+            func.__n2o_options__ = dict(cdiv=False, inline=False)
 
             self.funcs.append(func)
             return func
 
         return wrapper
 
-    def options(self, cdiv=False):
+    def options(self, cdiv=False, inline=False):
         """Set behavioural options which affect the generated code.
 
         :param cdiv: Set ``True`` to match C behaviour when performing integer division.
+        :param inline: Set ``True`` to always inline the function.
 
         """
         def wrapper(func):
-            func.__n2o_options__["cdiv"] = cdiv
+            func.__n2o_options__.update(cdiv=cdiv, inline=inline)
             return func
         return wrapper
 
@@ -163,6 +164,8 @@ class Module(object):
                                                  self._qualify(func.func_name),
                                                  func.__n2o_restype__,
                                                  argtypes)
+            if func.__n2o_options__["inline"]:
+                llvm.AddFunctionAttr(func.__n2o_func__, llvm.AlwaysInlineAttribute)
 
         # Once all functions are declared, emit their contents
         for func in self.funcs:
@@ -179,6 +182,7 @@ class Module(object):
         # IR optimizations; currently at default opt level.
         pm = llvm.CreatePassManager()
         pm_builder = llvm.PassManagerBuilderCreate()
+        llvm.PassManagerBuilderUseInlinerWithThreshold(pm_builder, 275)
         llvm.PassManagerBuilderPopulateModulePassManager(pm_builder, pm)
 
         if not llvm.RunPassManager(pm, self.module):
@@ -207,6 +211,8 @@ class Module(object):
 
             # Debug
             # if call(("otool", "-tv", so_path)):
+            #     raise RuntimeError("Could not disassemble target extension")
+            # if call(("objdump", "-S", so_path)):
             #     raise RuntimeError("Could not disassemble target extension")
 
         # Compilation successful; build ctypes interface to new module.

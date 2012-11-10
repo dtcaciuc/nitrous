@@ -129,6 +129,10 @@ _func("SetLinkage", None, [ValueRef, ctypes.c_int])
 _func("GetParam", ValueRef, [ValueRef, ctypes.c_uint])
 _func("GetReturnType", TypeRef, [TypeRef])
 
+_func("AddFunctionAttr", None, [ValueRef, ctypes.c_int])
+
+AlwaysInlineAttribute = 1 << 12
+
 
 def function_return_type(func):
     """Gets the return type directly from a function object."""
@@ -321,6 +325,7 @@ _func("PassManagerBuilderCreate", PassManagerBuilderRef, [])
 _func("PassManagerBuilderDispose", None, [PassManagerBuilderRef])
 
 _func("PassManagerBuilderSetOptLevel", None, [PassManagerBuilderRef, ctypes.c_uint])
+_func("PassManagerBuilderUseInlinerWithThreshold", None, [PassManagerBuilderRef, ctypes.c_uint])
 _func("PassManagerBuilderPopulateModulePassManager", None,
       [PassManagerBuilderRef, PassManagerRef])
 
