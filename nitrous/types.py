@@ -24,8 +24,19 @@ def types_equal(tx, ty):
     return type_key(tx) == type_key(ty)
 
 
-ScalarType = namedtuple("ScalarType", ("c_type", "llvm_type"))
-"""Base for all scalar data types."""
+class ScalarType(object):
+    """Base for all scalar data types."""
+
+    __slots__ = ("c_type", "llvm_type")
+
+    def __init__(self, c_type, llvm_type):
+        self.c_type = c_type
+        self.llvm_type = llvm_type
+
+    def __call__(self, v):
+        """Nicer equivalent to ``cast(v, Type)``"""
+        from .lib import cast
+        return cast(v, self)
 
 
 Double = ScalarType(ctypes.c_double, llvm.DoubleType())

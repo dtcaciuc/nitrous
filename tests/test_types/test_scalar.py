@@ -4,6 +4,19 @@ from nitrous.types import Bool, Long, Float, Double
 from nitrous.util import ModuleTest
 
 
+class CastTests(ModuleTest, unittest.TestCase):
+
+    def test(self):
+
+        @self.m.function(Float, a=Double)
+        def cast_(a):
+            return Float(a)
+
+        out = self.m.build()
+        self.assertEqual(out.cast_(1.0), 1.0)
+        self.assertRegexpMatches(self.m.dumps(), "trunc")
+
+
 class BoolTests(ModuleTest, unittest.TestCase):
 
     def test_and(self):
