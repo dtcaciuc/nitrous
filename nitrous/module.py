@@ -174,6 +174,22 @@ class Module(object):
         return "__".join((self.name, symbol))
 
 
+class ModuleOutput(object):
+    """Returned as output of Module.build() call.
+
+    Provides access to compiled functions and calls user defined
+    dispose function to free up any associated resources on deallocation.
+
+    """
+
+    def __init__(self, module, dispose):
+        self.__n2o_module__ = module
+        self.__n2o_dispose__ = dispose
+
+    def __del__(self):
+        self.__n2o_dispose__()
+
+
 def build_so(module):
     """Builds and returns exposed module through shared object
     library in temporary space.
@@ -184,6 +200,8 @@ def build_so(module):
     from subprocess import call
     from uuid import uuid4
     from imp import new_module
+
+    import atexit
 
     if llvm.InitializeNativeTarget__():
         raise SystemError("Cannot initialize LLVM target")
@@ -233,17 +251,14 @@ def build_so(module):
 
     llvm.DisposeTargetMachine(machine)
 
-    def module__del__(self):
+    def dispose():
         llvm.DisposeModule(module.module)
         shutil.rmtree(build_dir)
 
     # Compilation successful; build ctypes interface to new module.
     so = ctypes.cdll.LoadLibrary(so_path)
-    out_module = type(module.name, (object,), {
-        '__del__': module__del__,
-        '__n2o_module__': module.module,
-        '__n2o_so__': so,
-    })
+    out_module = ModuleOutput(module.module, dispose)
+    out_module.__n2o_so__ = so
 
     for func in module.funcs:
         cfunc = getattr(so, module._qualify(func.func_name))

@@ -4,7 +4,6 @@ class ModuleTest(object):
     def setUp(self):
         from .module import Module
         self.m = Module(__name__)
-        self.addCleanup(delattr, self, "m")
 
 
 def remove_indent(source_lines):
