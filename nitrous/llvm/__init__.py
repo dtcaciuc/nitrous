@@ -352,7 +352,7 @@ _func("DisposeExecutionEngine", None, [ExecutionEngineRef])
 
 # Command line options
 _func("ParseEnvironmentOptions", None, [ctypes.c_char_p, ctypes.c_char_p, ctypes.c_char_p])
-if os.envion.get("NITROUS_LLVM_OPTS"):
+if os.environ.get("NITROUS_LLVM_OPTS"):
     ParseEnvironmentOptions("nitrous", "NITROUS_LLVM_OPTS", None)
 
 
