@@ -352,7 +352,8 @@ _func("DisposeExecutionEngine", None, [ExecutionEngineRef])
 
 # Command line options
 _func("ParseEnvironmentOptions", None, [ctypes.c_char_p, ctypes.c_char_p, ctypes.c_char_p])
-ParseEnvironmentOptions("nitrous", "NITROUS_LLVM_OPTS", None)
+if os.envion.get("NITROUS_LLVM_OPTS"):
+    ParseEnvironmentOptions("nitrous", "NITROUS_LLVM_OPTS", None)
 
 
 def build_py_idiv(builder, a, b, name):
