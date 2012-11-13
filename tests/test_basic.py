@@ -739,3 +739,18 @@ class InlineTests(ModuleTest, unittest.TestCase):
 
         out = self.m.build()
         self.assertRegexpMatches(dump(out), "alwaysinline")
+
+
+class JITTests(unittest.TestCase):
+
+    def test(self):
+        from nitrous.module import Module, build_jit
+
+        m = Module("X", backend=build_jit)
+
+        @m.function(Long, a=Long, b=Long)
+        def add(a, b):
+            return a + b
+
+        out = m.build()
+        self.assertEqual(out.add(3, 7), 10)

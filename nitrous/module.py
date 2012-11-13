@@ -10,7 +10,7 @@ from . import llvm
 class Module(object):
     """A unit of compilation and a container for optimized functions."""
 
-    def __init__(self, name):
+    def __init__(self, name, backend=None):
         """Create a new module with a *name*."""
         self.name = name
         self.funcs = []
@@ -20,6 +20,8 @@ class Module(object):
         # Upon .build(), the module ownership is transferred to the
         # resulting wrapper object and below reference is set to None.
         self.module = llvm.ModuleCreateWithName(self.name)
+
+        self.backend = backend or build_so
 
     def include_function(self, name, restype, argtypes, lib=None, libdir=None):
         """Includes externally defined function for use with the module.
@@ -151,20 +153,8 @@ class Module(object):
 
         llvm.DisposeBuilder(ir_builder)
 
-        # IR optimizations; currently at default opt level.
-        pm = llvm.CreatePassManager()
-        pm_builder = llvm.PassManagerBuilderCreate()
-        llvm.PassManagerBuilderUseInlinerWithThreshold(pm_builder, 275)
-        llvm.PassManagerBuilderPopulateModulePassManager(pm_builder, pm)
-
-        if not llvm.RunPassManager(pm, self.module):
-            raise RuntimeError("Could not run IR optimization passes")
-
-        llvm.PassManagerBuilderDispose(pm_builder)
-        llvm.DisposePassManager(pm)
-
         # Invalidate module reference and return the wrapper
-        out = build_so(self)
+        out = self.backend(self)
         self.module = None
 
         return out
@@ -191,10 +181,8 @@ class ModuleOutput(object):
 
 
 def build_so(module):
-    """Builds and returns exposed module through shared object
-    library in temporary space.
+    """Output and return module wrapper backed by shared object file."""
 
-    """
     from .function import Function
 
     from subprocess import call
@@ -229,6 +217,9 @@ def build_so(module):
     so_path = format(os.path.join(build_dir, module.name))
     libs = tuple("-l{0}".format(lib) for lib in module.libs)
     libdirs = tuple("-L{0}".format(d) for d in module.libdirs)
+
+    # TODO get target data from TargetMachine?
+    _optimize(module.module, None)
 
     with tempfile.NamedTemporaryFile(suffix=".s") as tmp_s:
         message = ctypes.c_char_p()
@@ -267,9 +258,66 @@ def build_so(module):
     return out_module
 
 
+def build_jit(module):
+    """Output module wrapper backed by JIT execution engine."""
+    from .function import Function
+
+    if llvm.InitializeNativeTarget__():
+        raise SystemError("Cannot initialize LLVM target")
+
+    engine = llvm.ExecutionEngineRef()
+    opt_level = 3
+
+    message = ctypes.c_char_p()
+    if llvm.CreateJITCompilerForModule(ctypes.byref(engine), module.module, opt_level, ctypes.byref(message)):
+        err = RuntimeError("Could not create execution engine: {0}".format(message.value))
+        llvm.DisposeMessage(message)
+        raise err
+
+    _optimize(module.module, llvm.GetExecutionEngineTargetData(engine))
+
+    def dispose():
+        llvm.DisposeExecutionEngine(engine)
+        # The engine takes its ownership of module; no need to dispose separately.
+
+    out_module = ModuleOutput(module.module, dispose)
+    out_module.__n2o_engine__ = engine
+
+    for func in module.funcs:
+        result_c_type = (func.__n2o_restype__.c_type
+                         if func.__n2o_restype__ is not None
+                         else None)
+        arg_c_types = (func.__n2o_argtypes__[name].c_type
+                       for name in func.__n2o_args__)
+        proto = ctypes.CFUNCTYPE(result_c_type, *arg_c_types)
+        c_func = proto(llvm.GetPointerToGlobal(engine, func.__n2o_func__))
+        setattr(out_module, func.func_name, Function.wrap(func, c_func))
+
+    return out_module
+
+
 def dump(output):
     """Return a string with module output's LLVM IR."""
     return llvm.DumpModuleToString(output.__n2o_module__).value
+
+
+def _optimize(module, target_data):
+    """Runs optimization passes on given module."""
+
+    # IR optimizations; currently at default opt level.
+    pm = llvm.CreatePassManager()
+    if target_data is not None:
+        llvm.AddTargetData(target_data, pm)
+
+    pm_builder = llvm.PassManagerBuilderCreate()
+    llvm.PassManagerBuilderUseInlinerWithThreshold(pm_builder, 275)
+    llvm.PassManagerBuilderPopulateModulePassManager(pm_builder, pm)
+
+    if not llvm.RunPassManager(pm, module):
+        raise RuntimeError("Could not run IR optimization passes")
+
+    llvm.PassManagerBuilderDispose(pm_builder)
+    llvm.DisposePassManager(pm)
 
 
 def _create_function(module, name, restype, argtypes):

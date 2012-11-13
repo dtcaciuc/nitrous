@@ -329,6 +329,25 @@ _func("PassManagerBuilderUseInlinerWithThreshold", None, [PassManagerBuilderRef,
 _func("PassManagerBuilderPopulateModulePassManager", None,
       [PassManagerBuilderRef, PassManagerRef])
 
+_func("AddTargetData", None, [TargetDataRef, PassManagerRef])
+
+
+# Execution engine
+class OpaqueExecutionEngine(ctypes.Structure):
+    pass
+
+ExecutionEngineRef = ctypes.POINTER(OpaqueExecutionEngine)
+
+_func("CreateJITCompilerForModule", Bool,
+      [ctypes.POINTER(ExecutionEngineRef), ModuleRef,
+       ctypes.c_uint, ctypes.POINTER(ctypes.c_char_p)])
+
+_func("GetExecutionEngineTargetData", TargetDataRef, [ExecutionEngineRef])
+_func("GetPointerToGlobal", ctypes.c_void_p, [ExecutionEngineRef, ValueRef])
+
+_func("DisposeExecutionEngine", None, [ExecutionEngineRef])
+
+
 # Command line options
 _func("ParseEnvironmentOptions", None, [ctypes.c_char_p, ctypes.c_char_p, ctypes.c_char_p])
 ParseEnvironmentOptions("nitrous", "NITROUS_LLVM_OPTS", None)
