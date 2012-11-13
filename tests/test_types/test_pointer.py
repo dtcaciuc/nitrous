@@ -10,6 +10,23 @@ except ImportError:
     np = None
 
 
+class ComparisonTests(ModuleTest, unittest.TestCase):
+
+    def test(self):
+        from nitrous.types import Bool
+
+        DoubleN = Pointer(Double)
+
+        @self.m.function(Bool, x=DoubleN)
+        def is_null(x):
+            return x == DoubleN.null
+
+        out = self.m.build()
+
+        self.assertFalse(out.is_null((Double.c_type * 2)()))
+        self.assertTrue(out.is_null(None))
+
+
 class ConverterTests(ModuleTest, unittest.TestCase):
 
     def setUp(self):

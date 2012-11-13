@@ -166,6 +166,11 @@ class Pointer(object):
     def c_type(self):
         return ctypes.POINTER(self.element_type.c_type)
 
+    @property
+    def null(self):
+        """Returns NULL value of current pointer type."""
+        return llvm.ConstNull(self.llvm_type)
+
     def convert(self, p):
         import array
 

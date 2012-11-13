@@ -383,7 +383,7 @@ class FunctionBuilder(ast.NodeVisitor):
         self.push(v)
 
     def visit_Compare(self, node):
-        from .types import COMPARE_INST, type_key, types_equal
+        from .types import COMPARE_INST, _INTEGRAL_COMPARE_INST, type_key, types_equal
 
         if len(node.ops) > 1 or len(node.comparators) > 1:
             raise NotImplementedError("Only simple `if` expressions are supported")
@@ -398,7 +398,12 @@ class FunctionBuilder(ast.NodeVisitor):
             raise TypeError("Conflicting operand types for {0}: {1} and {2}"
                             .format(op, lhs, rhs))
 
-        inst, ops = COMPARE_INST[type_key(ty)]
+        # FIXME move this reponsibility to individual types.
+        if llvm.GetTypeKind(ty) == llvm.PointerTypeKind:
+            inst, ops = _INTEGRAL_COMPARE_INST
+        else:
+            inst, ops = COMPARE_INST[type_key(ty)]
+
         v = inst(self.builder, ops[type(op)], lhs, rhs, "tmp")
 
         self.push(v)
