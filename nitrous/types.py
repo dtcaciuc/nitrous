@@ -1,7 +1,6 @@
 import ctypes
 import ast
 
-from collections import namedtuple
 from . import llvm
 
 

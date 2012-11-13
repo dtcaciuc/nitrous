@@ -46,6 +46,46 @@ class BoolTests(ModuleTest, unittest.TestCase):
         self.assertEqual(out.or_(False, True), True)
         self.assertEqual(out.or_(False, False), False)
 
+    def test_complex_and(self):
+        """Multi-value `and` expression."""
+
+        @self.m.function(Bool, a=Long, b=Long, c=Long)
+        def and_(a, b, c):
+            return a < -2 and b == 0 and c > 2
+
+        out = self.m.build()
+
+        self.assertFalse(out.and_(1, 1, 1))
+
+        self.assertFalse(out.and_(-3, 1, 1))
+        self.assertFalse(out.and_(-3, 0, 1))
+        self.assertFalse(out.and_(-3, 1, 3))
+
+        self.assertFalse(out.and_(1, 0, 1))
+        self.assertFalse(out.and_(1, 0, 3))
+        self.assertFalse(out.and_(3, 0, 1))
+
+        self.assertFalse(out.and_(1, 1, 3))
+        self.assertFalse(out.and_(1, 0, 3))
+        self.assertFalse(out.and_(-3, 1, 3))
+
+        self.assertTrue(out.and_(-3, 0, 3))
+
+    def test_complex_or(self):
+        """Multi-value `or` expression."""
+
+        @self.m.function(Bool, a=Long, b=Long, c=Long)
+        def or_(a, b, c):
+            return a < -2 or b == 0 or c > 2
+
+        out = self.m.build()
+
+        self.assertFalse(out.or_(1, 1, 1))
+
+        self.assertTrue(out.or_(-3, 1, 1))
+        self.assertTrue(out.or_(1, 0, 1))
+        self.assertTrue(out.or_(1, 0, 3))
+
 
 class LongTests(ModuleTest, unittest.TestCase):
 

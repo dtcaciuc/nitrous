@@ -376,11 +376,13 @@ class FunctionBuilder(ast.NodeVisitor):
 
     def visit_BoolOp(self, node):
         ast.NodeVisitor.generic_visit(self, node)
-        rhs = self.pop()
-        lhs = self.pop()
 
-        v = BOOL_INST[type(node.op)](self.builder, lhs, rhs, "tmp")
-        self.push(v)
+        rhs = self.pop()
+        # Expressions like `a > 1 or b > 1 or c > 1` collapse into one `or` with 3 .values
+        for _ in range(len(node.values) - 1):
+            rhs = BOOL_INST[type(node.op)](self.builder, self.pop(), rhs, "cmp")
+
+        self.push(rhs)
 
     def visit_Compare(self, node):
         from .types import COMPARE_INST, _INTEGRAL_COMPARE_INST, type_key, types_equal
