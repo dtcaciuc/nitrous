@@ -12,42 +12,15 @@ class Module(object):
 
     def __init__(self, name):
         """Create a new module with a *name*."""
-        import uuid
-
         self.name = name
         self.funcs = []
         self.libs = []
         self.libdirs = []
 
         self.module = llvm.ModuleCreateWithName(self.name)
-        self.builder = llvm.CreateBuilder()
-        if llvm.InitializeNativeTarget__():
-            raise SystemError("Cannot initialize LLVM target")
-
-        triple = llvm.GetDefaultTargetTriple__()
-
-        # At this point, multiple targets can be initialized
-        # (eg x86 and x86_64), but only one is functional.
-        message = ctypes.c_char_p()
-        self.target = llvm.LookupTarget__(triple, ctypes.byref(message))
-        if not self.target:
-            err = RuntimeError("Could not find suitable target: {0}".format(message.value))
-            llvm.DisposeMessage(message)
-            raise err
-
-        self.machine = llvm.CreateTargetMachine(self.target,
-                                                triple, "", "",
-                                                llvm.CodeGenLevelDefault,
-                                                llvm.RelocPIC,
-                                                llvm.CodeModelDefault)
-
-        self.build_dir = os.path.join(tempfile.gettempdir(), "n2o", str(uuid.uuid4()))
 
     def __del__(self):
-        llvm.DisposeTargetMachine(self.machine)
-        llvm.DisposeBuilder(self.builder)
         llvm.DisposeModule(self.module)
-        self.clean()
 
     def include_function(self, name, restype, argtypes, lib=None, libdir=None):
         """Includes externally defined function for use with the module.
@@ -148,14 +121,7 @@ class Module(object):
         the same attribute names as the original functions being wrapped.
 
         """
-        import os
-        import tempfile
-        import types
-
-        from subprocess import call
-        from .function import Function, emit_body
-
-        os.makedirs(self.build_dir)
+        from .function import emit_body
 
         # Translate all registered functions
         for func in self.funcs:
@@ -167,6 +133,8 @@ class Module(object):
             if func.__n2o_options__["inline"]:
                 llvm.AddFunctionAttr(func.__n2o_func__, llvm.AlwaysInlineAttribute)
 
+        ir_builder = llvm.CreateBuilder()
+
         # Once all functions are declared, emit their contents
         for func in self.funcs:
             # Update globals with local function objects, including
@@ -175,9 +143,11 @@ class Module(object):
             for other_func in self.funcs:
                 func.__n2o_globals__[other_func.func_name] = other_func
 
-            emit_body(self.module, self.builder, func)
+            emit_body(self.module, ir_builder, func)
             if llvm.VerifyFunction(func.__n2o_func__, llvm.PrintMessageAction):
                 raise RuntimeError("Could not compile {0}()".format(func.func_name))
+
+        llvm.DisposeBuilder(ir_builder)
 
         # IR optimizations; currently at default opt level.
         pm = llvm.CreatePassManager()
@@ -191,39 +161,8 @@ class Module(object):
         llvm.PassManagerBuilderDispose(pm_builder)
         llvm.DisposePassManager(pm)
 
-        # Path to output shared library.
-        so_path = format(os.path.join(self.build_dir, self.name))
-        libs = tuple("-l{0}".format(lib) for lib in self.libs)
-        libdirs = tuple("-L{0}".format(d) for d in self.libdirs)
+        return build_so(self)
 
-        with tempfile.NamedTemporaryFile(suffix=".s") as tmp_s:
-            message = ctypes.c_char_p()
-            status = llvm.TargetMachineEmitToFile(self.machine, self.module,
-                                                  tmp_s.name, llvm.AssemblyFile,
-                                                  ctypes.byref(message))
-            if status != 0:
-                error = RuntimeError("Could not assemble IR: {0}".format(message.value))
-                llvm.DisposeMessage(message)
-                raise error
-
-            if call(("clang", "-shared", "-o", so_path, tmp_s.name) + libs + libdirs):
-                raise RuntimeError("Could not build target extension")
-
-            # Debug
-            # if call(("otool", "-tv", so_path)):
-            #     raise RuntimeError("Could not disassemble target extension")
-            # if call(("objdump", "-S", so_path)):
-            #     raise RuntimeError("Could not disassemble target extension")
-
-        # Compilation successful; build ctypes interface to new module.
-        out_module = type(self.name, (types.ModuleType,), {})
-        out_module.__n2o_shlib__ = ctypes.cdll.LoadLibrary(so_path)
-
-        for func in self.funcs:
-            cfunc = getattr(out_module.__n2o_shlib__, self._qualify(func.func_name))
-            setattr(out_module, func.func_name, Function.wrap(func, cfunc))
-
-        return out_module
 
     def dumps(self):
         """Return a string with module's LLVM IR."""
@@ -235,12 +174,85 @@ class Module(object):
         This gets called automatically when module is garbage collected.
 
         """
-        if os.path.isdir(self.build_dir):
-            shutil.rmtree(self.build_dir)
 
     def _qualify(self, symbol):
         """Qualifies symbol with parent module name."""
         return "__".join((self.name, symbol))
+
+
+def build_so(module):
+    """Builds and returns exposed module through shared object
+    library in temporary space.
+
+    """
+    from .function import Function
+
+    from subprocess import call
+    from uuid import uuid4
+    from imp import new_module
+
+    import atexit
+
+    if llvm.InitializeNativeTarget__():
+        raise SystemError("Cannot initialize LLVM target")
+
+    # At this point, multiple targets can be initialized
+    # (eg x86 and x86_64), but only one is functional.
+    message = ctypes.c_char_p()
+    triple = llvm.GetDefaultTargetTriple__()
+    target = llvm.LookupTarget__(triple, ctypes.byref(message))
+    if not target:
+        err = RuntimeError("Could not find suitable target: {0}".format(message.value))
+        llvm.DisposeMessage(message)
+        raise err
+
+    machine = llvm.CreateTargetMachine(target,
+                                       triple, "", "",
+                                       llvm.CodeGenLevelDefault,
+                                       llvm.RelocPIC,
+                                       llvm.CodeModelDefault)
+
+    build_dir = os.path.join(tempfile.gettempdir(), "n2o", str(uuid4()))
+    os.makedirs(build_dir)
+
+    # TODO find a more timely and cleaner way to do this?
+    atexit.register(shutil.rmtree, build_dir)
+
+    # Path to output shared library.
+    so_path = format(os.path.join(build_dir, module.name))
+    libs = tuple("-l{0}".format(lib) for lib in module.libs)
+    libdirs = tuple("-L{0}".format(d) for d in module.libdirs)
+
+    with tempfile.NamedTemporaryFile(suffix=".s") as tmp_s:
+        message = ctypes.c_char_p()
+        status = llvm.TargetMachineEmitToFile(machine, module.module,
+                                              tmp_s.name, llvm.AssemblyFile,
+                                              ctypes.byref(message))
+        if status != 0:
+            error = RuntimeError("Could not assemble IR: {0}".format(message.value))
+            llvm.DisposeMessage(message)
+            raise error
+
+        if call(("clang", "-shared", "-o", so_path, tmp_s.name) + libs + libdirs):
+            raise RuntimeError("Could not build target extension")
+
+        # Debug
+        # if call(("otool", "-tv", so_path)):
+        #     raise RuntimeError("Could not disassemble target extension")
+        # if call(("objdump", "-S", so_path)):
+        #     raise RuntimeError("Could not disassemble target extension")
+
+    # Compilation successful; build ctypes interface to new module.
+    out_module = new_module(module.name)
+    out_module.__n2o_shlib__ = ctypes.cdll.LoadLibrary(so_path)
+
+    for func in module.funcs:
+        cfunc = getattr(out_module.__n2o_shlib__, module._qualify(func.func_name))
+        setattr(out_module, func.func_name, Function.wrap(func, cfunc))
+
+    llvm.DisposeTargetMachine(machine)
+
+    return out_module
 
 
 def _create_function(module, name, restype, argtypes):
