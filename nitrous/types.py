@@ -84,6 +84,21 @@ BINARY_INST = {
     type_key(Byte.llvm_type): _INTEGRAL_BINARY_INST,
 }
 
+_FLOATING_UNARY_INST = {
+    ast.USub: llvm.BuildFNeg
+}
+
+_INTEGRAL_UNARY_INST = {
+    ast.USub: llvm.BuildNeg
+}
+
+UNARY_INST = {
+    type_key(Double.llvm_type): _FLOATING_UNARY_INST,
+    type_key(Float.llvm_type): _FLOATING_UNARY_INST,
+    type_key(Long.llvm_type): _INTEGRAL_UNARY_INST,
+    type_key(Byte.llvm_type): _INTEGRAL_UNARY_INST,
+}
+
 
 _FLOATING_COMPARE_INST = (
     llvm.BuildFCmp, {

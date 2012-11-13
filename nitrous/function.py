@@ -354,6 +354,18 @@ class FunctionBuilder(ast.NodeVisitor):
 
             llvm.BuildRet(self.builder, v)
 
+    def visit_UnaryOp(self, node):
+        from .types import UNARY_INST, type_key
+
+        ast.NodeVisitor.generic_visit(self, node)
+        rhs = self.pop()
+
+        op_type = type(node.op)
+        inst = UNARY_INST[type_key(llvm.TypeOf(rhs))][op_type]
+
+        v = inst(self.builder, rhs, op_type.__name__.lower())
+        self.push(v)
+
     def visit_BinOp(self, node):
         ast.NodeVisitor.generic_visit(self, node)
         rhs = self.pop()

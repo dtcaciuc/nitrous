@@ -208,6 +208,7 @@ _func("BuildCondBr", ValueRef, [BuilderRef, ValueRef,
 for name in ("BuildFAdd", "BuildFSub", "BuildFMul", "BuildFDiv"):
     _func(name, ValueRef, [BuilderRef, ValueRef, ValueRef, ctypes.c_char_p])
 
+_func("BuildFNeg", ValueRef, [BuilderRef, ValueRef, ctypes.c_char_p])
 _func("BuildFCmp", ValueRef, [BuilderRef, ctypes.c_int, ValueRef, ValueRef, ctypes.c_char_p])
 
 
@@ -215,6 +216,7 @@ _func("BuildFCmp", ValueRef, [BuilderRef, ctypes.c_int, ValueRef, ValueRef, ctyp
 for name in ("BuildAdd", "BuildSub", "BuildMul", "BuildUDiv", "BuildSDiv"):
     _func(name, ValueRef, [BuilderRef, ValueRef, ValueRef, ctypes.c_char_p])
 
+_func("BuildNeg", ValueRef, [BuilderRef, ValueRef, ctypes.c_char_p])
 _func("BuildICmp", ValueRef, [BuilderRef, ctypes.c_int, ValueRef, ValueRef, ctypes.c_char_p])
 
 

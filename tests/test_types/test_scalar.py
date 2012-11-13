@@ -74,6 +74,19 @@ class LongTests(ModuleTest, unittest.TestCase):
                 self.assertEqual(cf(a, b), f(a, b),
                                  "{0}({1}, {2})".format(f.func_name, a, b))
 
+    def test_unary(self):
+
+        annotate = self.m.function(Long, a=Long)
+        funcs = [annotate(f) for f in unary_funcs()]
+        out = self.m.build()
+
+        values = [-5, 0, 5]
+
+        for f in funcs:
+            cf = getattr(out, f.func_name)
+            for a in values:
+                self.assertEqual(cf(a), f(a), "{0}({1})".format(f.func_name, a))
+
     def test_cmp(self):
 
         annotate = self.m.function(Bool, a=Long, b=Long)
@@ -106,6 +119,19 @@ class LongTests(ModuleTest, unittest.TestCase):
 
 
 class FloatingTests(ModuleTest):
+
+    def test_unary(self):
+
+        annotate = self.m.function(self.Type, a=self.Type)
+        funcs = [annotate(f) for f in unary_funcs()]
+        out = self.m.build()
+
+        values = [-5.0, 0.0, 5.0]
+
+        for f in funcs:
+            cf = getattr(out, f.func_name)
+            for a in values:
+                self.assertEqual(cf(a), f(a), "{0}({1})".format(f.func_name, a))
 
     def test_binary(self):
 
@@ -157,6 +183,14 @@ class DoubleTests(FloatingTests, unittest.TestCase):
 
         out = self.m.build()
         self.assertEqual(out.x(), 5.0)
+
+
+def unary_funcs():
+
+    def negate(a):
+        return -a
+
+    return [negate]
 
 
 def binary_funcs():
