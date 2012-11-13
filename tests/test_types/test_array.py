@@ -114,6 +114,7 @@ class IndexTests(ModuleTest, unittest.TestCase):
 
     def test_static_dimension(self):
         """Replace access to known dimensions with direct constants"""
+        from nitrous.module import dump
 
         D = DynamicArray(Long, shape=(Dynamic, 3, 3))
         X, Y, Z = range(3)
@@ -124,11 +125,13 @@ class IndexTests(ModuleTest, unittest.TestCase):
 
         out = self.m.build()
         # All indices should be resolved at run-time, so there should be no multiplications.
-        self.assertNotRegexpMatches(self.m.dumps(), "mul")
+        self.assertNotRegexpMatches(dump(out), "mul")
         self.assertEqual(out.f(self.data), 14)
 
     def test_all_dynamic_dimension(self):
         """All dimensions are dynamic, no indices can be resolved at runtime"""
+        from nitrous.module import dump
+
         D = DynamicArray(Long, shape=(Dynamic, Dynamic, Dynamic))
         X, Y, Z = range(3)
 
@@ -138,11 +141,12 @@ class IndexTests(ModuleTest, unittest.TestCase):
 
         out = self.m.build()
         # Should have run-time multiplications during index flattening.
-        self.assertRegexpMatches(self.m.dumps(), "mul")
+        self.assertRegexpMatches(dump(out), "mul")
         self.assertEqual(out.f(self.data), 14)
 
     def test_mixed_dynamic_dimension(self):
         """Some dimensions are dynamic, other than major one"""
+        from nitrous.module import dump
 
         D = DynamicArray(Long, shape=(Dynamic, 3, Dynamic))
         X, Y, Z = range(3)
@@ -153,5 +157,5 @@ class IndexTests(ModuleTest, unittest.TestCase):
 
         out = self.m.build()
         # Should have run-time multiplications during index flattening.
-        self.assertRegexpMatches(self.m.dumps(), "mul")
+        self.assertRegexpMatches(dump(out), "mul")
         self.assertEqual(out.f(self.data), 14)

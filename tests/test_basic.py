@@ -675,6 +675,7 @@ class ScopedVarsTests(unittest.TestCase):
 class OptimizationTests(ModuleTest, unittest.TestCase):
 
     def test_branch_elimination(self):
+        from nitrous.module import dump
 
         add_5 = False
         add_any = True
@@ -692,7 +693,7 @@ class OptimizationTests(ModuleTest, unittest.TestCase):
             return a
 
         out = self.m.build()
-        ir = " ".join(self.m.dumps().split("\n"))
+        ir = " ".join(dump(out).split("\n"))
 
         # In first function, conditional depends on a parameter
         self.assertRegexpMatches(ir, "f1.+\{.+icmp.+\}")
@@ -729,13 +730,12 @@ class UnpackTests(ModuleTest, unittest.TestCase):
 class InlineTests(ModuleTest, unittest.TestCase):
 
     def test(self):
+        from nitrous.module import dump
 
         @self.m.options(inline=True)
         @self.m.function(Long, a=Long, b=Long)
         def foo(a, b):
             return a + b
 
-        self.m.build()
-
-        ir = self.m.dumps()
-        self.assertRegexpMatches(ir, "alwaysinline")
+        out = self.m.build()
+        self.assertRegexpMatches(dump(out), "alwaysinline")

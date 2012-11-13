@@ -17,10 +17,9 @@ class Module(object):
         self.libs = []
         self.libdirs = []
 
+        # Upon .build(), the module ownership is transferred to the
+        # resulting wrapper object and below reference is set to None.
         self.module = llvm.ModuleCreateWithName(self.name)
-
-    def __del__(self):
-        llvm.DisposeModule(self.module)
 
     def include_function(self, name, restype, argtypes, lib=None, libdir=None):
         """Includes externally defined function for use with the module.
@@ -123,6 +122,9 @@ class Module(object):
         """
         from .function import emit_body
 
+        if self.module is None:
+            raise RuntimeError("Module was already built")
+
         # Translate all registered functions
         for func in self.funcs:
             argtypes = [func.__n2o_argtypes__[name] for name in func.__n2o_args__]
@@ -161,19 +163,11 @@ class Module(object):
         llvm.PassManagerBuilderDispose(pm_builder)
         llvm.DisposePassManager(pm)
 
-        return build_so(self)
+        # Invalidate module reference and return the wrapper
+        out = build_so(self)
+        self.module = None
 
-
-    def dumps(self):
-        """Return a string with module's LLVM IR."""
-        return llvm.DumpModuleToString(self.module).value
-
-    def clean(self):
-        """Clean the temporary build products.
-
-        This gets called automatically when module is garbage collected.
-
-        """
+        return out
 
     def _qualify(self, symbol):
         """Qualifies symbol with parent module name."""
@@ -190,8 +184,6 @@ def build_so(module):
     from subprocess import call
     from uuid import uuid4
     from imp import new_module
-
-    import atexit
 
     if llvm.InitializeNativeTarget__():
         raise SystemError("Cannot initialize LLVM target")
@@ -214,9 +206,6 @@ def build_so(module):
 
     build_dir = os.path.join(tempfile.gettempdir(), "n2o", str(uuid4()))
     os.makedirs(build_dir)
-
-    # TODO find a more timely and cleaner way to do this?
-    atexit.register(shutil.rmtree, build_dir)
 
     # Path to output shared library.
     so_path = format(os.path.join(build_dir, module.name))
@@ -242,17 +231,30 @@ def build_so(module):
         # if call(("objdump", "-S", so_path)):
         #     raise RuntimeError("Could not disassemble target extension")
 
-    # Compilation successful; build ctypes interface to new module.
-    out_module = new_module(module.name)
-    out_module.__n2o_shlib__ = ctypes.cdll.LoadLibrary(so_path)
-
-    for func in module.funcs:
-        cfunc = getattr(out_module.__n2o_shlib__, module._qualify(func.func_name))
-        setattr(out_module, func.func_name, Function.wrap(func, cfunc))
-
     llvm.DisposeTargetMachine(machine)
 
+    def module__del__(self):
+        llvm.DisposeModule(module.module)
+        shutil.rmtree(build_dir)
+
+    # Compilation successful; build ctypes interface to new module.
+    so = ctypes.cdll.LoadLibrary(so_path)
+    out_module = type(module.name, (object,), {
+        '__del__': module__del__,
+        '__n2o_module__': module.module,
+        '__n2o_so__': so,
+    })
+
+    for func in module.funcs:
+        cfunc = getattr(so, module._qualify(func.func_name))
+        setattr(out_module, func.func_name, Function.wrap(func, cfunc))
+
     return out_module
+
+
+def dump(output):
+    """Return a string with module output's LLVM IR."""
+    return llvm.DumpModuleToString(output.__n2o_module__).value
 
 
 def _create_function(module, name, restype, argtypes):

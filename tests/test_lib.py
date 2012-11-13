@@ -83,6 +83,7 @@ class CastTests(ModuleTest, unittest.TestCase):
         """Cast between narrower and wider integer"""
         from nitrous.lib import cast
         from nitrous.types import Int
+        from nitrous.module import dump
 
         @self.m.function(Int, a=self.Byte)
         def int_to_long(a):
@@ -90,12 +91,13 @@ class CastTests(ModuleTest, unittest.TestCase):
 
         out = self.m.build()
         self.assertEqual(out.int_to_long(3), 3)
-        self.assertRegexpMatches(self.m.dumps(), "zext")
+        self.assertRegexpMatches(dump(out), "zext")
 
     def test_cast_long_to_int(self):
         """Cast between wider and narrower integer"""
         from nitrous.lib import cast
         from nitrous.types import Int
+        from nitrous.module import dump
 
         @self.m.function(self.Byte, a=Int)
         def int_to_long(a):
@@ -103,12 +105,13 @@ class CastTests(ModuleTest, unittest.TestCase):
 
         out = self.m.build()
         self.assertEqual(out.int_to_long(3), 3)
-        self.assertRegexpMatches(self.m.dumps(), "trunc")
+        self.assertRegexpMatches(dump(out), "trunc")
 
     def test_cast_double_to_float(self):
         """Cast between wider and narrower float"""
         from nitrous.lib import cast
         from nitrous.types import Float
+        from nitrous.module import dump
 
         @self.m.function(Float, a=Double)
         def double_to_float(a):
@@ -116,12 +119,13 @@ class CastTests(ModuleTest, unittest.TestCase):
 
         out = self.m.build()
         self.assertEqual(out.double_to_float(1.0), 1.0)
-        self.assertRegexpMatches(self.m.dumps(), "trunc")
+        self.assertRegexpMatches(dump(out), "trunc")
 
     def test_cast_float_to_double(self):
         """Cast between narrower and wider float"""
         from nitrous.lib import cast
         from nitrous.types import Float
+        from nitrous.module import dump
 
         @self.m.function(Double, a=Float)
         def float_to_double(a):
@@ -129,7 +133,7 @@ class CastTests(ModuleTest, unittest.TestCase):
 
         out = self.m.build()
         self.assertEqual(out.float_to_double(1.0), 1.0)
-        self.assertRegexpMatches(self.m.dumps(), "ext")
+        self.assertRegexpMatches(dump(out), "ext")
 
     def test_invalid_cast(self):
         from nitrous.lib import cast
