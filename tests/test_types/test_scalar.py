@@ -7,7 +7,6 @@ from nitrous.util import ModuleTest
 class CastTests(ModuleTest, unittest.TestCase):
 
     def test(self):
-        from nitrous.module import dump
 
         @self.m.function(Float, a=Double)
         def cast_(a):
@@ -15,10 +14,21 @@ class CastTests(ModuleTest, unittest.TestCase):
 
         out = self.m.build()
         self.assertEqual(out.cast_(1.0), 1.0)
-        self.assertRegexpMatches(dump(out), "trunc")
+        self.assertRegexpMatches(out, "trunc")
 
 
 class BoolTests(ModuleTest, unittest.TestCase):
+
+    def test_not(self):
+
+        @self.m.function(Bool, a=Bool)
+        def not_(a):
+            return not a
+
+        out = self.m.build()
+
+        self.assertTrue(out.not_(False))
+        self.assertFalse(out.not_(True))
 
     def test_and(self):
 

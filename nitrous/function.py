@@ -361,7 +361,12 @@ class FunctionBuilder(ast.NodeVisitor):
         rhs = self.pop()
 
         op_type = type(node.op)
-        inst = UNARY_INST[type_key(llvm.TypeOf(rhs))][op_type]
+        if op_type == ast.Not:
+            # Boolean `not`
+            rhs = emit_nonzero(self.builder, rhs)
+            inst = llvm.BuildNot
+        else:
+            inst = UNARY_INST[type_key(llvm.TypeOf(rhs))][op_type]
 
         v = inst(self.builder, rhs, op_type.__name__.lower())
         self.push(v)
@@ -377,11 +382,12 @@ class FunctionBuilder(ast.NodeVisitor):
     def visit_BoolOp(self, node):
         ast.NodeVisitor.generic_visit(self, node)
 
-        rhs = self.pop()
+        rhs = emit_nonzero(self.builder, self.pop())
         # Expressions like `a > 1 or b > 1 or c > 1` collapse into one `or` with 3 .values
         for _ in range(len(node.values) - 1):
-            rhs = BOOL_INST[type(node.op)](self.builder, self.pop(), rhs, "cmp")
-
+            rhs = BOOL_INST[type(node.op)](self.builder,
+                                           emit_nonzero(self.builder, self.pop()),
+                                           rhs, "cmp")
         self.push(rhs)
 
     def visit_Compare(self, node):
@@ -723,6 +729,18 @@ def emit_binary_op(builder, op, lhs, rhs, cdiv):
         inst = BINARY_INST[type_key(ty)][type(op)]
 
     return inst(builder, lhs, rhs, type(op).__name__.lower())
+
+
+def emit_nonzero(builder, v):
+    """Emits check to see whether the value of *v* is non-zero."""
+    ty = llvm.TypeOf(v)
+    kind = llvm.GetTypeKind(ty)
+    if kind in (llvm.IntegerTypeKind, llvm.PointerTypeKind):
+        v = llvm.BuildICmp(builder, llvm.IntNE, v, llvm.ConstNull(ty), "nz")
+    else:
+        raise TypeError("Incompatible type for boolean expressions")
+        # TODO say which type exactly
+    return v
 
 
 def truncate_bool(builder, v):
