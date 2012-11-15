@@ -227,9 +227,9 @@ class FunctionBuilder(ast.NodeVisitor):
 
         if hasattr(vt, "emit_getattr"):
             if isinstance(node.ctx, ast.Load):
-                a, at = vt.emit_getattr(self.module, self.builder, v, node.attr)
+                a, at = vt.emit_getattr(self.builder, v, node.attr)
             elif isinstance(node.ctx, ast.Store):
-                a, at = vt.emit_setattr(self.module, self.builder, v, node.attr)
+                a, at = vt.emit_setattr(self.builder, v, node.attr)
             else:
                 raise NotImplementedError("Unsupported attribute context {0}".format(node.ctx))
         else:

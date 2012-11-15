@@ -241,12 +241,12 @@ class Structure(object):
         # Pass by reference if directly used as argument type.
         return Reference(self)
 
-    def emit_getattr(self, module, builder, ref, attr):
+    def emit_getattr(self, builder, ref, attr):
         """IR: Emits attribute value load from structure reference."""
         gep, t = self._field_gep(builder, ref, attr)
         return llvm.BuildLoad(builder, gep, "v"), t
 
-    def emit_setattr(self, module, builder, ref, attr):
+    def emit_setattr(self, builder, ref, attr):
         """IR: Emits GEP used to set the attribute value."""
         gep, t = self._field_gep(builder, ref, attr)
         return gep, Reference(t)
@@ -270,7 +270,7 @@ class StaticArray(Pointer):
     # TODO add a guard against None/Dynamic dimensions
     # TODO abstract element access interface into a mixin?
 
-    def emit_getattr(self, module, builder, ref, attr):
+    def emit_getattr(self, builder, ref, attr):
         from .function import entry_alloca
 
         if attr == "ndim":
@@ -279,6 +279,7 @@ class StaticArray(Pointer):
         elif attr == "shape":
             # First time, initialize a global constant array
             # and then use it on every access.
+            module = llvm.GetParentModule__(builder)
             shape_name = "StaticArray{0}".format(id(self))
             shape = llvm.GetNamedGlobal(module, shape_name)
 
@@ -386,8 +387,8 @@ class DynamicArray(Structure):
     def _item_gep(self, builder, v, i):
         # Get array shape from struct value
         # TODO first arg is module instance
-        shape_value, shape_type = self.emit_getattr(None, builder, v, "shape")
-        data_value, data_type = self.emit_getattr(None, builder, v, "data")
+        shape_value, shape_type = self.emit_getattr(builder, v, "shape")
+        data_value, data_type = self.emit_getattr(builder, v, "data")
 
         def emit_dimension(i):
             # Use direct constants, if possible; otherwise load from actual shape array.
