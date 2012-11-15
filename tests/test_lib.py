@@ -10,6 +10,16 @@ import unittest2 as unittest
 
 class MathTests(ModuleTest, unittest.TestCase):
 
+    def test_pow(self):
+        from nitrous.module import dump
+
+        @self.m.function(Double, x=Double, y=Double)
+        def pow(x, y):
+            return nitrous.lib.math.pow(x, y)
+
+        out = self.m.build()
+        self.assertAlmostEqual(math.pow(3.0, 5.0), out.pow(3.0, 5.0))
+
     def test_sqrt(self):
 
         @self.m.function(Double, x=Double)

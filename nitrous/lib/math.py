@@ -9,27 +9,36 @@ pi = _pymath.pi
 e = _pymath.e
 
 
+def _pymath_doc(f):
+    """Copies docstring from Python stdlib `math` function of the same name."""
+    f.__doc__ = getattr(_pymath, f.__name__).__doc__
+    return f
+
+
+@_pymath_doc
 def exp(x):
-    return IntrinsicEmitter("exp", x)
+    return IntrinsicEmitter("exp", (x,))
 
 
+@_pymath_doc
+def pow(x, y):
+    return IntrinsicEmitter("pow", (x, y), spec=(x,))
+
+
+@_pymath_doc
 def log(x, base=None):
 
     @value_emitter
     def emit(module, builder):
-        n, n_ty = IntrinsicEmitter("log", x)(module, builder)
+        n, n_ty = IntrinsicEmitter("log", (x,))(module, builder)
         if base is not None:
-            d, _ = IntrinsicEmitter("log", base)(module, builder)
+            d, _ = IntrinsicEmitter("log", (base,))(module, builder)
             n = llvm.BuildFDiv(builder, n, d, "")
         return n, n_ty
 
     return emit
 
 
+@_pymath_doc
 def sqrt(x):
-    return IntrinsicEmitter("sqrt", x)
-
-
-exp.__doc__ = _pymath.exp.__doc__
-sqrt.__doc__ = _pymath.sqrt.__doc__
-log.__doc__ = _pymath.log.__doc__
+    return IntrinsicEmitter("sqrt", (x,))
