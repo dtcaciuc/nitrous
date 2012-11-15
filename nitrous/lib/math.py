@@ -1,6 +1,5 @@
 from __future__ import absolute_import
 import math as _pymath
-import ctypes
 
 from .. import llvm
 from . import IntrinsicEmitter, value_emitter

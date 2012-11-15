@@ -40,6 +40,7 @@ class IntrinsicEmitter(object):
         self.spec = spec or args
 
     def __call__(self, module, builder):
+        # TODO remove module arg; we can get that from builder directly.
         n_args = len(self.args)
         n_spec = len(self.spec)
 

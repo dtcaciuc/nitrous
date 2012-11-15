@@ -187,7 +187,7 @@ class FloatingTests(ModuleTest):
     def test_binary(self):
 
         annotate = self.m.function(self.Type, a=self.Type, b=self.Type)
-        funcs = [annotate(f) for f in binary_funcs()]
+        funcs = [annotate(f) for f in binary_funcs() + floating_binary_funcs()]
         out = self.m.build()
 
         values = [(0.0, 1.0), (3.0, 2.0), (2.0, 3.0), (-3.0, 2.0), (3.0, -2.0)]
@@ -259,6 +259,14 @@ def binary_funcs():
         return a / b
 
     return [add, sub, mul, div]
+
+
+def floating_binary_funcs():
+
+    def pow(a, b):
+        return a ** b
+
+    return [pow]
 
 
 def cmp_funcs():

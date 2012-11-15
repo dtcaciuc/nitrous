@@ -196,6 +196,9 @@ _func("PositionBuilderAtEnd", None, [BuilderRef, BasicBlockRef])
 _func("PositionBuilder", None, [BuilderRef, BasicBlockRef, ValueRef])
 _func("GetInsertBlock", BasicBlockRef, [BuilderRef])
 
+_func("GetParentModule__", ModuleRef, [BuilderRef])
+
+
 # Terminators
 _func("BuildRetVoid", ValueRef, [BuilderRef])
 _func("BuildRet", ValueRef, [BuilderRef, ValueRef])
@@ -384,3 +387,9 @@ def build_py_idiv(builder, a, b, name):
     return BuildSub(builder, q,
                     BuildCast(builder, ZExt, q_sub, TypeOf(a), name + "_cast"),
                     name)
+
+
+def build_pow(builder, a, b, name):
+    from ..lib.math import pow
+    v, ty = pow(a, b)(GetParentModule__(builder), builder)
+    return v

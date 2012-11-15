@@ -81,6 +81,12 @@ extern "C" {
         return strdup(llvm::sys::getDefaultTargetTriple().c_str());
     }
 
+    LLVMModuleRef
+    LLVMGetParentModule__(LLVMBuilderRef B) {
+        llvm::Module *M = llvm::unwrap(B)->GetInsertBlock()->getParent()->getParent();
+        return llvm::wrap(M);
+    }
+
 
     /**
      * See TargetRegistry::lookupTarget()
