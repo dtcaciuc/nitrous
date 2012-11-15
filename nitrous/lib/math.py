@@ -28,10 +28,10 @@ def pow(x, y):
 def log(x, base=None):
 
     @value_emitter
-    def emit(module, builder):
-        n, n_ty = IntrinsicEmitter("log", (x,))(module, builder)
+    def emit(builder):
+        n, n_ty = IntrinsicEmitter("log", (x,))(builder)
         if base is not None:
-            d, _ = IntrinsicEmitter("log", (base,))(module, builder)
+            d, _ = IntrinsicEmitter("log", (base,))(builder)
             n = llvm.BuildFDiv(builder, n, d, "")
         return n, n_ty
 

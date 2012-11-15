@@ -1,8 +1,6 @@
 from __future__ import absolute_import
 from .. import llvm
 
-import ctypes
-
 
 _KIND_CASTS = {
 
@@ -39,11 +37,11 @@ class IntrinsicEmitter(object):
         self.args = args
         self.spec = spec or args
 
-    def __call__(self, module, builder):
-        # TODO remove module arg; we can get that from builder directly.
+    def __call__(self, builder):
         n_args = len(self.args)
         n_spec = len(self.spec)
 
+        module = llvm.GetParentModule__(builder)
         i = llvm.INTRINSICS["llvm.{0}".format(self.name)]
         spectypes = (llvm.TypeRef * n_spec)(*map(llvm.TypeOf, self.spec))
         func = llvm.GetIntrinsicDeclaration(module, i, spectypes, n_spec)
@@ -56,7 +54,7 @@ def cast(value, target_type):
     """Casts *value* to a specified *target_type*."""
 
     @value_emitter
-    def emit(module, builder):
+    def emit(builder):
         from ..types import type_key
 
         # TODO support
@@ -107,7 +105,7 @@ def _range(*args):
     """
 
     @value_emitter
-    def emit(module, builder):
+    def emit(builder):
         from ..types import const_index
 
         # TODO add checks

@@ -86,8 +86,7 @@ class ScopedVars(object):
 
 class FunctionBuilder(ast.NodeVisitor):
 
-    def __init__(self, module, builder, globals_, opts):
-        self.module = module
+    def __init__(self, builder, globals_, opts):
         self.builder = builder
         self.opts = opts
 
@@ -618,12 +617,12 @@ class FunctionBuilder(ast.NodeVisitor):
             # Function is either CPython one or an LLVM emitter.
             result = func(*args)
             if getattr(result, "__n2o_emitter__", False):
-                result, result_type = result(self.module, self.builder)
+                result, result_type = result(self.builder)
 
         self.push(result, result_type)
 
 
-def emit_body(module, builder, func):
+def emit_body(builder, func):
     """Emits function body IR.
 
     Expects function already is declared and referenced as func.__n2o_func__.
@@ -638,7 +637,7 @@ def emit_body(module, builder, func):
     func_body = ast.parse(func_source).body[0].body
 
     # Emit function body IR
-    b = FunctionBuilder(module, builder, dict(resolve_constants(func.__n2o_globals__)), func.__n2o_options__)
+    b = FunctionBuilder(builder, dict(resolve_constants(func.__n2o_globals__)), func.__n2o_options__)
     llvm.PositionBuilderAtEnd(builder, llvm.AppendBasicBlock(func.__n2o_func__, "entry"))
 
     # Store function parameters as locals

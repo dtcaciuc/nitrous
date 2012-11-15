@@ -391,5 +391,5 @@ def build_py_idiv(builder, a, b, name):
 
 def build_pow(builder, a, b, name):
     from ..lib.math import pow
-    v, ty = pow(a, b)(GetParentModule__(builder), builder)
+    v, ty = pow(a, b)(builder)
     return v

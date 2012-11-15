@@ -324,7 +324,7 @@ class StaticArray(Pointer):
         from operator import mul
 
         @value_emitter
-        def emit(module, builder):
+        def emit(builder):
             func = llvm.GetBasicBlockParent(llvm.GetInsertBlock(builder))
             # Total number of elements across all dimensions.
             n = const_index(reduce(mul, self.shape, 1))
@@ -386,7 +386,6 @@ class DynamicArray(Structure):
 
     def _item_gep(self, builder, v, i):
         # Get array shape from struct value
-        # TODO first arg is module instance
         shape_value, shape_type = self.emit_getattr(builder, v, "shape")
         data_value, data_type = self.emit_getattr(builder, v, "data")
 

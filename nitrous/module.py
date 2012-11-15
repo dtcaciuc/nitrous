@@ -147,7 +147,7 @@ class Module(object):
             for other_func in self.funcs:
                 func.__n2o_globals__[other_func.func_name] = other_func
 
-            emit_body(self.module, ir_builder, func)
+            emit_body(ir_builder, func)
             if llvm.VerifyFunction(func.__n2o_func__, llvm.PrintMessageAction):
                 raise RuntimeError("Could not compile {0}()".format(func.func_name))
 
