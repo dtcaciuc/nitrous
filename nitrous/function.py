@@ -498,10 +498,64 @@ class FunctionBuilder(ast.NodeVisitor):
         else:
             llvm.DeleteBasicBlock(merge_bb)
 
+    def visit_While(self, node):
+        """while loop block.
+
+        Component blocks:
+
+            test_bb:
+                - if loop counter < end, goto body_bb; else goto exit_bb
+            body_bb:
+                - with new local scope
+                    - traverse nested AST
+            exit_bb:
+                - end loop IR
+
+        """
+
+        if len(node.orelse) != 0:
+            raise NotImplementedError("`else` in a `while` statement is not supported")
+
+        func = llvm.GetBasicBlockParent(llvm.GetInsertBlock(self.builder))
+
+        top_bb = llvm.GetInsertBlock(self.builder)
+
+        test_bb = llvm.AppendBasicBlock(func, "while_test")
+        body_bb = llvm.AppendBasicBlock(func, "while_body")
+        exit_bb = llvm.AppendBasicBlock(func, "while_exit")
+
+        llvm.MoveBasicBlockAfter(test_bb, top_bb)
+        llvm.MoveBasicBlockAfter(body_bb, test_bb)
+        llvm.MoveBasicBlockAfter(exit_bb, body_bb)
+
+        llvm.BuildBr(self.builder, test_bb)
+        llvm.PositionBuilderAtEnd(self.builder, test_bb)
+
+        self.visit(node.test)
+        test = self.pop()
+
+        true_ = llvm.ConstInt(llvm.IntType(1), 1, True)
+        t = llvm.BuildICmp(self.builder, llvm.IntEQ, test, true_, "t")
+        llvm.BuildCondBr(self.builder, t, body_bb, exit_bb)
+
+        llvm.PositionBuilderAtEnd(self.builder, body_bb)
+
+        # Posting entrance and exit blocks (for continue/break respectively)
+        self.loop_info.append((test_bb, exit_bb))
+
+        with self.locals.scope():
+            for b in node.body:
+                self.visit(b)
+
+        self.loop_info.pop()
+        llvm.BuildBr(self.builder, test_bb)
+
+        llvm.PositionBuilderAtEnd(self.builder, exit_bb)
+
     def visit_For(self, node):
         """for/else loop block.
 
-        IR is structured as following:
+        Component blocks:
 
             start_bb:
                 - get range start/end/step

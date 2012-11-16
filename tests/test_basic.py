@@ -553,6 +553,74 @@ class LoopTests(ModuleTest, unittest.TestCase):
         self.assertEqual(out.loop_1(data, 3), 4)
         self.assertEqual(list(data), expected)
 
+    def test_while(self):
+        import ctypes
+        from nitrous.module import dump
+
+        @self.m.function(Long, data=Pointer(Long), n=Long)
+        def loop_1(data, n):
+            i = 0
+            while i < n:
+                data[i] = (i if i < 3 else 99)
+                i += 1
+            return 0
+
+        out = self.m.build()
+
+        # 5 + 1 elements to check stop correctness
+        data = (ctypes.c_long * 6)()
+
+        out.loop_1(data, 5)
+        self.assertEqual(list(data), [0, 1, 2, 99, 99, 0])
+
+    def test_while_break_continue(self):
+        """Test while loop with break/continue."""
+
+        @self.m.function(Long, n=Long)
+        def loop_1(n):
+            a = 0
+            i = 0
+            while i < n:
+                if i < 3:
+                    a += i * 3
+                    i += 1
+                    continue
+                elif i == 7:
+                    break
+                else:
+                    a = a + 1
+                i += 1
+
+            return a
+
+        out = self.m.build()
+        self.assertEqual(out.loop_1(10), 13)
+
+    def test_double_while(self):
+        import ctypes
+
+        @self.m.function(data=Pointer(Long), n=Long)
+        def loop_1(data, n):
+            i = 0
+            while i < n:
+                j = 0
+                while j < n:
+                    data[i * n + j] = i + j
+                    j += 1
+                i += 1
+
+        out = self.m.build()
+        data = (ctypes.c_long * 9)()
+        expected = [0, 1, 2,
+                    1, 2, 3,
+                    2, 3, 4]
+
+        loop_1(data, 3)
+        self.assertEqual(list(data), expected)
+
+        out.loop_1(data, 3)
+        self.assertEqual(list(data), expected)
+
 
 class CallTests(ModuleTest, unittest.TestCase):
 
