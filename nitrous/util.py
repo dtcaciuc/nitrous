@@ -7,14 +7,6 @@ class ModuleTest(object):
         self.addCleanup(delattr, self, "m")
 
 
-def remove_indent(source_lines):
-    """Removes base indent for a set of source lines."""
-    lines, _ = source_lines
-    line_0 = lines[0].lstrip()
-    indent = len(lines[0]) - len(line_0)
-    return "".join(line[indent:] for line in lines)
-
-
 def dump_ast(node, annotate_fields=True, include_attributes=False):
     import ast
 

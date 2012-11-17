@@ -698,12 +698,12 @@ def emit_body(builder, func):
 
     """
     from .exceptions import TranslationError
-    from .util import remove_indent
     from inspect import getsourcelines
+    from textwrap import dedent
 
     # ast.parse returns us a module, first function there is what we're parsing.
-    # TODO use textwrap.dedent
-    func_source = remove_indent(getsourcelines(func.__n2o_pyfunc__))
+    lines, _ = getsourcelines(func.__n2o_pyfunc__)
+    func_source = dedent("".join(lines))
     func_body = ast.parse(func_source).body[0].body
 
     # Emit function body IR
