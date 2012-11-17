@@ -23,6 +23,13 @@ class Module(object):
 
         self.backend = backend or build_so
 
+        # List of callables to run to free up resources associated with build.
+        self.cleanup = []
+
+    def __del__(self):
+        for f in self.cleanup:
+            f()
+
     def include_function(self, name, restype, argtypes, lib=None, libdir=None):
         """Includes externally defined function for use with the module.
 
@@ -152,35 +159,17 @@ class Module(object):
         llvm.DisposeBuilder(ir_builder)
 
         # Invalidate module reference and return the wrapper
-        out = self.backend(self)
-        self.module = None
-
-        return out
+        self.backend(self)
 
     def _qualify(self, symbol):
         """Qualifies symbol with parent module name."""
         return "__".join((self.name, symbol))
 
 
-class ModuleOutput(object):
-    """Returned as output of Module.build() call.
-
-    Provides access to compiled functions and calls user defined
-    dispose function to free up any associated resources on deallocation.
-
-    """
-
-    def __init__(self, module, dispose):
-        self.__n2o_module__ = module
-        self.__n2o_dispose__ = dispose
-
-    def __del__(self):
-        self.__n2o_dispose__()
-
-
 def build_so(module):
     """Output and return module wrapper backed by shared object file."""
 
+    from functools import partial
     from subprocess import call
     from uuid import uuid4
 
@@ -235,24 +224,21 @@ def build_so(module):
 
     llvm.DisposeTargetMachine(machine)
 
-    def dispose():
-        llvm.DisposeModule(module.module)
-        shutil.rmtree(build_dir)
-
     # Compilation successful; build ctypes interface to new module.
     so = ctypes.cdll.LoadLibrary(so_path)
-    out_module = ModuleOutput(module.module, dispose)
-    out_module.__n2o_so__ = so
-
     for func in module.funcs:
         func.wrap_so(so)
-        setattr(out_module, func.__name__, func)
 
-    return out_module
+    module.cleanup.append(partial(llvm.DisposeModule, module.module))
+    module.cleanup.append(partial(shutil.rmtree, build_dir))
+
+    module.__n2o_so__ = so
 
 
 def build_jit(module):
     """Output module wrapper backed by JIT execution engine."""
+
+    from functools import partial
 
     if llvm.InitializeNativeTarget__():
         raise SystemError("Cannot initialize LLVM target")
@@ -268,23 +254,18 @@ def build_jit(module):
 
     _optimize(module.module, llvm.GetExecutionEngineTargetData(engine))
 
-    def dispose():
-        llvm.DisposeExecutionEngine(engine)
-        # The engine takes its ownership of module; no need to dispose separately.
-
-    out_module = ModuleOutput(module.module, dispose)
-    out_module.__n2o_engine__ = engine
-
     for func in module.funcs:
         func.wrap_engine(engine)
-        setattr(out_module, func.__name__, func)
 
-    return out_module
+    # The engine takes its ownership of module; no need to dispose separately.
+    module.cleanup.append(partial(llvm.DisposeExecutionEngine, engine))
+
+    module.__n2o_engine__ = engine
 
 
-def dump(output):
+def dump(module):
     """Return a string with module output's LLVM IR."""
-    return llvm.DumpModuleToString(output.__n2o_module__).value
+    return llvm.DumpModuleToString(module.module).value
 
 
 def _optimize(module, target_data):

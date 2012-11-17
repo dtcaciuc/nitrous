@@ -24,7 +24,7 @@ class StructureTests(ModuleTest, unittest.TestCase):
             ai = a[i]
             return ai.x + ai.y + ai.z
 
-        out = self.m.build()
+        self.m.build()
 
         a1 = Coord.c_type(1, 2, 3)
         a2 = (Coord.c_type * 2)(
@@ -32,7 +32,7 @@ class StructureTests(ModuleTest, unittest.TestCase):
             (4, 5, 6)
         )
 
-        for f in (out.sum_1, out.sum_2):
+        for f in (sum_1, sum_2):
             self.assertAlmostEqual(f(ctypes.byref(a1), 0), 6)
             self.assertAlmostEqual(f(a2, 0), 6)
             self.assertAlmostEqual(f(ctypes.byref(a2[0]), 0), 6)
@@ -56,9 +56,9 @@ class StructureTests(ModuleTest, unittest.TestCase):
             ai.y = y
             ai.z = z
 
-        out = self.m.build()
+        self.m.build()
 
-        for f in (out.store_1, out.store_2):
+        for f in (store_1, store_2):
 
             a = (Coord.c_type * 2)(
                 (0, 0, 0),
@@ -101,8 +101,8 @@ class StructureTests(ModuleTest, unittest.TestCase):
             (4, 5, 6)
         )
 
-        out = self.m.build()
-        out.add_i(a, 0, 1)
+        self.m.build()
+        add_i(a, 0, 1)
 
         self.assertAlmostEqual(a[0].x, 5)
         self.assertAlmostEqual(a[0].y, 7)
@@ -125,7 +125,7 @@ class StructureTests(ModuleTest, unittest.TestCase):
             # Test passing by-value to inner compiled function.
             return _norm(a)
 
-        out = self.m.build()
+        self.m.build()
 
         c = Coord.c_type(1, 2, 3)
-        self.assertAlmostEqual(out.norm(c), 3.741657386)
+        self.assertAlmostEqual(norm(c), 3.741657386)

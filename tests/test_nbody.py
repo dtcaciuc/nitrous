@@ -104,23 +104,23 @@ class NBodyTests(ModuleTest, unittest.TestCase):
             for i in range(n_steps):
                 advance(xyz, vxyz, mass, n_bodies, 0.01)
 
-        out = self.m.build()
+        self.m.build()
 
         xyz = np.genfromtxt("tests/data/nbody-position")
         vxyz = np.genfromtxt("tests/data/nbody-velocity") * DAYS_PER_YEAR
         mass = np.genfromtxt("tests/data/nbody-mass") * SOLAR_MASS
 
-        out.offset_momentum(vxyz, mass, 5)
+        offset_momentum(vxyz, mass, 5)
 
         # from time import time
         # t0 = time()
 
-        e0 = out.energy(xyz, vxyz, mass, 5)
+        e0 = energy(xyz, vxyz, mass, 5)
         self.assertAlmostEqual(e0, -0.169075164)
         # print " e=", e0, "Elapsed", time() - t0
 
-        out.loop(xyz, vxyz, mass, 5, 50000000)
+        loop(xyz, vxyz, mass, 5, 50000000)
 
-        e1 = out.energy(xyz, vxyz, mass, 5)
+        e1 = energy(xyz, vxyz, mass, 5)
         self.assertAlmostEqual(e1, -0.169059907)
         # print " e=", e1, "Elapsed", time() - t0

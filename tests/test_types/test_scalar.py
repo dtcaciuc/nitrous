@@ -13,9 +13,9 @@ class CastTests(ModuleTest, unittest.TestCase):
         def cast_(a):
             return Float(a)
 
-        out = self.m.build()
-        self.assertEqual(out.cast_(1.0), 1.0)
-        self.assertRegexpMatches(dump(out), "trunc")
+        self.m.build()
+        self.assertEqual(cast_(1.0), 1.0)
+        self.assertRegexpMatches(dump(self.m), "trunc")
 
 
 class BoolTests(ModuleTest, unittest.TestCase):
@@ -26,10 +26,10 @@ class BoolTests(ModuleTest, unittest.TestCase):
         def not_(a):
             return not a
 
-        out = self.m.build()
+        self.m.build()
 
-        self.assertTrue(out.not_(False))
-        self.assertFalse(out.not_(True))
+        self.assertTrue(not_(False))
+        self.assertFalse(not_(True))
 
     def test_and(self):
 
@@ -37,12 +37,12 @@ class BoolTests(ModuleTest, unittest.TestCase):
         def and_(a, b):
             return a and b
 
-        out = self.m.build()
+        self.m.build()
 
-        self.assertEqual(out.and_(True, True), True)
-        self.assertEqual(out.and_(True, False), False)
-        self.assertEqual(out.and_(False, True), False)
-        self.assertEqual(out.and_(False, False), False)
+        self.assertEqual(and_(True, True), True)
+        self.assertEqual(and_(True, False), False)
+        self.assertEqual(and_(False, True), False)
+        self.assertEqual(and_(False, False), False)
 
     def test_or(self):
 
@@ -50,12 +50,12 @@ class BoolTests(ModuleTest, unittest.TestCase):
         def or_(a, b):
             return a or b
 
-        out = self.m.build()
+        self.m.build()
 
-        self.assertEqual(out.or_(True, True), True)
-        self.assertEqual(out.or_(True, False), True)
-        self.assertEqual(out.or_(False, True), True)
-        self.assertEqual(out.or_(False, False), False)
+        self.assertEqual(or_(True, True), True)
+        self.assertEqual(or_(True, False), True)
+        self.assertEqual(or_(False, True), True)
+        self.assertEqual(or_(False, False), False)
 
     def test_complex_and(self):
         """Multi-value `and` expression."""
@@ -64,23 +64,23 @@ class BoolTests(ModuleTest, unittest.TestCase):
         def and_(a, b, c):
             return a < -2 and b == 0 and c > 2
 
-        out = self.m.build()
+        self.m.build()
 
-        self.assertFalse(out.and_(1, 1, 1))
+        self.assertFalse(and_(1, 1, 1))
 
-        self.assertFalse(out.and_(-3, 1, 1))
-        self.assertFalse(out.and_(-3, 0, 1))
-        self.assertFalse(out.and_(-3, 1, 3))
+        self.assertFalse(and_(-3, 1, 1))
+        self.assertFalse(and_(-3, 0, 1))
+        self.assertFalse(and_(-3, 1, 3))
 
-        self.assertFalse(out.and_(1, 0, 1))
-        self.assertFalse(out.and_(1, 0, 3))
-        self.assertFalse(out.and_(3, 0, 1))
+        self.assertFalse(and_(1, 0, 1))
+        self.assertFalse(and_(1, 0, 3))
+        self.assertFalse(and_(3, 0, 1))
 
-        self.assertFalse(out.and_(1, 1, 3))
-        self.assertFalse(out.and_(1, 0, 3))
-        self.assertFalse(out.and_(-3, 1, 3))
+        self.assertFalse(and_(1, 1, 3))
+        self.assertFalse(and_(1, 0, 3))
+        self.assertFalse(and_(-3, 1, 3))
 
-        self.assertTrue(out.and_(-3, 0, 3))
+        self.assertTrue(and_(-3, 0, 3))
 
     def test_complex_or(self):
         """Multi-value `or` expression."""
@@ -89,13 +89,13 @@ class BoolTests(ModuleTest, unittest.TestCase):
         def or_(a, b, c):
             return a < -2 or b == 0 or c > 2
 
-        out = self.m.build()
+        self.m.build()
 
-        self.assertFalse(out.or_(1, 1, 1))
+        self.assertFalse(or_(1, 1, 1))
 
-        self.assertTrue(out.or_(-3, 1, 1))
-        self.assertTrue(out.or_(1, 0, 1))
-        self.assertTrue(out.or_(1, 0, 3))
+        self.assertTrue(or_(-3, 1, 1))
+        self.assertTrue(or_(1, 0, 1))
+        self.assertTrue(or_(1, 0, 3))
 
 
 class LongTests(ModuleTest, unittest.TestCase):
@@ -108,8 +108,8 @@ class LongTests(ModuleTest, unittest.TestCase):
             a = 5
             return a
 
-        out = self.m.build()
-        self.assertEqual(out.x(), 5)
+        self.m.build()
+        self.assertEqual(x(), 5)
 
     def test_binary(self):
 
@@ -159,11 +159,11 @@ class LongTests(ModuleTest, unittest.TestCase):
         def cdiv(a, b):
             return a / b
 
-        out = self.m.build()
+        self.m.build()
 
         self.assertEqual(-5 / 2, -3)
-        self.assertEqual(out.pydiv(-5, 2), -3)
-        self.assertEqual(out.cdiv(-5, 2), -2)
+        self.assertEqual(pydiv(-5, 2), -3)
+        self.assertEqual(cdiv(-5, 2), -2)
 
 
 class FloatingTests(ModuleTest):
@@ -226,8 +226,8 @@ class DoubleTests(FloatingTests, unittest.TestCase):
             a = 5.0
             return a
 
-        out = self.m.build()
-        self.assertEqual(out.x(), 5.0)
+        self.m.build()
+        self.assertEqual(x(), 5.0)
 
 
 def unary_funcs():

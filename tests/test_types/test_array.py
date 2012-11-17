@@ -27,8 +27,10 @@ class ArrayTests(object):
                         m += 1
             return m
 
+        self.f = f
+
     def test_array(self):
-        out = self.m.build()
+        self.m.build()
 
         A = (((ctypes.c_long * 2) * 3) * 2)
         a = A(((1, 2), (3, 4), (5, 6)),
@@ -37,7 +39,7 @@ class ArrayTests(object):
         B = ctypes.c_long * 12
         b = B()
 
-        m = out.f(a, b)
+        m = self.f(a, b)
 
         self.assertEqual(m, 12)
         self.assertEqual(list(b), range(1, 13))
@@ -52,8 +54,8 @@ class ArrayTests(object):
 
         b = np.empty(12, dtype=dtype)
 
-        out = self.m.build()
-        m = out.f(a, b)
+        self.m.build()
+        m = self.f(a, b)
 
         self.assertEqual(m, 12)
         self.assertEqual(list(b), range(1, 13))
@@ -96,10 +98,10 @@ class StaticAllocTests(ModuleTest, unittest.TestCase):
 
             return a
 
-        out = self.m.build()
+        self.m.build()
 
         x = (Double.c_type * 4)()
-        self.assertEqual(out.f(x), 43.0)
+        self.assertEqual(f(x), 43.0)
 
 
 class IndexTests(ModuleTest, unittest.TestCase):
@@ -123,10 +125,10 @@ class IndexTests(ModuleTest, unittest.TestCase):
         def f(a):
             return a[2, 1, 2]
 
-        out = self.m.build()
+        self.m.build()
         # All indices should be resolved at run-time, so there should be no multiplications.
-        self.assertNotRegexpMatches(dump(out), "mul")
-        self.assertEqual(out.f(self.data), 14)
+        self.assertNotRegexpMatches(dump(self.m), "mul")
+        self.assertEqual(f(self.data), 14)
 
     def test_all_dynamic_dimension(self):
         """All dimensions are dynamic, no indices can be resolved at runtime"""
@@ -139,10 +141,10 @@ class IndexTests(ModuleTest, unittest.TestCase):
         def f(a):
             return a[2, 1, 2]
 
-        out = self.m.build()
+        self.m.build()
         # Should have run-time multiplications during index flattening.
-        self.assertRegexpMatches(dump(out), "mul")
-        self.assertEqual(out.f(self.data), 14)
+        self.assertRegexpMatches(dump(self.m), "mul")
+        self.assertEqual(f(self.data), 14)
 
     def test_mixed_dynamic_dimension(self):
         """Some dimensions are dynamic, other than major one"""
@@ -155,7 +157,7 @@ class IndexTests(ModuleTest, unittest.TestCase):
         def f(a):
             return a[2, 1, 2]
 
-        out = self.m.build()
+        self.m.build()
         # Should have run-time multiplications during index flattening.
-        self.assertRegexpMatches(dump(out), "mul")
-        self.assertEqual(out.f(self.data), 14)
+        self.assertRegexpMatches(dump(self.m), "mul")
+        self.assertEqual(f(self.data), 14)

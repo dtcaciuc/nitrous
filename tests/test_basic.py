@@ -41,8 +41,8 @@ class SymbolTests(ModuleTest, unittest.TestCase):
         def x(y):
             return nitrous.lib.cast(y, nitrous.types.Double)
 
-        out = self.m.build()
-        rv = out.x(int(5))
+        self.m.build()
+        rv = x(int(5))
 
         self.assertEqual(rv, 5.0)
         self.assertEqual(type(rv), float)
@@ -55,8 +55,8 @@ class SymbolTests(ModuleTest, unittest.TestCase):
         def x(y):
             return cast(y, Double)
 
-        out = self.m.build()
-        rv = out.x(int(5))
+        self.m.build()
+        rv = x(int(5))
 
         self.assertEqual(rv, 5.0)
         self.assertEqual(type(rv), float)
@@ -124,10 +124,10 @@ class AssignTests(ModuleTest, unittest.TestCase):
             b[0] += 7
             return a
 
-        out = self.m.build()
+        self.m.build()
 
         b = (Long.c_type * 1)(5)
-        self.assertEqual(out.f(6, b), 11)
+        self.assertEqual(f(6, b), 11)
         self.assertEqual(b[0], 12)
 
     def test_reassign(self):
@@ -138,8 +138,8 @@ class AssignTests(ModuleTest, unittest.TestCase):
             x = x + 5
             return x
 
-        out = self.m.build()
-        self.assertEqual(out.f(10), 15)
+        self.m.build()
+        self.assertEqual(f(10), 15)
 
     def test_assign_global_const(self):
         """Externally declared values are resolved at compile."""
@@ -151,8 +151,8 @@ class AssignTests(ModuleTest, unittest.TestCase):
             x = a + y
             return x
 
-        out = self.m.build()
-        self.assertEqual(out.f(10), 15)
+        self.m.build()
+        self.assertEqual(f(10), 15)
 
 
 class SubscriptTests(ModuleTest, unittest.TestCase):
@@ -179,7 +179,7 @@ class IndexTests(ModuleTest, unittest.TestCase):
         def x(y, i, j, k):
             return y[i, j, k]
 
-        out = self.m.build()
+        self.m.build()
 
         dtype = (((ctypes.c_long * 2) * 3) * 2)
         data = dtype(((1, 2), (3, 4), (5, 6)), ((7, 8), (9, 10), (11, 12)))
@@ -188,7 +188,7 @@ class IndexTests(ModuleTest, unittest.TestCase):
         for i in range(2):
             for j in range(3):
                 for k in range(2):
-                    self.assertEqual(out.x(c_data, i, j, k), data[i][j][k])
+                    self.assertEqual(x(c_data, i, j, k), data[i][j][k])
 
 
 class ReturnTests(ModuleTest, unittest.TestCase):
@@ -203,10 +203,10 @@ class ReturnTests(ModuleTest, unittest.TestCase):
             else:
                 return b
 
-        out = self.m.build()
+        self.m.build()
 
-        self.assertEqual(out.max2(2, 3), 3)
-        self.assertEqual(out.max2(4, 1), 4)
+        self.assertEqual(max2(2, 3), 3)
+        self.assertEqual(max2(4, 1), 4)
 
     def test_return_comparison(self):
         """Returning comparison (1-bit integer) casts it to Bool type."""
@@ -215,10 +215,10 @@ class ReturnTests(ModuleTest, unittest.TestCase):
         def max(a, b):
             return a > b
 
-        out = self.m.build()
+        self.m.build()
 
-        self.assertEqual(out.max(3, 2), True)
-        self.assertEqual(out.max(2, 3), False)
+        self.assertEqual(max(3, 2), True)
+        self.assertEqual(max(2, 3), False)
 
     def test_return_void(self):
 
@@ -226,8 +226,8 @@ class ReturnTests(ModuleTest, unittest.TestCase):
         def f():
             return
 
-        out = self.m.build()
-        self.assertIsNone(out.f())
+        self.m.build()
+        self.assertIsNone(f())
 
     def test_return_implicit_void(self):
 
@@ -235,8 +235,8 @@ class ReturnTests(ModuleTest, unittest.TestCase):
         def f():
             pass
 
-        out = self.m.build()
-        self.assertIsNone(out.f())
+        self.m.build()
+        self.assertIsNone(f())
 
     def test_missing_return(self):
         """Raise error if no return in function with non-void return type."""
@@ -318,9 +318,9 @@ class IfTests(ModuleTest, unittest.TestCase):
                 v = b
             return v
 
-        out = self.m.build()
+        self.m.build()
 
-        for f in [out.max2_1, out.max2_2]:
+        for f in [max2_1, max2_2]:
             self.assertEqual(f(2, 3), 3)
             self.assertEqual(f(4, 1), 4)
 
@@ -337,11 +337,11 @@ class IfTests(ModuleTest, unittest.TestCase):
                 c = 0
             return c
 
-        out = self.m.build()
+        self.m.build()
 
-        self.assertEqual(out.f(2, 3), 3)
-        self.assertEqual(out.f(3, 2), 3)
-        self.assertEqual(out.f(2, 2), 0)
+        self.assertEqual(f(2, 3), 3)
+        self.assertEqual(f(3, 2), 3)
+        self.assertEqual(f(2, 2), 0)
 
     def test_elif(self):
 
@@ -354,11 +354,11 @@ class IfTests(ModuleTest, unittest.TestCase):
                 c = b
             return c
 
-        out = self.m.build()
+        self.m.build()
 
-        self.assertEqual(out.f(2, 3), 3)
-        self.assertEqual(out.f(3, 2), 3)
-        self.assertEqual(out.f(2, 2), 0)
+        self.assertEqual(f(2, 3), 3)
+        self.assertEqual(f(3, 2), 3)
+        self.assertEqual(f(2, 2), 0)
 
     def test_if_expr(self):
 
@@ -374,13 +374,13 @@ class IfTests(ModuleTest, unittest.TestCase):
                     (b if (b > a and b > c) else
                      (c)))
 
-        out = self.m.build()
+        self.m.build()
 
-        self.assertEqual(out.max2(2, 3), 3)
-        self.assertEqual(out.max2(4, 1), 4)
+        self.assertEqual(max2(2, 3), 3)
+        self.assertEqual(max2(4, 1), 4)
 
-        self.assertEqual(out.max3(2, 3, 1), 3)
-        self.assertEqual(out.max3(4, 1, 5), 5)
+        self.assertEqual(max3(2, 3, 1), 3)
+        self.assertEqual(max3(4, 1, 5), 5)
 
     def test_if_expr_type_mismatch(self):
         """Raise error when `if` expression clause types don't match."""
@@ -405,13 +405,13 @@ class MemoryTests(ModuleTest, unittest.TestCase):
             e = data[i]
             return e
 
-        out = self.m.build()
+        self.m.build()
 
         dtype = (ctypes.c_long * 5)
         data = dtype(0, 10, 20, 30, 40)
 
         for i in range(5):
-            self.assertEqual(out.get_i(data, i), data[i])
+            self.assertEqual(get_i(data, i), data[i])
 
     def test_store_element(self):
         import ctypes
@@ -421,14 +421,14 @@ class MemoryTests(ModuleTest, unittest.TestCase):
             data[i] = e
             return 0
 
-        out = self.m.build()
+        self.m.build()
 
         dtype = (ctypes.c_long * 5)
         data = dtype(0, 0, 0, 0, 0)
 
-        out.set_i(data, 1, 2)
-        out.set_i(data, 2, 5)
-        out.set_i(data, 4, 10)
+        set_i(data, 1, 2)
+        set_i(data, 2, 5)
+        set_i(data, 4, 10)
 
         expected = (0, 2, 5, 0, 10)
 
@@ -449,11 +449,11 @@ class LoopTests(ModuleTest, unittest.TestCase):
 
             return 0
 
-        out = self.m.build()
+        self.m.build()
         # 5 + 1 elements to check stop correctness
         data = (ctypes.c_long * 6)()
 
-        out.loop_1(data, 5)
+        loop_1(data, 5)
         self.assertEqual(list(data), [0, 1, 2, 99, 99, 0])
 
     def test_for_else(self):
@@ -490,14 +490,14 @@ class LoopTests(ModuleTest, unittest.TestCase):
 
             return 0
 
-        out = self.m.build()
+        self.m.build()
 
         data = (ctypes.c_long * 8)()
-        out.loop_1(data, 2, 7)
+        loop_1(data, 2, 7)
         self.assertEqual(list(data), [0, 0, 2, 3, 4, 5, 6, 0])
 
         data = (ctypes.c_long * 8)()
-        out.loop_2(data, 2, 7, 2)
+        loop_2(data, 2, 7, 2)
         self.assertEqual(list(data), [0, 0, 2, 0, 4, 0, 6, 0])
 
     def test_for_break_continue(self):
@@ -516,8 +516,8 @@ class LoopTests(ModuleTest, unittest.TestCase):
 
             return a
 
-        out = self.m.build()
-        self.assertEqual(out.loop_1(10), 4)
+        self.m.build()
+        self.assertEqual(loop_1(10), 4)
 
     def test_double_for(self):
         import ctypes
@@ -533,13 +533,13 @@ class LoopTests(ModuleTest, unittest.TestCase):
             # loop variables outside the loop.
             return i * j
 
-        out = self.m.build()
+        self.m.build()
         data = (ctypes.c_long * 9)()
         expected = [0, 1, 2,
                     1, 2, 3,
                     2, 3, 4]
 
-        self.assertEqual(out.loop_1(data, 3), 4)
+        self.assertEqual(loop_1(data, 3), 4)
         self.assertEqual(list(data), expected)
 
     def test_while(self):
@@ -553,12 +553,12 @@ class LoopTests(ModuleTest, unittest.TestCase):
                 i += 1
             return 0
 
-        out = self.m.build()
+        self.m.build()
 
         # 5 + 1 elements to check stop correctness
         data = (ctypes.c_long * 6)()
 
-        out.loop_1(data, 5)
+        loop_1(data, 5)
         self.assertEqual(list(data), [0, 1, 2, 99, 99, 0])
 
     def test_while_break_continue(self):
@@ -581,8 +581,8 @@ class LoopTests(ModuleTest, unittest.TestCase):
 
             return a
 
-        out = self.m.build()
-        self.assertEqual(out.loop_1(10), 13)
+        self.m.build()
+        self.assertEqual(loop_1(10), 13)
 
     def test_double_while(self):
         import ctypes
@@ -597,13 +597,13 @@ class LoopTests(ModuleTest, unittest.TestCase):
                     j += 1
                 i += 1
 
-        out = self.m.build()
+        self.m.build()
         data = (ctypes.c_long * 9)()
         expected = [0, 1, 2,
                     1, 2, 3,
                     2, 3, 4]
 
-        out.loop_1(data, 3)
+        loop_1(data, 3)
         self.assertEqual(list(data), expected)
 
 
@@ -620,10 +620,8 @@ class CallTests(ModuleTest, unittest.TestCase):
         def f2(x):
             return x + f1(x)
 
-        out = self.m.build()
-
+        self.m.build()
         self.assertEqual(f2(2), 7)
-        self.assertEqual(out.f2(2), 7)
 
     def test_call_wrong_arg_count(self):
 
@@ -685,8 +683,8 @@ class ExternalCallTests(ModuleTest, unittest.TestCase):
         def wrapper(x, y):
             return my_pow(x, y)
 
-        out = self.m.build()
-        self.assertEqual(out.wrapper(3, 5), 3 ** 5)
+        self.m.build()
+        self.assertEqual(wrapper(3, 5), 3 ** 5)
 
 
 class ScopedVarsTests(unittest.TestCase):
@@ -745,8 +743,8 @@ class OptimizationTests(ModuleTest, unittest.TestCase):
                 a += 5
             return a
 
-        out = self.m.build()
-        ir = " ".join(dump(out).split("\n"))
+        self.m.build()
+        ir = " ".join(dump(self.m).split("\n"))
 
         # In first function, conditional depends on a parameter
         self.assertRegexpMatches(ir, "f1.+\{.+icmp.+\}")
@@ -765,8 +763,8 @@ class UnpackTests(ModuleTest, unittest.TestCase):
             b, a = a, b
             return b * 10 + a * 100
 
-        out = self.m.build()
-        self.assertEqual(out.foo(5, 6), 650)
+        self.m.build()
+        self.assertEqual(foo(5, 6), 650)
 
     def test_shape_mismatch(self):
         """Raise error if packed/unpacked tuple lengths differ"""
@@ -790,8 +788,8 @@ class InlineTests(ModuleTest, unittest.TestCase):
         def foo(a, b):
             return a + b
 
-        out = self.m.build()
-        self.assertRegexpMatches(dump(out), "alwaysinline")
+        self.m.build()
+        self.assertRegexpMatches(dump(self.m), "alwaysinline")
 
 
 class JITTests(unittest.TestCase):
@@ -805,5 +803,5 @@ class JITTests(unittest.TestCase):
         def add(a, b):
             return a + b
 
-        out = m.build()
-        self.assertEqual(out.add(3, 7), 10)
+        m.build()
+        self.assertEqual(add(3, 7), 10)
