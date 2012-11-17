@@ -13,24 +13,39 @@ BOOL_INST = {
 
 class Function(object):
 
-    @classmethod
-    def wrap(class_, func, cfunc):
-        # Arrange type dictionary into their respective positions.
-        argtypes = [func.__n2o_argtypes__[arg] for arg in func.__n2o_args__]
+    def __init__(self, restype, argtypes, args):
+        self.__n2o_restype__ = restype
+        self.__n2o_argtypes__ = argtypes
+        # TODO Replace this with __n2o_argtypes__ ordered dictionary?
+        # For consistency, same in ExternalFunction as well.
+        self.__n2o_args__ = args
+        self.__n2o_globals__ = {}
 
-        cfunc.argtypes = [t.c_type for t in argtypes]
-        cfunc.restype = (func.__n2o_restype__.c_type
-                         if func.__n2o_restype__ is not None
-                         else None)
-
-        return class_(cfunc, argtypes)
-
-    def __init__(self, cfunc, argtypes):
-        self.cfunc = cfunc
         self.converters = [
             t.convert if hasattr(t, "convert") else lambda a: a
-            for t in argtypes
+            for t in [self.__n2o_argtypes__[arg] for arg in self.__n2o_args__]
         ]
+
+        self.cfunc = None
+
+    @property
+    def _c_restype(self):
+        return self.__n2o_restype__.c_type if self.__n2o_restype__ is not None else None
+
+    @property
+    def _c_argtypes(self):
+        return [self.__n2o_argtypes__[arg].c_type for arg in self.__n2o_args__]
+
+    def wrap_so(self, so):
+        """Populates ctypes function object from a loaded SO file."""
+        self.cfunc = getattr(so, llvm.GetValueName(self.__n2o_func__))
+        self.cfunc.argtypes = self._c_argtypes
+        self.cfunc.restype = self._c_restype
+
+    def wrap_engine(self, engine):
+        """Populates ctypes function object from an execution engine."""
+        proto = ctypes.CFUNCTYPE(self._c_restype, *self._c_argtypes)
+        self.cfunc = proto(llvm.GetPointerToGlobal(engine, self.__n2o_func__))
 
     def __call__(self, *args):
         return self.cfunc(*(c(a) for c, a in zip(self.converters, args)))
@@ -40,7 +55,7 @@ class ExternalFunction(object):
     """Stores information about externally defined function included in the module."""
 
     def __init__(self, name, func, restype, argtypes):
-        self.func_name = name
+        self.__name__ = name
         self.__n2o_func__ = func
         self.__n2o_restype__ = restype
         self.__n2o_argtypes__ = argtypes
@@ -687,7 +702,8 @@ def emit_body(builder, func):
     from inspect import getsourcelines
 
     # ast.parse returns us a module, first function there is what we're parsing.
-    func_source = remove_indent(getsourcelines(func))
+    # TODO use textwrap.dedent
+    func_source = remove_indent(getsourcelines(func.__n2o_pyfunc__))
     func_body = ast.parse(func_source).body[0].body
 
     # Emit function body IR
@@ -705,7 +721,7 @@ def emit_body(builder, func):
             b.visit(node)
 
     except TranslationError, e:
-        raise _unpack_translation_error(func.func_name, func_source, e.args)
+        raise _unpack_translation_error(func_source, e.args)
 
     last_block = llvm.GetInsertBlock(builder)
     if not llvm.IsATerminatorInst(llvm.GetLastInstruction(last_block)):
@@ -716,7 +732,7 @@ def emit_body(builder, func):
         else:
             # Point to the last function line where the return statement should be.
             e_args = (TypeError, func_body[-1].lineno, "Function must return a value")
-            raise _unpack_translation_error(func.func_name, func_source, e_args)
+            raise _unpack_translation_error(func_source, e_args)
 
 
 def entry_alloca(func, type_, name):
@@ -816,9 +832,9 @@ def _validate_function_args(func, args):
 
     if len(args) != len(func.__n2o_argtypes__):
         raise TypeError("{0}() takes exactly {1} argument(s) ({2} given)"
-                        .format(func.func_name, len(func.__n2o_argtypes__), len(args)))
+                        .format(func.__name__, len(func.__n2o_argtypes__), len(args)))
 
-    spec = inspect.getargspec(func)
+    spec = inspect.getargspec(func.__n2o_pyfunc__)
     mask = map(types_equal,
                (func.__n2o_argtypes__[name].llvm_type for name in spec.args),
                (llvm.TypeOf(val) for val in args))
@@ -826,10 +842,10 @@ def _validate_function_args(func, args):
     if not all(mask):
         wrong_args = ", ".join((a for a, ok in zip(spec.args, mask) if not ok))
         raise TypeError("{0}() called with wrong argument type(s) for {1}"
-                        .format(func.func_name, wrong_args))
+                        .format(func.__name__, wrong_args))
 
 
-def _unpack_translation_error(func_name, func_lines, args, before=2, after=5):
+def _unpack_translation_error(func_lines, args, before=2, after=5):
     """Unpacks TranslationError *args* data and reconstructs the contained exception.
 
     Translation errors are used to attach source localtion (line number / column offset)

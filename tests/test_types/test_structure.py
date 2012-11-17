@@ -39,7 +39,6 @@ class StructureTests(ModuleTest, unittest.TestCase):
             self.assertAlmostEqual(f(a2, 1), 15)
             self.assertAlmostEqual(f(ctypes.byref(a2[1]), 0), 15)
 
-
     def test_store_fields(self):
 
         # Attribute store to subscript

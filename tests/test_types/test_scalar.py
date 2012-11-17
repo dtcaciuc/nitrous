@@ -114,38 +114,35 @@ class LongTests(ModuleTest, unittest.TestCase):
     def test_binary(self):
 
         annotate = self.m.function(Long, a=Long, b=Long)
-        funcs = [annotate(f) for f in binary_funcs()]
-        out = self.m.build()
+        funcs = [(annotate(f), f) for f in binary_funcs()]
+        self.m.build()
 
         values = [(0, 1), (3, 2), (2, 3), (-3, 2), (3, -2)]
 
-        for f in funcs:
-            cf = getattr(out, f.func_name)
+        for cf, f in funcs:
             for a, b in values:
                 self.assertEqual(cf(a, b), f(a, b),
-                                 "{0}({1}, {2})".format(f.func_name, a, b))
+                                 "{0}({1}, {2})".format(f.__name__, a, b))
 
     def test_unary(self):
 
         annotate = self.m.function(Long, a=Long)
-        funcs = [annotate(f) for f in unary_funcs()]
-        out = self.m.build()
+        funcs = [(annotate(f), f) for f in unary_funcs()]
+        self.m.build()
 
         values = [-5, 0, 5]
 
-        for f in funcs:
-            cf = getattr(out, f.func_name)
+        for cf, f in funcs:
             for a in values:
-                self.assertEqual(cf(a), f(a), "{0}({1})".format(f.func_name, a))
+                self.assertEqual(cf(a), f(a), "{0}({1})".format(f.__name__, a))
 
     def test_cmp(self):
 
         annotate = self.m.function(Bool, a=Long, b=Long)
-        funcs = [annotate(f) for f in cmp_funcs()]
-        out = self.m.build()
+        funcs = [(annotate(f), f) for f in cmp_funcs()]
+        self.m.build()
 
-        for f in funcs:
-            cf = getattr(out, f.func_name)
+        for cf, f in funcs:
             self.assertEqual(cf(6, 5), f(6, 5))
             self.assertEqual(cf(5, 5), f(5, 5))
             self.assertEqual(cf(5, 6), f(5, 6))
@@ -174,38 +171,35 @@ class FloatingTests(ModuleTest):
     def test_unary(self):
 
         annotate = self.m.function(self.Type, a=self.Type)
-        funcs = [annotate(f) for f in unary_funcs()]
-        out = self.m.build()
+        funcs = [(annotate(f), f) for f in unary_funcs()]
+        self.m.build()
 
         values = [-5.0, 0.0, 5.0]
 
-        for f in funcs:
-            cf = getattr(out, f.func_name)
+        for cf, f in funcs:
             for a in values:
-                self.assertEqual(cf(a), f(a), "{0}({1})".format(f.func_name, a))
+                self.assertEqual(cf(a), f(a), "{0}({1})".format(f.__name__, a))
 
     def test_binary(self):
 
         annotate = self.m.function(self.Type, a=self.Type, b=self.Type)
-        funcs = [annotate(f) for f in binary_funcs() + floating_binary_funcs()]
-        out = self.m.build()
+        funcs = [(annotate(f), f) for f in binary_funcs() + floating_binary_funcs()]
+        self.m.build()
 
         values = [(0.0, 1.0), (3.0, 2.0), (2.0, 3.0), (-3.0, 2.0), (3.0, -2.0)]
 
-        for f in funcs:
-            cf = getattr(out, f.func_name)
+        for cf, f in funcs:
             for a, b in values:
                 self.assertAlmostEqual(cf(a, b), f(a, b), self.digits,
-                                       "{0}({1}, {2})".format(f.func_name, a, b))
+                                       "{0}({1}, {2})".format(f.__name__, a, b))
 
     def test_cmp(self):
 
         annotate = self.m.function(Bool, a=self.Type, b=self.Type)
-        funcs = [annotate(f) for f in cmp_funcs()]
-        out = self.m.build()
+        funcs = [(annotate(f), f) for f in cmp_funcs()]
+        self.m.build()
 
-        for f in funcs:
-            cf = getattr(out, f.func_name)
+        for cf, f in funcs:
             self.assertEqual(cf(6.0, 5.0), f(6.0, 5.0))
             self.assertEqual(cf(5.0, 5.0), f(5.0, 5.0))
             self.assertEqual(cf(5.0, 6.0), f(5.0, 6.0))

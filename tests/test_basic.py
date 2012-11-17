@@ -127,10 +127,6 @@ class AssignTests(ModuleTest, unittest.TestCase):
         out = self.m.build()
 
         b = (Long.c_type * 1)(5)
-        self.assertEqual(f(6, b), 11)
-        self.assertEqual(b[0], 12)
-
-        b = (Long.c_type * 1)(5)
         self.assertEqual(out.f(6, b), 11)
         self.assertEqual(b[0], 12)
 
@@ -143,8 +139,6 @@ class AssignTests(ModuleTest, unittest.TestCase):
             return x
 
         out = self.m.build()
-
-        self.assertEqual(f(10), 15)
         self.assertEqual(out.f(10), 15)
 
     def test_assign_global_const(self):
@@ -158,8 +152,6 @@ class AssignTests(ModuleTest, unittest.TestCase):
             return x
 
         out = self.m.build()
-
-        self.assertEqual(f(10), 15)
         self.assertEqual(out.f(10), 15)
 
 
@@ -547,15 +539,11 @@ class LoopTests(ModuleTest, unittest.TestCase):
                     1, 2, 3,
                     2, 3, 4]
 
-        self.assertEqual(loop_1(data, 3), 4)
-        self.assertEqual(list(data), expected)
-
         self.assertEqual(out.loop_1(data, 3), 4)
         self.assertEqual(list(data), expected)
 
     def test_while(self):
         import ctypes
-        from nitrous.module import dump
 
         @self.m.function(Long, data=Pointer(Long), n=Long)
         def loop_1(data, n):
@@ -614,9 +602,6 @@ class LoopTests(ModuleTest, unittest.TestCase):
         expected = [0, 1, 2,
                     1, 2, 3,
                     2, 3, 4]
-
-        loop_1(data, 3)
-        self.assertEqual(list(data), expected)
 
         out.loop_1(data, 3)
         self.assertEqual(list(data), expected)
