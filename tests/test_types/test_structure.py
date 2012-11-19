@@ -1,30 +1,31 @@
 
 import unittest2 as unittest
 
+from nitrous.module import module
+from nitrous.function import function
 from nitrous.types import Double, Long, Structure, Pointer
-from nitrous.util import ModuleTest
 
 
 Coord = Structure("Coord", ("x", Double), ("y", Double), ("z", Double))
 
 
-class StructureTests(ModuleTest, unittest.TestCase):
+class StructureTests(unittest.TestCase):
 
     def test_load_fields(self):
         import ctypes
 
         # Attribute load from subscript
-        @self.m.function(Double, a=Pointer(Coord), i=Long)
+        @function(Double, a=Pointer(Coord), i=Long)
         def sum_1(a, i):
             return a[i].x + a[i].y + a[i].z
 
         # Subscript, reference assignment, then attribute load
-        @self.m.function(Double, a=Pointer(Coord), i=Long)
+        @function(Double, a=Pointer(Coord), i=Long)
         def sum_2(a, i):
             ai = a[i]
             return ai.x + ai.y + ai.z
 
-        self.m.build()
+        m = module([sum_1, sum_2])
 
         a1 = Coord.c_type(1, 2, 3)
         a2 = (Coord.c_type * 2)(
@@ -32,7 +33,7 @@ class StructureTests(ModuleTest, unittest.TestCase):
             (4, 5, 6)
         )
 
-        for f in (sum_1, sum_2):
+        for f in (m.sum_1, m.sum_2):
             self.assertAlmostEqual(f(ctypes.byref(a1), 0), 6)
             self.assertAlmostEqual(f(a2, 0), 6)
             self.assertAlmostEqual(f(ctypes.byref(a2[0]), 0), 6)
@@ -42,23 +43,23 @@ class StructureTests(ModuleTest, unittest.TestCase):
     def test_store_fields(self):
 
         # Attribute store to subscript
-        @self.m.function(None, a=Pointer(Coord), i=Long, x=Double, y=Double, z=Double)
+        @function(None, a=Pointer(Coord), i=Long, x=Double, y=Double, z=Double)
         def store_1(a, i, x, y, z):
             a[i].x = x
             a[i].y = y
             a[i].z = z
 
         # Subscript, reference assignment, then attribute store
-        @self.m.function(None, a=Pointer(Coord), i=Long, x=Double, y=Double, z=Double)
+        @function(None, a=Pointer(Coord), i=Long, x=Double, y=Double, z=Double)
         def store_2(a, i, x, y, z):
             ai = a[i]
             ai.x = x
             ai.y = y
             ai.z = z
 
-        self.m.build()
+        m = module([store_1, store_2])
 
-        for f in (store_1, store_2):
+        for f in (m.store_1, m.store_2):
 
             a = (Coord.c_type * 2)(
                 (0, 0, 0),
@@ -90,7 +91,7 @@ class StructureTests(ModuleTest, unittest.TestCase):
     def test_aug_assign(self):
         """Augmented attribute assignment"""
 
-        @self.m.function(None, a=Pointer(Coord), i=Long, j=Long)
+        @function(None, a=Pointer(Coord), i=Long, j=Long)
         def add_i(a, i, j):
             a[i].x += a[j].x
             a[i].y += a[j].y
@@ -101,8 +102,8 @@ class StructureTests(ModuleTest, unittest.TestCase):
             (4, 5, 6)
         )
 
-        self.m.build()
-        add_i(a, 0, 1)
+        m = module([add_i])
+        m.add_i(a, 0, 1)
 
         self.assertAlmostEqual(a[0].x, 5)
         self.assertAlmostEqual(a[0].y, 7)
@@ -116,16 +117,16 @@ class StructureTests(ModuleTest, unittest.TestCase):
         """Passing structure argument by value"""
         from nitrous.lib.math import sqrt
 
-        @self.m.function(Double, a=Coord)
+        @function(Double, a=Coord)
         def _norm(a):
             return sqrt(a.x * a.x + a.y * a.y + a.z * a.z)
 
-        @self.m.function(Double, a=Coord)
+        @function(Double, a=Coord)
         def norm(a):
             # Test passing by-value to inner compiled function.
             return _norm(a)
 
-        self.m.build()
+        m = module([norm])
 
         c = Coord.c_type(1, 2, 3)
-        self.assertAlmostEqual(norm(c), 3.741657386)
+        self.assertAlmostEqual(m.norm(c), 3.741657386)

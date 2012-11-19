@@ -1,8 +1,9 @@
 import unittest2 as unittest
 import ctypes
 
+from nitrous.module import module
+from nitrous.function import function
 from nitrous.types import DynamicArray, StaticArray, Long, Dynamic
-from nitrous.util import ModuleTest
 
 try:
     import numpy as np
@@ -13,11 +14,10 @@ except ImportError:
 class ArrayTests(object):
 
     def setUp(self):
-        super(ArrayTests, self).setUp()
 
         X, Y, Z = range(3)
 
-        @self.m.function(Long, a=self.A, b=self.B)
+        @function(Long, a=self.A, b=self.B)
         def f(a, b):
             m = 0
             for i in range(a.shape[X]):
@@ -27,10 +27,9 @@ class ArrayTests(object):
                         m += 1
             return m
 
-        self.f = f
+        self.m = module([f])
 
     def test_array(self):
-        self.m.build()
 
         A = (((ctypes.c_long * 2) * 3) * 2)
         a = A(((1, 2), (3, 4), (5, 6)),
@@ -39,7 +38,7 @@ class ArrayTests(object):
         B = ctypes.c_long * 12
         b = B()
 
-        m = self.f(a, b)
+        m = self.m.f(a, b)
 
         self.assertEqual(m, 12)
         self.assertEqual(list(b), range(1, 13))
@@ -54,26 +53,25 @@ class ArrayTests(object):
 
         b = np.empty(12, dtype=dtype)
 
-        self.m.build()
-        m = self.f(a, b)
+        m = self.m.f(a, b)
 
         self.assertEqual(m, 12)
         self.assertEqual(list(b), range(1, 13))
 
 
-class DynamicArrayTests(ArrayTests, ModuleTest, unittest.TestCase):
+class DynamicArrayTests(ArrayTests, unittest.TestCase):
 
     A = DynamicArray(Long, (Dynamic,) * 3)
     B = DynamicArray(Long)
 
 
-class StaticArrayTests(ArrayTests, ModuleTest, unittest.TestCase):
+class StaticArrayTests(ArrayTests, unittest.TestCase):
 
     A = StaticArray(Long, (2, 3, 2))
     B = StaticArray(Long, (12,))
 
 
-class StaticAllocTests(ModuleTest, unittest.TestCase):
+class StaticAllocTests(unittest.TestCase):
 
     def test_alloc(self):
         """Stack allocation of a fixed size array by calling its type"""
@@ -81,7 +79,7 @@ class StaticAllocTests(ModuleTest, unittest.TestCase):
 
         Mat2d = StaticArray(Double, shape=(2, 2))
 
-        @self.m.function(Double)
+        @function(Double)
         def f():
 
             m = Mat2d()
@@ -98,16 +96,15 @@ class StaticAllocTests(ModuleTest, unittest.TestCase):
 
             return a
 
-        self.m.build()
+        m = module([f])
 
         x = (Double.c_type * 4)()
-        self.assertEqual(f(x), 43.0)
+        self.assertEqual(m.f(x), 43.0)
 
 
-class IndexTests(ModuleTest, unittest.TestCase):
+class IndexTests(unittest.TestCase):
 
     def setUp(self):
-        super(IndexTests, self).setUp()
         self.data = (((Long.c_type * 3) * 3) * 3)(
             ((0, 1, 2), (3, 4, 5), (6, 7, 8)),
             ((18, 19, 20), (21, 22, 23), (24, 25, 26)),
@@ -121,14 +118,14 @@ class IndexTests(ModuleTest, unittest.TestCase):
         D = DynamicArray(Long, shape=(Dynamic, 3, 3))
         X, Y, Z = range(3)
 
-        @self.m.function(Long, a=D)
+        @function(Long, a=D)
         def f(a):
             return a[2, 1, 2]
 
-        self.m.build()
+        m = module([f])
         # All indices should be resolved at run-time, so there should be no multiplications.
-        self.assertNotRegexpMatches(dump(self.m), "mul")
-        self.assertEqual(f(self.data), 14)
+        self.assertNotRegexpMatches(dump(m), "mul")
+        self.assertEqual(m.f(self.data), 14)
 
     def test_all_dynamic_dimension(self):
         """All dimensions are dynamic, no indices can be resolved at runtime"""
@@ -137,14 +134,14 @@ class IndexTests(ModuleTest, unittest.TestCase):
         D = DynamicArray(Long, shape=(Dynamic, Dynamic, Dynamic))
         X, Y, Z = range(3)
 
-        @self.m.function(Long, a=D)
+        @function(Long, a=D)
         def f(a):
             return a[2, 1, 2]
 
-        self.m.build()
+        m = module([f])
         # Should have run-time multiplications during index flattening.
-        self.assertRegexpMatches(dump(self.m), "mul")
-        self.assertEqual(f(self.data), 14)
+        self.assertRegexpMatches(dump(m), "mul")
+        self.assertEqual(m.f(self.data), 14)
 
     def test_mixed_dynamic_dimension(self):
         """Some dimensions are dynamic, other than major one"""
@@ -153,11 +150,11 @@ class IndexTests(ModuleTest, unittest.TestCase):
         D = DynamicArray(Long, shape=(Dynamic, 3, Dynamic))
         X, Y, Z = range(3)
 
-        @self.m.function(Long, a=D)
+        @function(Long, a=D)
         def f(a):
             return a[2, 1, 2]
 
-        self.m.build()
+        m = module([f])
         # Should have run-time multiplications during index flattening.
-        self.assertRegexpMatches(dump(self.m), "mul")
-        self.assertEqual(f(self.data), 14)
+        self.assertRegexpMatches(dump(m), "mul")
+        self.assertEqual(m.f(self.data), 14)

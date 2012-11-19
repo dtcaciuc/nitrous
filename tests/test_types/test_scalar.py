@@ -1,205 +1,213 @@
 import unittest2 as unittest
 
+from nitrous.module import module
+from nitrous.function import function
 from nitrous.types import Bool, Long, Float, Double
-from nitrous.util import ModuleTest
 
 
-class CastTests(ModuleTest, unittest.TestCase):
+class CastTests(unittest.TestCase):
 
     def test(self):
         from nitrous.module import dump
 
-        @self.m.function(Float, a=Double)
+        @function(Float, a=Double)
         def cast_(a):
             return Float(a)
 
-        self.m.build()
-        self.assertEqual(cast_(1.0), 1.0)
-        self.assertRegexpMatches(dump(self.m), "trunc")
+        m = module([cast_])
+        self.assertEqual(m.cast_(1.0), 1.0)
+        self.assertRegexpMatches(dump(m), "trunc")
 
 
-class BoolTests(ModuleTest, unittest.TestCase):
+class BoolTests(unittest.TestCase):
 
     def test_not(self):
 
-        @self.m.function(Bool, a=Bool)
+        @function(Bool, a=Bool)
         def not_(a):
             return not a
 
-        self.m.build()
+        m = module([not_])
 
-        self.assertTrue(not_(False))
-        self.assertFalse(not_(True))
+        self.assertTrue(m.not_(False))
+        self.assertFalse(m.not_(True))
 
     def test_and(self):
 
-        @self.m.function(Bool, a=Bool, b=Bool)
+        @function(Bool, a=Bool, b=Bool)
         def and_(a, b):
             return a and b
 
-        self.m.build()
+        m = module([and_])
 
-        self.assertEqual(and_(True, True), True)
-        self.assertEqual(and_(True, False), False)
-        self.assertEqual(and_(False, True), False)
-        self.assertEqual(and_(False, False), False)
+        self.assertEqual(m.and_(True, True), True)
+        self.assertEqual(m.and_(True, False), False)
+        self.assertEqual(m.and_(False, True), False)
+        self.assertEqual(m.and_(False, False), False)
 
     def test_or(self):
 
-        @self.m.function(Bool, a=Bool, b=Bool)
+        @function(Bool, a=Bool, b=Bool)
         def or_(a, b):
             return a or b
 
-        self.m.build()
+        m = module([or_])
 
-        self.assertEqual(or_(True, True), True)
-        self.assertEqual(or_(True, False), True)
-        self.assertEqual(or_(False, True), True)
-        self.assertEqual(or_(False, False), False)
+        self.assertEqual(m.or_(True, True), True)
+        self.assertEqual(m.or_(True, False), True)
+        self.assertEqual(m.or_(False, True), True)
+        self.assertEqual(m.or_(False, False), False)
 
     def test_complex_and(self):
         """Multi-value `and` expression."""
 
-        @self.m.function(Bool, a=Long, b=Long, c=Long)
+        @function(Bool, a=Long, b=Long, c=Long)
         def and_(a, b, c):
             return a < -2 and b == 0 and c > 2
 
-        self.m.build()
+        m = module([and_])
 
-        self.assertFalse(and_(1, 1, 1))
+        self.assertFalse(m.and_(1, 1, 1))
 
-        self.assertFalse(and_(-3, 1, 1))
-        self.assertFalse(and_(-3, 0, 1))
-        self.assertFalse(and_(-3, 1, 3))
+        self.assertFalse(m.and_(-3, 1, 1))
+        self.assertFalse(m.and_(-3, 0, 1))
+        self.assertFalse(m.and_(-3, 1, 3))
 
-        self.assertFalse(and_(1, 0, 1))
-        self.assertFalse(and_(1, 0, 3))
-        self.assertFalse(and_(3, 0, 1))
+        self.assertFalse(m.and_(1, 0, 1))
+        self.assertFalse(m.and_(1, 0, 3))
+        self.assertFalse(m.and_(3, 0, 1))
 
-        self.assertFalse(and_(1, 1, 3))
-        self.assertFalse(and_(1, 0, 3))
-        self.assertFalse(and_(-3, 1, 3))
+        self.assertFalse(m.and_(1, 1, 3))
+        self.assertFalse(m.and_(1, 0, 3))
+        self.assertFalse(m.and_(-3, 1, 3))
 
-        self.assertTrue(and_(-3, 0, 3))
+        self.assertTrue(m.and_(-3, 0, 3))
 
     def test_complex_or(self):
         """Multi-value `or` expression."""
 
-        @self.m.function(Bool, a=Long, b=Long, c=Long)
+        @function(Bool, a=Long, b=Long, c=Long)
         def or_(a, b, c):
             return a < -2 or b == 0 or c > 2
 
-        self.m.build()
+        m = module([or_])
 
-        self.assertFalse(or_(1, 1, 1))
+        self.assertFalse(m.or_(1, 1, 1))
 
-        self.assertTrue(or_(-3, 1, 1))
-        self.assertTrue(or_(1, 0, 1))
-        self.assertTrue(or_(1, 0, 3))
+        self.assertTrue(m.or_(-3, 1, 1))
+        self.assertTrue(m.or_(1, 0, 1))
+        self.assertTrue(m.or_(1, 0, 3))
 
 
-class LongTests(ModuleTest, unittest.TestCase):
+class LongTests(unittest.TestCase):
 
     def test_const(self):
         """Constant declaration."""
 
-        @self.m.function(Long)
+        @function(Long)
         def x():
             a = 5
             return a
 
-        self.m.build()
-        self.assertEqual(x(), 5)
+        m = module([x])
+        self.assertEqual(m.x(), 5)
 
     def test_binary(self):
 
-        annotate = self.m.function(Long, a=Long, b=Long)
-        funcs = [(annotate(f), f) for f in binary_funcs()]
-        self.m.build()
+        annotate = function(Long, a=Long, b=Long)
+        funcs = binary_funcs()
+        m = module(map(annotate, funcs))
 
         values = [(0, 1), (3, 2), (2, 3), (-3, 2), (3, -2)]
 
-        for cf, f in funcs:
+        for f in funcs:
+            cf = getattr(m, f.__name__)
             for a, b in values:
                 self.assertEqual(cf(a, b), f(a, b),
                                  "{0}({1}, {2})".format(f.__name__, a, b))
 
     def test_unary(self):
 
-        annotate = self.m.function(Long, a=Long)
-        funcs = [(annotate(f), f) for f in unary_funcs()]
-        self.m.build()
+        annotate = function(Long, a=Long)
+        funcs = unary_funcs()
+        m = module(map(annotate, funcs))
 
         values = [-5, 0, 5]
 
-        for cf, f in funcs:
+        for f in funcs:
+            cf = getattr(m, f.__name__)
             for a in values:
                 self.assertEqual(cf(a), f(a), "{0}({1})".format(f.__name__, a))
 
     def test_cmp(self):
 
-        annotate = self.m.function(Bool, a=Long, b=Long)
-        funcs = [(annotate(f), f) for f in cmp_funcs()]
-        self.m.build()
+        annotate = function(Bool, a=Long, b=Long)
+        funcs = cmp_funcs()
+        m = module(map(annotate, funcs))
 
-        for cf, f in funcs:
+        for f in funcs:
+            cf = getattr(m, f.__name__)
             self.assertEqual(cf(6, 5), f(6, 5))
             self.assertEqual(cf(5, 5), f(5, 5))
             self.assertEqual(cf(5, 6), f(5, 6))
 
     def test_cdiv(self):
         """Switch to enable C-style integer division"""
+        from nitrous.function import options
 
-        @self.m.function(Long, a=Long, b=Long)
+        @function(Long, a=Long, b=Long)
         def pydiv(a, b):
             return a / b
 
-        @self.m.options(cdiv=True)
-        @self.m.function(Long, a=Long, b=Long)
+        @options(cdiv=True)
+        @function(Long, a=Long, b=Long)
         def cdiv(a, b):
             return a / b
 
-        self.m.build()
+        m = module([pydiv, cdiv])
 
         self.assertEqual(-5 / 2, -3)
-        self.assertEqual(pydiv(-5, 2), -3)
-        self.assertEqual(cdiv(-5, 2), -2)
+        self.assertEqual(m.pydiv(-5, 2), -3)
+        self.assertEqual(m.cdiv(-5, 2), -2)
 
 
-class FloatingTests(ModuleTest):
+class FloatingTests(object):
 
     def test_unary(self):
 
-        annotate = self.m.function(self.Type, a=self.Type)
-        funcs = [(annotate(f), f) for f in unary_funcs()]
-        self.m.build()
+        annotate = function(self.Type, a=self.Type)
+        funcs = unary_funcs()
+        m = module(map(annotate, funcs))
 
         values = [-5.0, 0.0, 5.0]
 
-        for cf, f in funcs:
+        for f in funcs:
+            cf = getattr(m, f.__name__)
             for a in values:
                 self.assertEqual(cf(a), f(a), "{0}({1})".format(f.__name__, a))
 
     def test_binary(self):
 
-        annotate = self.m.function(self.Type, a=self.Type, b=self.Type)
-        funcs = [(annotate(f), f) for f in binary_funcs() + floating_binary_funcs()]
-        self.m.build()
+        annotate = function(self.Type, a=self.Type, b=self.Type)
+        funcs = binary_funcs() + floating_binary_funcs()
+        m = module(map(annotate, funcs))
 
         values = [(0.0, 1.0), (3.0, 2.0), (2.0, 3.0), (-3.0, 2.0), (3.0, -2.0)]
 
-        for cf, f in funcs:
+        for f in funcs:
+            cf = getattr(m, f.__name__)
             for a, b in values:
                 self.assertAlmostEqual(cf(a, b), f(a, b), self.digits,
                                        "{0}({1}, {2})".format(f.__name__, a, b))
 
     def test_cmp(self):
 
-        annotate = self.m.function(Bool, a=self.Type, b=self.Type)
-        funcs = [(annotate(f), f) for f in cmp_funcs()]
-        self.m.build()
+        annotate = function(Bool, a=self.Type, b=self.Type)
+        funcs = cmp_funcs()
+        m = module(map(annotate, funcs))
 
-        for cf, f in funcs:
+        for f in funcs:
+            cf = getattr(m, f.__name__)
             self.assertEqual(cf(6.0, 5.0), f(6.0, 5.0))
             self.assertEqual(cf(5.0, 5.0), f(5.0, 5.0))
             self.assertEqual(cf(5.0, 6.0), f(5.0, 6.0))
@@ -221,13 +229,13 @@ class DoubleTests(FloatingTests, unittest.TestCase):
     def test_const(self):
         """Constant declaration."""
 
-        @self.m.function(self.Type)
+        @function(self.Type)
         def x():
             a = 5.0
             return a
 
-        self.m.build()
-        self.assertEqual(x(), 5.0)
+        m = module([x])
+        self.assertEqual(m.x(), 5.0)
 
 
 def unary_funcs():

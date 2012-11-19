@@ -1,5 +1,4 @@
 import unittest2 as unittest
-from nitrous.util import ModuleTest
 
 try:
     import numpy as np
@@ -8,10 +7,12 @@ except ImportError:
 
 
 @unittest.skipIf(not np, "Uses NumPy arrays")
-class NBodyTests(ModuleTest, unittest.TestCase):
+class NBodyTests(unittest.TestCase):
 
     def test(self):
         """N-body benchmark adaptation from http://shootout.alioth.debian.org"""
+        from nitrous.module import module
+        from nitrous.function import function
         from nitrous.types import Long, Double, Pointer
         from nitrous.lib.math import sqrt
 
@@ -38,7 +39,7 @@ class NBodyTests(ModuleTest, unittest.TestCase):
             "n_bodies": Long
         }
 
-        @self.m.function(vxyz=DoubleNx3, mass=DoubleN, n_bodies=Long)
+        @function(vxyz=DoubleNx3, mass=DoubleN, n_bodies=Long)
         def offset_momentum(vxyz, mass, n_bodies):
             px = 0.0
             py = 0.0
@@ -53,7 +54,7 @@ class NBodyTests(ModuleTest, unittest.TestCase):
             vxyz[0, Y] = py / SOLAR_MASS
             vxyz[0, Z] = pz / SOLAR_MASS
 
-        @self.m.function(Double, **common_args)
+        @function(Double, **common_args)
         def energy(xyz, vxyz, mass, n_bodies):
 
             e = 0.0
@@ -75,7 +76,7 @@ class NBodyTests(ModuleTest, unittest.TestCase):
 
             return e
 
-        @self.m.function(dt=Double, **common_args)
+        @function(dt=Double, **common_args)
         def advance(xyz, vxyz, mass, n_bodies, dt):
             for i in range(n_bodies):
                 for j in range(i + 1, n_bodies):
@@ -99,28 +100,28 @@ class NBodyTests(ModuleTest, unittest.TestCase):
                 xyz[i, Y] += dt * vxyz[i, Y]
                 xyz[i, Z] += dt * vxyz[i, Z]
 
-        @self.m.function(n_steps=Long, **common_args)
+        @function(n_steps=Long, **common_args)
         def loop(xyz, vxyz, mass, n_bodies, n_steps):
             for i in range(n_steps):
                 advance(xyz, vxyz, mass, n_bodies, 0.01)
 
-        self.m.build()
+        m = module([offset_momentum, energy, loop])
 
         xyz = np.genfromtxt("tests/data/nbody-position")
         vxyz = np.genfromtxt("tests/data/nbody-velocity") * DAYS_PER_YEAR
         mass = np.genfromtxt("tests/data/nbody-mass") * SOLAR_MASS
 
-        offset_momentum(vxyz, mass, 5)
+        m.offset_momentum(vxyz, mass, 5)
 
         # from time import time
         # t0 = time()
 
-        e0 = energy(xyz, vxyz, mass, 5)
+        e0 = m.energy(xyz, vxyz, mass, 5)
         self.assertAlmostEqual(e0, -0.169075164)
         # print " e=", e0, "Elapsed", time() - t0
 
-        loop(xyz, vxyz, mass, 5, 50000000)
+        m.loop(xyz, vxyz, mass, 5, 50000000)
 
-        e1 = energy(xyz, vxyz, mass, 5)
+        e1 = m.energy(xyz, vxyz, mass, 5)
         self.assertAlmostEqual(e1, -0.169059907)
         # print " e=", e1, "Elapsed", time() - t0
