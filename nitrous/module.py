@@ -142,7 +142,7 @@ def _create_module(decls, name):
     from uuid import uuid4
 
     if not name:
-        name = "n2o_" + str(uuid4())
+        name = "n2o_" + str(uuid4()).replace("-", "_")
 
     module = llvm.ModuleCreateWithName(name)
     funcs = []
