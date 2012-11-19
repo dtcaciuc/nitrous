@@ -24,6 +24,11 @@ extern "C" {
         llvm::cl::ParseEnvironmentOptions(Program, Var, Overview);
     }
 
+    const char *
+    LLVMGetModuleName(LLVMModuleRef M) {
+        return llvm::unwrap(M)->getModuleIdentifier().c_str();
+    }
+
     char *
     LLVMDumpModuleToString(LLVMModuleRef M) {
         std::string out;

@@ -1,12 +1,3 @@
-class ModuleTest(object):
-    """Test mixin to provide an empty NOS module as `self.m`."""
-
-    def setUp(self):
-        from .module import Module
-        self.m = Module(__name__)
-        self.addCleanup(delattr, self, "m")
-
-
 def dump_ast(node, annotate_fields=True, include_attributes=False):
     import ast
 

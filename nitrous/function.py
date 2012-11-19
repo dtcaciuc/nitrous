@@ -11,7 +11,7 @@ BOOL_INST = {
 }
 
 
-class Function(object):
+class FunctionDecl(object):
 
     def __init__(self, restype, argtypes, args):
         self.__n2o_restype__ = restype
@@ -20,6 +20,22 @@ class Function(object):
         # For consistency, same in ExternalFunction as well.
         self.__n2o_args__ = args
         self.__n2o_globals__ = {}
+
+        # Gets populated by functools.wraps
+        self.__name__ = None
+
+
+class Function(object):
+
+    def __init__(self, decl):
+        # TODO store decl reference(?), get rid of silly underscores
+        self.__n2o_restype__ = decl.__n2o_restype__
+        self.__n2o_argtypes__ = decl.__n2o_argtypes__
+        self.__n2o_args__ = decl.__n2o_args__
+        self.__n2o_globals__ = decl.__n2o_globals__.copy()
+        self.__n2o_options__ = decl.__n2o_options__
+        self.__n2o_pyfunc__ = decl.__n2o_pyfunc__
+        self.__name__ = decl.__name__
 
         self.converters = [
             t.convert if hasattr(t, "convert") else lambda a: a
@@ -51,6 +67,69 @@ class Function(object):
         return self.cfunc(*(c(a) for c, a in zip(self.converters, args)))
 
 
+def function(restype=None, **kwargs):
+    """Decorate an existing function with signature type annotations.
+
+    *restype* is the function return type. *kwargs* key/value pairs map argument
+    names to their respective types.
+
+    """
+    def wrapper(pyfunc):
+        from .exceptions import AnnotationError
+        from .function import Function
+        from .lib import _range
+        import functools
+        import inspect
+
+        # Types can provide a susbtitution if they're used directly
+        # as an argument type (eg. Structure needs to be implicitly
+        # passed as Reference() to said structure.
+        argtypes = dict(
+            (k, t.argtype if hasattr(t, "argtype") else t)
+            for k, t in kwargs.items()
+        )
+
+        # - Ordered argument name sequence
+        spec = inspect.getargspec(pyfunc)
+        if spec.varargs or spec.keywords:
+            raise AnnotationError("Variable and/or keyword arguments are not allowed")
+        if set(spec.args) != set(argtypes):
+            raise AnnotationError("Argument type annotations don't match function arguments.")
+
+        func = functools.wraps(pyfunc)(FunctionDecl(restype, argtypes, spec.args))
+        func.__n2o_pyfunc__ = pyfunc
+
+        # Immutable global symbols.
+        # - Built-ins
+        func.__n2o_globals__["range"] = _range
+        # - Other symbols available at the point of function
+        #   definition; try to resolve as many constants as possible.
+        parent_frame = inspect.currentframe().f_back
+        func.__n2o_globals__.update(parent_frame.f_globals)
+        func.__n2o_globals__.update(parent_frame.f_locals)
+        del parent_frame
+
+        # Options
+        func.__n2o_options__ = dict(cdiv=False, inline=False)
+
+        return func
+
+    return wrapper
+
+
+def options(cdiv=False, inline=False):
+    """Set behavioural options which affect the generated code.
+
+    :param cdiv: Set ``True`` to match C behaviour when performing integer division.
+    :param inline: Set ``True`` to always inline the function.
+
+    """
+    def wrapper(func):
+        func.__n2o_options__.update(cdiv=cdiv, inline=inline)
+        return func
+    return wrapper
+
+
 class ExternalFunction(object):
     """Stores information about externally defined function included in the module."""
 
@@ -59,6 +138,34 @@ class ExternalFunction(object):
         self.__n2o_func__ = func
         self.__n2o_restype__ = restype
         self.__n2o_argtypes__ = argtypes
+
+
+# FIXME restore included functions
+def include_function(self, name, restype, argtypes, lib=None, libdir=None):
+    """Includes externally defined function for use with the module.
+
+    Typically this is a function in an external shared or static library. C and
+    Fortran functions should be good to interface with; unfortunately C++ should
+    be kept at a distance from for the time being.
+
+    :param name: function name as it's listed in library symbols.
+    :param restype: function return value type
+    :param argtypes: sequence of function argument types
+    :param lib: library name where function is defined and we'll link with
+    :param libdir: directory where library is located
+
+    """
+    from .function import ExternalFunction
+
+    func = _create_function(self.module, name, restype, argtypes)
+
+    if lib is not None:
+        self.libs.append(lib)
+
+    if libdir is not None:
+        self.libdirs.append(libdir)
+
+    return ExternalFunction(name, func, restype, argtypes)
 
 
 class ScopedVars(object):
@@ -126,6 +233,10 @@ class FunctionBuilder(ast.NodeVisitor):
 
         # Value stack used to assemble LLVM IR as the syntax tree is traversed.
         self.stack = []
+
+        # List of compiled functions that has been used
+        # but were not yet declared.
+        self.new_funcs = []
 
     def store(self, addr, value, type_=None):
         """Stores *value* on the stack under *addr*.
@@ -672,9 +783,43 @@ class FunctionBuilder(ast.NodeVisitor):
 
         result_type = None
 
-        if hasattr(func, "__n2o_func__"):
+        if isinstance(func, FunctionDecl):
+            from .module import _create_function, _qualify
+
+            # Function has not yet been declared
+            module = llvm.GetParentModule__(self.builder)
+
+            qual_name = _qualify(module, func.__name__)
+            llvm_func = llvm.GetNamedFunction(module, qual_name)
+            # XXX this function may be another one already registered which happened
+            # to have the same unqualified name (e.g. imported from another module.)
+            # Check and disallow repetition of unqualified names in one module.
+
+            if not llvm_func:
+                # Create a copy of the wrapper so that the original can
+                # be used from elsewhere as well.
+                func = Function(func)
+
+                # Function is not yet declared in the module; do so
+                argtypes = [func.__n2o_argtypes__[arg] for arg in func.__n2o_args__]
+                llvm_func = _create_function(module, qual_name,
+                                             func.__n2o_restype__,
+                                             argtypes)
+
+                func.__n2o_func__ = llvm_func
+                self.new_funcs.append(func)
+
+            # TODO duplicates elif case below; factor out
+            _validate_function_args(func, args)
+            result_name = "v" if func.__n2o_restype__ is not None else ""
+            result = llvm.BuildCall(self.builder, llvm_func,
+                                    (llvm.ValueRef * len(args))(*args),
+                                    len(args), "")
+
+        elif isinstance(func, Function):
             # Function is compiled; check arguments for validity (unless
             # it's a definition for an external function) and make a direct call
+            # TODO restore external functions
             if not isinstance(func, ExternalFunction):
                 _validate_function_args(func, args)
             result = llvm.BuildCall(self.builder, func.__n2o_func__,
@@ -733,6 +878,8 @@ def emit_body(builder, func):
             # Point to the last function line where the return statement should be.
             e_args = (TypeError, func_body[-1].lineno, "Function must return a value")
             raise _unpack_translation_error(func_source, e_args)
+
+    return b.new_funcs
 
 
 def entry_alloca(func, type_, name):

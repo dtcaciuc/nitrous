@@ -1,4 +1,3 @@
-from __future__ import absolute_import
 import ctypes
 import os
 import shutil
@@ -10,168 +9,24 @@ from . import llvm
 class Module(object):
     """A unit of compilation and a container for optimized functions."""
 
-    def __init__(self, name, backend=None):
-        """Create a new module with a *name*."""
-        self.name = name
-        self.funcs = []
-        self.libs = []
-        self.libdirs = []
-
-        # Upon .build(), the module ownership is transferred to the
-        # resulting wrapper object and below reference is set to None.
-        self.module = llvm.ModuleCreateWithName(self.name)
-
-        self.backend = backend or build_so
-
+    def __init__(self, module, cleanup):
         # List of callables to run to free up resources associated with build.
-        self.cleanup = []
+        self.__n2o_module__ = module
+        self.__cleanup = cleanup
 
     def __del__(self):
-        for f in self.cleanup:
+        for f in self.__cleanup:
             f()
 
-    def include_function(self, name, restype, argtypes, lib=None, libdir=None):
-        """Includes externally defined function for use with the module.
 
-        Typically this is a function in an external shared or static library. C and
-        Fortran functions should be good to interface with; unfortunately C++ should
-        be kept at a distance from for the time being.
-
-        :param name: function name as it's listed in library symbols.
-        :param restype: function return value type
-        :param argtypes: sequence of function argument types
-        :param lib: library name where function is defined and we'll link with
-        :param libdir: directory where library is located
-
-        """
-        from .function import ExternalFunction
-
-        func = _create_function(self.module, name, restype, argtypes)
-
-        if lib is not None:
-            self.libs.append(lib)
-
-        if libdir is not None:
-            self.libdirs.append(libdir)
-
-        return ExternalFunction(name, func, restype, argtypes)
-
-    def function(self, restype=None, **kwargs):
-        """Decorate an existing function with signature type annotations.
-
-        The function gets included and will be built with the module.
-
-        *restype* is the function return type. *kwargs* key/value pairs map argument
-        names to their respective types.
-
-        """
-        def wrapper(pyfunc):
-            from .exceptions import AnnotationError
-            from .function import Function
-            from .lib import _range
-            import functools
-            import inspect
-
-            # Types can provide a susbtitution if they're used directly
-            # as an argument type (eg. Structure needs to be implicitly
-            # passed as Reference() to said structure.
-            argtypes = dict(
-                (k, t.argtype if hasattr(t, "argtype") else t)
-                for k, t in kwargs.items()
-            )
-
-            # - Ordered argument name sequence
-            spec = inspect.getargspec(pyfunc)
-            if spec.varargs or spec.keywords:
-                raise AnnotationError("Variable and/or keyword arguments are not allowed")
-            if set(spec.args) != set(argtypes):
-                raise AnnotationError("Argument type annotations don't match function arguments.")
-
-            func = functools.wraps(pyfunc)(Function(restype, argtypes, spec.args))
-            func.__n2o_pyfunc__ = pyfunc
-
-            # Immutable global symbols.
-            # - Built-ins
-            func.__n2o_globals__["range"] = _range
-            # - Other symbols available at the point of function
-            #   definition; try to resolve as many constants as possible.
-            parent_frame = inspect.currentframe().f_back
-            func.__n2o_globals__.update(parent_frame.f_globals)
-            func.__n2o_globals__.update(parent_frame.f_locals)
-            del parent_frame
-
-            # Options
-            func.__n2o_options__ = dict(cdiv=False, inline=False)
-
-            self.funcs.append(func)
-            return func
-
-        return wrapper
-
-    def options(self, cdiv=False, inline=False):
-        """Set behavioural options which affect the generated code.
-
-        :param cdiv: Set ``True`` to match C behaviour when performing integer division.
-        :param inline: Set ``True`` to always inline the function.
-
-        """
-        def wrapper(func):
-            func.__n2o_options__.update(cdiv=cdiv, inline=inline)
-            return func
-        return wrapper
-
-    def build(self):
-        """Build the module and return a handle to the resulting container.
-
-        The returned object is a Python module itself and contains wrappers under
-        the same attribute names as the original functions being wrapped.
-
-        """
-        from .function import emit_body
-
-        if self.module is None:
-            raise RuntimeError("Module was already built")
-
-        # Translate all registered functions
-        for func in self.funcs:
-            argtypes = [func.__n2o_argtypes__[name] for name in func.__n2o_args__]
-            func.__n2o_func__ = _create_function(self.module,
-                                                 self._qualify(func.__name__),
-                                                 func.__n2o_restype__,
-                                                 argtypes)
-            if func.__n2o_options__["inline"]:
-                llvm.AddFunctionAttr(func.__n2o_func__, llvm.AlwaysInlineAttribute)
-
-        ir_builder = llvm.CreateBuilder()
-
-        # Once all functions are declared, emit their contents
-        for func in self.funcs:
-            # Update globals with local function objects, including
-            # ourselves; this allows for declaration order-independent
-            # visibility and recursive calls.
-            for other_func in self.funcs:
-                func.__n2o_globals__[other_func.__name__] = other_func
-
-            emit_body(ir_builder, func)
-            if llvm.VerifyFunction(func.__n2o_func__, llvm.PrintMessageAction):
-                raise RuntimeError("Could not compile {0}()".format(func.__name__))
-
-        llvm.DisposeBuilder(ir_builder)
-
-        # Invalidate module reference and return the wrapper
-        self.backend(self)
-
-    def _qualify(self, symbol):
-        """Qualifies symbol with parent module name."""
-        return "__".join((self.name, symbol))
-
-
-def build_so(module):
-    """Output and return module wrapper backed by shared object file."""
+def so_module(decls, libs=[], libdirs=[], name=None):
+    """Build a module backed by shared object file."""
 
     from functools import partial
     from subprocess import call
     from uuid import uuid4
+
+    module, funcs = _create_module(decls, name)
 
     if llvm.InitializeNativeTarget__():
         raise SystemError("Cannot initialize LLVM target")
@@ -196,16 +51,17 @@ def build_so(module):
     os.makedirs(build_dir)
 
     # Path to output shared library.
-    so_path = format(os.path.join(build_dir, module.name))
-    libs = tuple("-l{0}".format(lib) for lib in module.libs)
-    libdirs = tuple("-L{0}".format(d) for d in module.libdirs)
+    # Getting module name again since _create_module may have used a default.
+    so_path = format(os.path.join(build_dir, llvm.GetModuleName(module)))
+    libs = tuple("-l{0}".format(lib) for lib in libs)
+    libdirs = tuple("-L{0}".format(d) for d in libdirs)
 
     # TODO get target data from TargetMachine?
-    _optimize(module.module, None)
+    _optimize(module, None)
 
     with tempfile.NamedTemporaryFile(suffix=".s") as tmp_s:
         message = ctypes.c_char_p()
-        status = llvm.TargetMachineEmitToFile(machine, module.module,
+        status = llvm.TargetMachineEmitToFile(machine, module,
                                               tmp_s.name, llvm.AssemblyFile,
                                               ctypes.byref(message))
         if status != 0:
@@ -226,19 +82,25 @@ def build_so(module):
 
     # Compilation successful; build ctypes interface to new module.
     so = ctypes.cdll.LoadLibrary(so_path)
-    for func in module.funcs:
+
+    cleanup = [partial(llvm.DisposeModule, module), partial(shutil.rmtree, build_dir)]
+
+    out = Module(module, cleanup)
+    out.__n2o_so__ = so
+
+    for func in funcs:
         func.wrap_so(so)
+        setattr(out, func.__name__, func)
 
-    module.cleanup.append(partial(llvm.DisposeModule, module.module))
-    module.cleanup.append(partial(shutil.rmtree, build_dir))
-
-    module.__n2o_so__ = so
+    return out
 
 
-def build_jit(module):
-    """Output module wrapper backed by JIT execution engine."""
+def jit_module(decls, name=None):
+    """Build a module backed by JIT execution engine."""
 
     from functools import partial
+
+    module, funcs = _create_module(decls, name)
 
     if llvm.InitializeNativeTarget__():
         raise SystemError("Cannot initialize LLVM target")
@@ -247,25 +109,87 @@ def build_jit(module):
     opt_level = 3
 
     message = ctypes.c_char_p()
-    if llvm.CreateJITCompilerForModule(ctypes.byref(engine), module.module, opt_level, ctypes.byref(message)):
+    if llvm.CreateJITCompilerForModule(ctypes.byref(engine), module, opt_level, ctypes.byref(message)):
         err = RuntimeError("Could not create execution engine: {0}".format(message.value))
         llvm.DisposeMessage(message)
         raise err
 
-    _optimize(module.module, llvm.GetExecutionEngineTargetData(engine))
+    _optimize(module, llvm.GetExecutionEngineTargetData(engine))
 
-    for func in module.funcs:
+    cleanup = [partial(llvm.DisposeExecutionEngine, engine)]
+
+    out = Module(module, cleanup)
+    out.__n2o_engine__ = engine
+
+    for func in funcs:
         func.wrap_engine(engine)
+        setattr(out, func.__name__, func)
 
-    # The engine takes its ownership of module; no need to dispose separately.
-    module.cleanup.append(partial(llvm.DisposeExecutionEngine, engine))
-
-    module.__n2o_engine__ = engine
+    return out
 
 
 def dump(module):
     """Return a string with module output's LLVM IR."""
-    return llvm.DumpModuleToString(module.module).value
+    return llvm.DumpModuleToString(module.__n2o_module__).value
+
+
+#: Default module builder.
+module = so_module
+
+
+def _create_module(decls, name):
+    from .function import emit_body, Function
+    from uuid import uuid4
+
+    if not name:
+        name = "n2o_" + str(uuid4())
+
+    module = llvm.ModuleCreateWithName(name)
+    funcs = []
+
+    # Translate all registered functions
+    for decl in decls:
+        func = Function(decl)
+        argtypes = [func.__n2o_argtypes__[arg] for arg in decl.__n2o_args__]
+        func.__n2o_func__ = _create_function(module, _qualify(module, decl.__name__),
+                                             decl.__n2o_restype__,
+                                             argtypes)
+        if func.__n2o_options__["inline"]:
+            llvm.AddFunctionAttr(func.__n2o_func__, llvm.AlwaysInlineAttribute)
+        funcs.append(func)
+
+    ir_builder = llvm.CreateBuilder()
+
+    # Once all known functions are declared, emit their contents
+    # Other functions can be added as they're discovered during emission.
+    i = 0
+    while i < len(funcs):
+        func = funcs[i]
+
+        # Update globals with local function objects, including
+        # ourselves; this allows for declaration order-independent
+        # visibility and recursive calls.
+        # TODO this is broken for the new module() arrangement; needs rewrite.
+        for other_func in funcs:
+            func.__n2o_globals__[other_func.__name__] = other_func
+
+        # Add functions used but not prevously declared.
+        new_funcs = emit_body(ir_builder, func)
+        funcs.extend(new_funcs)
+
+        if llvm.VerifyFunction(func.__n2o_func__, llvm.PrintMessageAction):
+            raise RuntimeError("Could not compile {0}()".format(func.__name__))
+
+        i += 1
+
+    llvm.DisposeBuilder(ir_builder)
+
+    return module, funcs
+
+
+def _qualify(module, symbol):
+    """Qualifies symbol with parent module name."""
+    return "__".join((llvm.GetModuleName(module), symbol))
 
 
 def _optimize(module, target_data):

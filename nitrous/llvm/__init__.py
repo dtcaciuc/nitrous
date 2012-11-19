@@ -62,6 +62,7 @@ class OpaqueModule(ctypes.Structure):
 ModuleRef = ctypes.POINTER(OpaqueModule)
 
 _func("ModuleCreateWithName", ModuleRef)
+_func("GetModuleName", ctypes.c_char_p, [ModuleRef])
 _func("DumpModule", None, [ModuleRef])
 _func("DumpModuleToString", owned_c_char_p, [ModuleRef])
 _func("DisposeModule", None, [ModuleRef])
@@ -125,6 +126,7 @@ _func("SetGlobalConstant", None, [ValueRef, Bool])
 # Functions
 _func("FunctionType", TypeRef, [TypeRef, ctypes.POINTER(TypeRef), ctypes.c_uint, ctypes.c_int])
 _func("AddFunction", ValueRef, [ModuleRef, ctypes.c_char_p, TypeRef])
+_func("GetNamedFunction", ValueRef, [ModuleRef, ctypes.c_char_p])
 _func("SetLinkage", None, [ValueRef, ctypes.c_int])
 _func("GetParam", ValueRef, [ValueRef, ctypes.c_uint])
 _func("GetReturnType", TypeRef, [TypeRef])
