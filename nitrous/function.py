@@ -98,23 +98,23 @@ def function(restype=None, **kwargs):
         if set(spec.args) != set(argtypes):
             raise AnnotationError("Argument type annotations don't match function arguments.")
 
-        func = functools.wraps(pyfunc)(FunctionDecl(restype, argtypes, spec.args))
-        func.__n2o_pyfunc__ = pyfunc
+        decl = functools.wraps(pyfunc)(FunctionDecl(restype, argtypes, spec.args))
+        decl.__n2o_pyfunc__ = pyfunc
 
         # Immutable global symbols.
         # - Built-ins
-        func.__n2o_globals__["range"] = _range
+        decl.__n2o_globals__["range"] = _range
         # - Other symbols available at the point of function
         #   definition; try to resolve as many constants as possible.
         parent_frame = inspect.currentframe().f_back
-        func.__n2o_globals__.update(parent_frame.f_globals)
-        func.__n2o_globals__.update(parent_frame.f_locals)
+        decl.__n2o_globals__.update(parent_frame.f_globals)
+        decl.__n2o_globals__.update(parent_frame.f_locals)
         del parent_frame
 
         # Options
-        func.__n2o_options__ = dict(cdiv=False, inline=False)
+        decl.__n2o_options__ = dict(cdiv=False, inline=False)
 
-        return func
+        return decl
 
     return wrapper
 
@@ -126,12 +126,13 @@ def options(cdiv=False, inline=False):
     :param inline: Set ``True`` to always inline the function.
 
     """
-    def wrapper(func):
-        func.__n2o_options__.update(cdiv=cdiv, inline=inline)
-        return func
+    def wrapper(decl):
+        decl.__n2o_options__.update(cdiv=cdiv, inline=inline)
+        return decl
     return wrapper
 
 
+# TODO reenable
 class ExternalFunction(object):
     """Stores information about externally defined function included in the module."""
 
@@ -985,24 +986,24 @@ def _create_function(module, decl, name=None):
     return llvm_func
 
 
-def _validate_function_args(func, args):
-    """Raises TypeError if if *args* do not match annotated function signature."""
+def _validate_function_args(decl, args):
+    """Raises TypeError if if *args* do not match function declaration."""
     from .types import types_equal
     import inspect
 
-    if len(args) != len(func.__n2o_argtypes__):
+    if len(args) != len(decl.__n2o_argtypes__):
         raise TypeError("{0}() takes exactly {1} argument(s) ({2} given)"
-                        .format(func.__name__, len(func.__n2o_argtypes__), len(args)))
+                        .format(decl.__name__, len(decl.__n2o_argtypes__), len(args)))
 
-    spec = inspect.getargspec(func.__n2o_pyfunc__)
+    spec = inspect.getargspec(decl.__n2o_pyfunc__)
     mask = map(types_equal,
-               (func.__n2o_argtypes__[name].llvm_type for name in spec.args),
+               (decl.__n2o_argtypes__[name].llvm_type for name in spec.args),
                (llvm.TypeOf(val) for val in args))
 
     if not all(mask):
         wrong_args = ", ".join((a for a, ok in zip(spec.args, mask) if not ok))
         raise TypeError("{0}() called with wrong argument type(s) for {1}"
-                        .format(func.__name__, wrong_args))
+                        .format(decl.__name__, wrong_args))
 
 
 def _unpack_translation_error(func_lines, args, before=2, after=5):
