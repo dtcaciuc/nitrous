@@ -817,7 +817,6 @@ class FunctionBuilder(ast.NodeVisitor):
         creates one if it doesn't exist yet.
 
         """
-        from .module import _qualify
         # XXX this function may be another one already registered which happened
         # to have the same unqualified name (e.g. imported from another module.)
         # Check and disallow repetition of unqualified names in one module.
@@ -969,9 +968,13 @@ def truncate_bool(builder, v):
     raise TypeError("Not a boolean variable")
 
 
-def _create_function(module, decl, name=None):
-    from .module import _qualify
+def _qualify(module, symbol):
+    """Qualifies symbol with parent module name."""
+    return "__".join((llvm.GetModuleName(module), symbol))
 
+
+def _create_function(module, decl, name=None):
+    """Declares an an LLVM function based on its declaration."""
     name = name or _qualify(module, decl.__name__)
     argtypes = [decl.argtypes[arg] for arg in decl.args]
     restype = decl.restype
