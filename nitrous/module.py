@@ -149,9 +149,7 @@ def _create_module(decls, name):
 
     # Translate all registered functions
     for decl in decls:
-        func = Function(decl)
-        func.__n2o_func__ = _create_function(module, decl)
-        funcs.append(func)
+        funcs.append(Function(decl, _create_function(module, decl)))
 
     ir_builder = llvm.CreateBuilder()
 
@@ -166,13 +164,13 @@ def _create_module(decls, name):
         # visibility and recursive calls.
         # TODO this is broken for the new module() arrangement; needs rewrite.
         for other_func in funcs:
-            func.__n2o_globals__[other_func.__name__] = other_func.decl
+            func.globals[other_func.__name__] = other_func.decl
 
         # Add functions used but not prevously declared.
         new_funcs = emit_body(ir_builder, func)
         funcs.extend(new_funcs)
 
-        if llvm.VerifyFunction(func.__n2o_func__, llvm.PrintMessageAction):
+        if llvm.VerifyFunction(func.llvm_func, llvm.PrintMessageAction):
             raise RuntimeError("Could not compile {0}()".format(func.__name__))
 
         i += 1

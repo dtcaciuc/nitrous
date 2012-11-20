@@ -13,16 +13,17 @@ BOOL_INST = {
 
 class FunctionDecl(object):
 
-    def __init__(self, restype, argtypes, args):
+    def __init__(self, restype, argtypes, args, pyfunc):
         self.restype = restype
         self.argtypes = argtypes
         # TODO Replace this with argtypes ordered dictionary?
         # For consistency, same in ExternalFunction as well.
         self.args = args
+        self.pyfunc = pyfunc
 
         # Options
         self.options = {'cdiv': False, 'inline': False}
-        self.__n2o_globals__ = {}
+        self.globals = {}
 
         # Gets populated by functools.wraps
         self.__name__ = None
@@ -30,13 +31,12 @@ class FunctionDecl(object):
 
 class Function(object):
 
-    def __init__(self, decl):
-        # TODO store decl reference(?), get rid of silly underscores
-        self.__n2o_globals__ = decl.__n2o_globals__.copy()
-        self.__n2o_pyfunc__ = decl.__n2o_pyfunc__
-        self.__name__ = decl.__name__
-
+    def __init__(self, decl, llvm_func):
         self.decl = decl
+        self.llvm_func = llvm_func
+        # Copy globals, since these depend on individual function environment.
+        self.globals = decl.globals.copy()
+        self.__name__ = decl.__name__
 
         self.converters = [
             t.convert if hasattr(t, "convert") else lambda a: a
@@ -55,14 +55,14 @@ class Function(object):
 
     def wrap_so(self, so):
         """Populates ctypes function object from a loaded SO file."""
-        self.cfunc = getattr(so, llvm.GetValueName(self.__n2o_func__))
+        self.cfunc = getattr(so, llvm.GetValueName(self.llvm_func))
         self.cfunc.argtypes = self._c_argtypes
         self.cfunc.restype = self._c_restype
 
     def wrap_engine(self, engine):
         """Populates ctypes function object from an execution engine."""
         proto = ctypes.CFUNCTYPE(self._c_restype, *self._c_argtypes)
-        self.cfunc = proto(llvm.GetPointerToGlobal(engine, self.__n2o_func__))
+        self.cfunc = proto(llvm.GetPointerToGlobal(engine, self.llvm_func))
 
     def __call__(self, *args):
         return self.cfunc(*(c(a) for c, a in zip(self.converters, args)))
@@ -97,17 +97,16 @@ def function(restype=None, **kwargs):
         if set(spec.args) != set(argtypes):
             raise AnnotationError("Argument type annotations don't match function arguments.")
 
-        decl = functools.wraps(pyfunc)(FunctionDecl(restype, argtypes, spec.args))
-        decl.__n2o_pyfunc__ = pyfunc
+        decl = functools.wraps(pyfunc)(FunctionDecl(restype, argtypes, spec.args, pyfunc))
 
         # Immutable global symbols.
         # - Built-ins
-        decl.__n2o_globals__["range"] = _range
+        decl.globals["range"] = _range
         # - Other symbols available at the point of function
         #   definition; try to resolve as many constants as possible.
         parent_frame = inspect.currentframe().f_back
-        decl.__n2o_globals__.update(parent_frame.f_globals)
-        decl.__n2o_globals__.update(parent_frame.f_locals)
+        decl.globals.update(parent_frame.f_globals)
+        decl.globals.update(parent_frame.f_locals)
         del parent_frame
 
         return decl
@@ -814,11 +813,8 @@ class FunctionBuilder(ast.NodeVisitor):
         llvm_func = llvm.GetNamedFunction(module, name)
 
         if not llvm_func:
-            func = Function(decl)
-            func.__n2o_func__ = _create_function(module, decl)
-            self.new_funcs.append(func)
-
-            llvm_func = func.__n2o_func__
+            llvm_func = _create_function(module, decl)
+            self.new_funcs.append(Function(decl, llvm_func))
 
         return llvm_func
 
@@ -826,7 +822,7 @@ class FunctionBuilder(ast.NodeVisitor):
 def emit_body(builder, func):
     """Emits function body IR.
 
-    Expects function already is declared and referenced as func.__n2o_func__.
+    Expects function already is declared and referenced as func.llvm_func.
 
     """
     from .exceptions import TranslationError
@@ -834,17 +830,17 @@ def emit_body(builder, func):
     from textwrap import dedent
 
     # ast.parse returns us a module, first function there is what we're parsing.
-    lines, _ = getsourcelines(func.__n2o_pyfunc__)
+    lines, _ = getsourcelines(func.decl.pyfunc)
     func_source = dedent("".join(lines))
     func_body = ast.parse(func_source).body[0].body
 
     # Emit function body IR
-    b = FunctionBuilder(builder, dict(resolve_constants(func.__n2o_globals__)), func.decl.options)
-    llvm.PositionBuilderAtEnd(builder, llvm.AppendBasicBlock(func.__n2o_func__, "entry"))
+    b = FunctionBuilder(builder, dict(resolve_constants(func.globals)), func.decl.options)
+    llvm.PositionBuilderAtEnd(builder, llvm.AppendBasicBlock(func.llvm_func, "entry"))
 
     # Store function parameters as locals
     for i, name in enumerate(func.decl.args):
-        param = llvm.GetParam(func.__n2o_func__, i)
+        param = llvm.GetParam(func.llvm_func, i)
         llvm.SetValueName(param, name)
         b.store(name, param, func.decl.argtypes[name])
 
@@ -858,7 +854,7 @@ def emit_body(builder, func):
     last_block = llvm.GetInsertBlock(builder)
     if not llvm.IsATerminatorInst(llvm.GetLastInstruction(last_block)):
         # Last return out of a void function can be implicit.
-        restype = llvm.function_return_type(func.__n2o_func__)
+        restype = llvm.function_return_type(func.llvm_func)
         if llvm.GetTypeKind(restype) == llvm.VoidTypeKind:
             llvm.BuildRetVoid(builder)
         else:
@@ -991,7 +987,7 @@ def _validate_function_args(decl, args):
         raise TypeError("{0}() takes exactly {1} argument(s) ({2} given)"
                         .format(decl.__name__, len(decl.argtypes), len(args)))
 
-    spec = inspect.getargspec(decl.__n2o_pyfunc__)
+    spec = inspect.getargspec(decl.pyfunc)
     mask = map(types_equal,
                (decl.argtypes[name].llvm_type for name in spec.args),
                (llvm.TypeOf(val) for val in args))
