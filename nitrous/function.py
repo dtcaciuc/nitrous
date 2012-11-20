@@ -784,48 +784,13 @@ class FunctionBuilder(ast.NodeVisitor):
         result_type = None
 
         if isinstance(func, FunctionDecl):
-            from .module import _create_function, _qualify
-
-            # Function has not yet been declared
-            module = llvm.GetParentModule__(self.builder)
-
-            qual_name = _qualify(module, func.__name__)
-            llvm_func = llvm.GetNamedFunction(module, qual_name)
-            # XXX this function may be another one already registered which happened
-            # to have the same unqualified name (e.g. imported from another module.)
-            # Check and disallow repetition of unqualified names in one module.
-
-            if not llvm_func:
-                # Create a copy of the wrapper so that the original can
-                # be used from elsewhere as well.
-                func = Function(func)
-
-                # Function is not yet declared in the module; do so
-                argtypes = [func.__n2o_argtypes__[arg] for arg in func.__n2o_args__]
-                llvm_func = _create_function(module, qual_name,
-                                             func.__n2o_restype__,
-                                             argtypes)
-
-                func.__n2o_func__ = llvm_func
-                self.new_funcs.append(func)
-
-            # TODO duplicates elif case below; factor out
             _validate_function_args(func, args)
-            result_name = "v" if func.__n2o_restype__ is not None else ""
+            llvm_func = self._get_or_create_function(func)
             result = llvm.BuildCall(self.builder, llvm_func,
                                     (llvm.ValueRef * len(args))(*args),
                                     len(args), "")
-
-        elif isinstance(func, Function):
-            # Function is compiled; check arguments for validity (unless
-            # it's a definition for an external function) and make a direct call
-            # TODO restore external functions
-            if not isinstance(func, ExternalFunction):
-                _validate_function_args(func, args)
-            result = llvm.BuildCall(self.builder, func.__n2o_func__,
-                                    (llvm.ValueRef * len(args))(*args),
-                                    len(args), "")
             if func.__n2o_restype__ is not None:
+                result_type = func.__n2o_restype__
                 llvm.SetValueName(result, "v")
         else:
             # Function is either CPython one or an LLVM emitter.
@@ -834,6 +799,29 @@ class FunctionBuilder(ast.NodeVisitor):
                 result, result_type = result(self.builder)
 
         self.push(result, result_type)
+
+    def _get_or_create_function(self, decl):
+        """Returns LLVM function value for given declaration;
+        creates one if it doesn't exist yet.
+
+        """
+        from .module import _create_function, _qualify
+        # XXX this function may be another one already registered which happened
+        # to have the same unqualified name (e.g. imported from another module.)
+        # Check and disallow repetition of unqualified names in one module.
+
+        module = llvm.GetParentModule__(self.builder)
+        name = _qualify(module, decl.__name__)
+        llvm_func = llvm.GetNamedFunction(module, name)
+
+        if not llvm_func:
+            func = Function(decl)
+            argtypes = [decl.__n2o_argtypes__[arg] for arg in decl.__n2o_args__]
+            llvm_func = _create_function(module, name, decl.__n2o_restype__, argtypes)
+            func.__n2o_func__ = llvm_func
+            self.new_funcs.append(func)
+
+        return llvm_func
 
 
 def emit_body(builder, func):
