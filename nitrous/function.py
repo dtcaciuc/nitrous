@@ -807,7 +807,7 @@ class FunctionBuilder(ast.NodeVisitor):
         creates one if it doesn't exist yet.
 
         """
-        from .module import _create_function, _qualify
+        from .module import _qualify
         # XXX this function may be another one already registered which happened
         # to have the same unqualified name (e.g. imported from another module.)
         # Check and disallow repetition of unqualified names in one module.
@@ -818,10 +818,10 @@ class FunctionBuilder(ast.NodeVisitor):
 
         if not llvm_func:
             func = Function(decl)
-            argtypes = [decl.__n2o_argtypes__[arg] for arg in decl.__n2o_args__]
-            llvm_func = _create_function(module, name, decl.__n2o_restype__, argtypes)
-            func.__n2o_func__ = llvm_func
+            func.__n2o_func__ = _create_function(module, decl)
             self.new_funcs.append(func)
+
+            llvm_func = func.__n2o_func__
 
         return llvm_func
 
@@ -960,6 +960,29 @@ def truncate_bool(builder, v):
             return v
 
     raise TypeError("Not a boolean variable")
+
+
+def _create_function(module, decl, name=None):
+    from .module import _qualify
+
+    name = name or _qualify(module, decl.__name__)
+    argtypes = [decl.__n2o_argtypes__[arg] for arg in decl.__n2o_args__]
+    restype = decl.__n2o_restype__
+
+    llvm_restype = restype.llvm_type if restype is not None else llvm.VoidType()
+
+    llvm_argtypes = (llvm.TypeRef * len(argtypes))()
+    for i, ty in enumerate(argtypes):
+        llvm_argtypes[i] = ty.llvm_type
+
+    llvm_func_type = llvm.FunctionType(llvm_restype, llvm_argtypes, len(llvm_argtypes), 0)
+    llvm_func = llvm.AddFunction(module, name, llvm_func_type)
+    llvm.SetLinkage(llvm_func, llvm.ExternalLinkage)
+
+    if decl.__n2o_options__["inline"]:
+        llvm.AddFunctionAttr(llvm_func, llvm.AlwaysInlineAttribute)
+
+    return llvm_func
 
 
 def _validate_function_args(func, args):

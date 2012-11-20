@@ -138,7 +138,7 @@ module = so_module
 
 
 def _create_module(decls, name):
-    from .function import emit_body, Function
+    from .function import emit_body, _create_function, Function
     from uuid import uuid4
 
     if not name:
@@ -150,12 +150,7 @@ def _create_module(decls, name):
     # Translate all registered functions
     for decl in decls:
         func = Function(decl)
-        argtypes = [func.__n2o_argtypes__[arg] for arg in decl.__n2o_args__]
-        func.__n2o_func__ = _create_function(module, _qualify(module, decl.__name__),
-                                             decl.__n2o_restype__,
-                                             argtypes)
-        if func.__n2o_options__["inline"]:
-            llvm.AddFunctionAttr(func.__n2o_func__, llvm.AlwaysInlineAttribute)
+        func.__n2o_func__ = _create_function(module, decl)
         funcs.append(func)
 
     ir_builder = llvm.CreateBuilder()
@@ -210,19 +205,3 @@ def _optimize(module, target_data):
 
     llvm.PassManagerBuilderDispose(pm_builder)
     llvm.DisposePassManager(pm)
-
-
-def _create_function(module, name, restype, argtypes):
-    """Creates an empty LLVM function."""
-
-    # Result type
-    restype_ = restype.llvm_type if restype is not None else llvm.VoidType()
-    argtypes_ = (llvm.TypeRef * len(argtypes))()
-    for i, ty in enumerate(argtypes):
-        argtypes_[i] = ty.llvm_type
-
-    func_type = llvm.FunctionType(restype_, argtypes_, len(argtypes_), 0)
-    func = llvm.AddFunction(module, name, func_type)
-    llvm.SetLinkage(func, llvm.ExternalLinkage)
-
-    return func
