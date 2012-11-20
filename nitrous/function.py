@@ -14,11 +14,14 @@ BOOL_INST = {
 class FunctionDecl(object):
 
     def __init__(self, restype, argtypes, args):
-        self.__n2o_restype__ = restype
-        self.__n2o_argtypes__ = argtypes
-        # TODO Replace this with __n2o_argtypes__ ordered dictionary?
+        self.restype = restype
+        self.argtypes = argtypes
+        # TODO Replace this with argtypes ordered dictionary?
         # For consistency, same in ExternalFunction as well.
-        self.__n2o_args__ = args
+        self.args = args
+
+        # Options
+        self.options = {'cdiv': False, 'inline': False}
         self.__n2o_globals__ = {}
 
         # Gets populated by functools.wraps
@@ -29,11 +32,7 @@ class Function(object):
 
     def __init__(self, decl):
         # TODO store decl reference(?), get rid of silly underscores
-        self.__n2o_restype__ = decl.__n2o_restype__
-        self.__n2o_argtypes__ = decl.__n2o_argtypes__
-        self.__n2o_args__ = decl.__n2o_args__
         self.__n2o_globals__ = decl.__n2o_globals__.copy()
-        self.__n2o_options__ = decl.__n2o_options__
         self.__n2o_pyfunc__ = decl.__n2o_pyfunc__
         self.__name__ = decl.__name__
 
@@ -41,18 +40,18 @@ class Function(object):
 
         self.converters = [
             t.convert if hasattr(t, "convert") else lambda a: a
-            for t in [self.__n2o_argtypes__[arg] for arg in self.__n2o_args__]
+            for t in [self.decl.argtypes[arg] for arg in self.decl.args]
         ]
 
         self.cfunc = None
 
     @property
     def _c_restype(self):
-        return self.__n2o_restype__.c_type if self.__n2o_restype__ is not None else None
+        return self.decl.restype.c_type if self.decl.restype is not None else None
 
     @property
     def _c_argtypes(self):
-        return [self.__n2o_argtypes__[arg].c_type for arg in self.__n2o_args__]
+        return [self.decl.argtypes[arg].c_type for arg in self.decl.args]
 
     def wrap_so(self, so):
         """Populates ctypes function object from a loaded SO file."""
@@ -111,9 +110,6 @@ def function(restype=None, **kwargs):
         decl.__n2o_globals__.update(parent_frame.f_locals)
         del parent_frame
 
-        # Options
-        decl.__n2o_options__ = dict(cdiv=False, inline=False)
-
         return decl
 
     return wrapper
@@ -127,7 +123,7 @@ def options(cdiv=False, inline=False):
 
     """
     def wrapper(decl):
-        decl.__n2o_options__.update(cdiv=cdiv, inline=inline)
+        decl.options.update(cdiv=cdiv, inline=inline)
         return decl
     return wrapper
 
@@ -792,8 +788,8 @@ class FunctionBuilder(ast.NodeVisitor):
             result = llvm.BuildCall(self.builder, llvm_func,
                                     (llvm.ValueRef * len(args))(*args),
                                     len(args), "")
-            if func.__n2o_restype__ is not None:
-                result_type = func.__n2o_restype__
+            if func.restype is not None:
+                result_type = func.restype
                 llvm.SetValueName(result, "v")
         else:
             # Function is either CPython one or an LLVM emitter.
@@ -843,14 +839,14 @@ def emit_body(builder, func):
     func_body = ast.parse(func_source).body[0].body
 
     # Emit function body IR
-    b = FunctionBuilder(builder, dict(resolve_constants(func.__n2o_globals__)), func.__n2o_options__)
+    b = FunctionBuilder(builder, dict(resolve_constants(func.__n2o_globals__)), func.decl.options)
     llvm.PositionBuilderAtEnd(builder, llvm.AppendBasicBlock(func.__n2o_func__, "entry"))
 
     # Store function parameters as locals
-    for i, name in enumerate(func.__n2o_args__):
+    for i, name in enumerate(func.decl.args):
         param = llvm.GetParam(func.__n2o_func__, i)
         llvm.SetValueName(param, name)
-        b.store(name, param, func.__n2o_argtypes__[name])
+        b.store(name, param, func.decl.argtypes[name])
 
     try:
         for node in func_body:
@@ -967,8 +963,8 @@ def _create_function(module, decl, name=None):
     from .module import _qualify
 
     name = name or _qualify(module, decl.__name__)
-    argtypes = [decl.__n2o_argtypes__[arg] for arg in decl.__n2o_args__]
-    restype = decl.__n2o_restype__
+    argtypes = [decl.argtypes[arg] for arg in decl.args]
+    restype = decl.restype
 
     llvm_restype = restype.llvm_type if restype is not None else llvm.VoidType()
 
@@ -980,7 +976,7 @@ def _create_function(module, decl, name=None):
     llvm_func = llvm.AddFunction(module, name, llvm_func_type)
     llvm.SetLinkage(llvm_func, llvm.ExternalLinkage)
 
-    if decl.__n2o_options__["inline"]:
+    if decl.options["inline"]:
         llvm.AddFunctionAttr(llvm_func, llvm.AlwaysInlineAttribute)
 
     return llvm_func
@@ -991,13 +987,13 @@ def _validate_function_args(decl, args):
     from .types import types_equal
     import inspect
 
-    if len(args) != len(decl.__n2o_argtypes__):
+    if len(args) != len(decl.argtypes):
         raise TypeError("{0}() takes exactly {1} argument(s) ({2} given)"
-                        .format(decl.__name__, len(decl.__n2o_argtypes__), len(args)))
+                        .format(decl.__name__, len(decl.argtypes), len(args)))
 
     spec = inspect.getargspec(decl.__n2o_pyfunc__)
     mask = map(types_equal,
-               (decl.__n2o_argtypes__[name].llvm_type for name in spec.args),
+               (decl.argtypes[name].llvm_type for name in spec.args),
                (llvm.TypeOf(val) for val in args))
 
     if not all(mask):
