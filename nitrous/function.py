@@ -12,6 +12,12 @@ BOOL_INST = {
 
 
 class FunctionDecl(object):
+    """Result of annotating a function with ``function()`` decorator.
+
+    Used to create a :class:`Function` instance first time declaration is used
+    in a module.
+
+    """
 
     def __init__(self, restype, argtypes, args, pyfunc):
         self.restype = restype
@@ -30,6 +36,14 @@ class FunctionDecl(object):
 
 
 class Function(object):
+    """Used for representing a function instance in a module and (optionally)
+    to interface the function to Python code through ctypes.
+
+    Before each function is returned as a :class:`Module` instance attribute,
+    its ``cfunc`` attribute is populated through either ``wrap_so`` or ``wrap_engine``
+    methods (depending on the type of module backend used).
+
+    """
 
     def __init__(self, decl, llvm_func):
         self.decl = decl
