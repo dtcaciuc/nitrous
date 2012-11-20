@@ -171,7 +171,7 @@ def _create_module(decls, name):
         # visibility and recursive calls.
         # TODO this is broken for the new module() arrangement; needs rewrite.
         for other_func in funcs:
-            func.__n2o_globals__[other_func.__name__] = other_func
+            func.__n2o_globals__[other_func.__name__] = other_func.decl
 
         # Add functions used but not prevously declared.
         new_funcs = emit_body(ir_builder, func)
@@ -184,7 +184,8 @@ def _create_module(decls, name):
 
     llvm.DisposeBuilder(ir_builder)
 
-    return module, funcs
+    # Return only the functions from explicitly listed declarations.
+    return module, funcs[:len(decls)]
 
 
 def _qualify(module, symbol):

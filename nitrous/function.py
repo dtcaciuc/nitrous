@@ -37,6 +37,8 @@ class Function(object):
         self.__n2o_pyfunc__ = decl.__n2o_pyfunc__
         self.__name__ = decl.__name__
 
+        self.decl = decl
+
         self.converters = [
             t.convert if hasattr(t, "convert") else lambda a: a
             for t in [self.__n2o_argtypes__[arg] for arg in self.__n2o_args__]

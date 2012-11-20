@@ -7,6 +7,31 @@ from nitrous.module import module
 from nitrous.function import function
 
 
+class ModuleTests(unittest.TestCase):
+
+    def test_exposed(self):
+        """Interface only functions from decls given to module constructor."""
+
+        @function(Long, a=Long)
+        def add1(a):
+            return a + 1
+
+        @function(Long, a=Long)
+        def add2(a):
+            return add1(add1(a))
+
+        @function(Long, a=Long)
+        def add3(a):
+            return add1(add2(a))
+
+        m = module([add1, add3])
+
+        self.assertEqual(m.add1(5), 6)
+        self.assertEqual(m.add3(11), 14)
+
+        self.assertFalse(hasattr(m, "add2"))
+
+
 class AnnotationTests(unittest.TestCase):
 
     def test_args_mismatch(self):
