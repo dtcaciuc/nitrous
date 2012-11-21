@@ -181,11 +181,6 @@ def _create_module(decls, name):
     return module, funcs[:len(decls)]
 
 
-def _qualify(module, symbol):
-    """Qualifies symbol with parent module name."""
-    return "__".join((llvm.GetModuleName(module), symbol))
-
-
 def _optimize(module, target_data):
     """Runs optimization passes on given module."""
 
