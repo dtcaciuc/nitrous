@@ -201,8 +201,9 @@ class Pointer(object):
         else:
             return llvm.BuildLoad(builder, gep, "v"), self.element_type
 
-    def emit_setitem(self, builder, v, i):
-        return self._item_gep(builder, v, i), Reference(self.element_type)
+    def emit_setitem(self, builder, v, i, e):
+        addr = self._item_gep(builder, v, i)
+        llvm.BuildStore(builder, e, addr)
 
     def _item_gep(self, builder, v, i):
         if len(i) != len(self.shape):
@@ -246,10 +247,10 @@ class Structure(object):
         gep, t = self._field_gep(builder, ref, attr)
         return llvm.BuildLoad(builder, gep, "v"), t
 
-    def emit_setattr(self, builder, ref, attr):
+    def emit_setattr(self, builder, ref, attr, v):
         """IR: Emits GEP used to set the attribute value."""
-        gep, t = self._field_gep(builder, ref, attr)
-        return gep, Reference(t)
+        addr, _ = self._field_gep(builder, ref, attr)
+        llvm.BuildStore(builder, v, addr)
 
     def _field_gep(self, builder, p, field):
         """Returns GEP and type for a *field*"""
@@ -381,8 +382,9 @@ class DynamicArray(Structure):
         else:
             return llvm.BuildLoad(builder, gep, "v"), self.element_type
 
-    def emit_setitem(self, builder, v, i):
-        return self._item_gep(builder, v, i), Reference(self.element_type)
+    def emit_setitem(self, builder, v, i, e):
+        addr = self._item_gep(builder, v, i)
+        llvm.BuildStore(builder, e, addr)
 
     def _item_gep(self, builder, v, i):
         # Get array shape from struct value

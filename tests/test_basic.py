@@ -139,7 +139,7 @@ class AssignTests(unittest.TestCase):
             return 0
 
         message = ">>>     a, b = 1"
-        with self.assertRaisesRegexp(NotImplementedError, message):
+        with self.assertRaisesRegexp(TypeError, message):
             module([f])
 
     def test_aug(self):
@@ -784,14 +784,30 @@ class OptimizationTests(unittest.TestCase):
 class UnpackTests(unittest.TestCase):
 
     def test_unpack(self):
+        """Unpacking tuples into simple values"""
 
-        @function(Long, a=Long, b=Long)
-        def foo(a, b):
-            b, a = a, b
-            return b * 10 + a * 100
+        @function(Long, a=Long, b=Long, c=Long)
+        def foo(a, b, c):
+            c, a, b = a, b, c
+            return b * 10 + a * 100 + c * 1000
 
         m = module([foo])
-        self.assertEqual(m.foo(5, 6), 650)
+        self.assertEqual(m.foo(5, 6, 2), 5000 + 600 + 20)
+
+    def test_unpack_subscript(self):
+        """Unpacking tuples into array elements"""
+
+        A, B, C = range(3)
+
+        @function(Long, d=Pointer(Long))
+        def foo(d):
+            d[C], d[A], d[B] = d[A], d[B], d[C]
+            return d[B] * 10 + d[A] * 100 + d[C] * 1000
+
+        m = module([foo])
+        d = (Long.c_type * 3)(5, 6, 2)
+
+        self.assertEqual(m.foo(d), 5000 + 600 + 20)
 
     def test_shape_mismatch(self):
         """Raise error if packed/unpacked tuple lengths differ"""

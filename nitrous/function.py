@@ -269,7 +269,9 @@ class FunctionBuilder(ast.NodeVisitor):
                 func = llvm.GetBasicBlockParent(llvm.GetInsertBlock(self.builder))
                 addr = entry_alloca(func, llvm.TypeOf(value), "v")
                 self.locals[name] = addr
-                # Register value type, if supplied
+                # Register value type, if supplied;
+                # also see if value has a registered type already.
+                type_ = type_ or self.typeof(value)
                 if type_ is not None:
                     self.types[name] = type_
 
@@ -346,7 +348,7 @@ class FunctionBuilder(ast.NodeVisitor):
         if isinstance(node.ctx, ast.Load):
             self.push(self.load(node.id), self.typeof(node.id))
         elif isinstance(node.ctx, ast.Store):
-            self.push(node.id)
+            self.store(node.id, self.pop())
         else:
             raise NotImplementedError("Unknown Name context {0!s}".format(type(node.ctx)))
 
@@ -364,24 +366,45 @@ class FunctionBuilder(ast.NodeVisitor):
 
         if hasattr(vt, "emit_getattr"):
             if isinstance(node.ctx, ast.Load):
-                a, at = vt.emit_getattr(self.builder, v, node.attr)
+                self.push(*vt.emit_getattr(self.builder, v, node.attr))
             elif isinstance(node.ctx, ast.Store):
-                a, at = vt.emit_setattr(self.builder, v, node.attr)
+                vt.emit_setattr(self.builder, v, node.attr, self.pop())
             else:
                 raise NotImplementedError("Unsupported attribute context {0}".format(node.ctx))
         else:
             # Assume regular python object
             if isinstance(node.ctx, ast.Load):
-                a, at = getattr(v, node.attr), None
+                self.push(getattr(v, node.attr))
             else:
                 raise NotImplementedError("Unsupported attribute context {0}".format(node.ctx))
 
-        self.push(a, at)
-
     def visit_Tuple(self, node):
-        ast.NodeVisitor.generic_visit(self, node)
-        v = tuple([self.pop() for _ in node.elts][::-1])
-        self.push(v)
+
+        if isinstance(node.ctx, ast.Load):
+            v = []
+            for e_node in node.elts:
+                self.visit(e_node)
+                v.append(self.pop())
+
+            self.push(tuple(v))
+
+        elif isinstance(node.ctx, ast.Store):
+            rhs = self.pop()
+            try:
+                rhs_len = len(rhs)
+            except TypeError:
+                raise TypeError("{0} is not an interable".format(rhs))
+
+            if len(node.elts) != rhs_len:
+                raise ValueError("Cannot unpack {0} values into {1}".format(rhs_len, len(node.elts)))
+
+            for e_node, v in zip(node.elts, rhs):
+                self.push(v)
+                # Node in store context will expect value on stack.
+                self.visit(e_node)
+
+        else:
+            raise NotImplementedError("Unsupported tuple context {0}".format(node.ctx))
 
     def visit_Index(self, node):
         if isinstance(node.value, ast.Tuple):
@@ -413,13 +436,11 @@ class FunctionBuilder(ast.NodeVisitor):
             vt = vt.value_type
 
         if isinstance(node.ctx, ast.Load):
-            e, et = vt.emit_getitem(self.builder, v, i)
+            self.push(*vt.emit_getitem(self.builder, v, i))
         elif isinstance(node.ctx, ast.Store):
-            e, et = vt.emit_setitem(self.builder, v, i)
+            vt.emit_setitem(self.builder, v, i, self.pop())
         else:
             raise NotImplementedError("Unsupported subscript context {0}".format(node.ctx))
-
-        self.push(e, et)
 
     def visit_Slice(self, node):
         raise NotImplementedError("Slices are not supported")
@@ -428,27 +449,13 @@ class FunctionBuilder(ast.NodeVisitor):
         raise NotImplementedError("`del`etions are not supported")
 
     def visit_Assign(self, node):
-        target = node.targets[0]
         if len(node.targets) > 1:
             raise NotImplementedError("Chained assignment is not supported")
 
-        ast.NodeVisitor.generic_visit(self, node)
-        rhs = self.pop()
-        lhs = self.pop()
-
-        if isinstance(target, (ast.Name, ast.Subscript, ast.Attribute)):
-            # Handled cases: lhs = rhs, *lhs_gep = rhs
-            self.store(lhs, rhs, self.typeof(rhs))
-        elif isinstance(target, ast.Tuple) and isinstance(rhs, tuple):
-            # TODO Currently only supports tuple to tuple repacking
-            if len(lhs) == len(rhs):
-                for x, y in zip(lhs, rhs):
-                    self.store(x, y, self.typeof(y))
-            else:
-                raise ValueError("Cannot unpack {0} values into {1}".format(len(rhs), len(lhs)))
-        else:
-            raise NotImplementedError("Unsupported assignment target {0}"
-                                      .format(node.targets[0]))
+        # Get value; keep it on the stack and visit target.
+        # visit_{Name, Subscript, Attribute, Tuple} in store context will expect it there.
+        self.visit(node.value)
+        self.visit(node.targets[0])
 
     def visit_AugAssign(self, node):
         raise RuntimeError("Encountered unexpected augmented assignment")
@@ -730,13 +737,15 @@ class FunctionBuilder(ast.NodeVisitor):
         # Loop header; get loop variable, iteration limits.
         llvm.PositionBuilderAtEnd(self.builder, start_bb)
 
-        self.visit(node.target)
-        target = self.pop()
-
         self.visit(node.iter)
         start, stop, step = self.pop()
 
         # Loop counter
+        if not isinstance(node.target, ast.Name):
+            raise TypeError("Unsupported loop variable type: {0}".format(type(node.target)))
+
+        target = node.target.id
+
         i_ptr = self.store(target, start)
         llvm.BuildBr(self.builder, test_bb)
 
