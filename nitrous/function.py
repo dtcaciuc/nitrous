@@ -451,18 +451,7 @@ class FunctionBuilder(ast.NodeVisitor):
                                       .format(node.targets[0]))
 
     def visit_AugAssign(self, node):
-        ast.NodeVisitor.generic_visit(self, node)
-        rhs = self.pop()
-
-        if isinstance(node.target, (ast.Name, ast.Subscript, ast.Attribute)):
-            # Handled cases: lhs = rhs, *lhs_gep = rhs
-            lhs_addr = self.pop()
-            rhs = emit_binary_op(self.builder, node.op, self.load(lhs_addr), rhs, self.opts["cdiv"])
-            # No need to store type, since the target already exists
-            self.store(lhs_addr, rhs)
-        else:
-            raise NotImplementedError("Unsupported augmented assignment target {0}"
-                                      .format(node.target))
+        raise RuntimeError("Encountered unexpected augmented assignment")
 
     def visit_Return(self, node):
         from .types import Bool, types_equal
@@ -832,6 +821,26 @@ class FunctionBuilder(ast.NodeVisitor):
         return llvm_func
 
 
+class UnpackAugAssign(ast.NodeTransformer):
+    """Replaces augmented assignments with non-augmented ones.
+
+    Eg., ``x[i] += y`` to ``x[i] = x[i] + y``.
+
+    """
+
+    def visit_AugAssign(self, node):
+        from ast import BinOp, Assign, Load, copy_location
+        from copy import copy
+
+        load_target = copy(node.target)
+        load_target.ctx = ast.Load()
+
+        op_node = BinOp(left=load_target, right=node.value, op=node.op)
+        assign = ast.Assign(targets=[node.target], value=copy_location(op_node, node))
+
+        return copy_location(assign, node)
+
+
 def emit_body(builder, func):
     """Emits function body IR.
 
@@ -859,6 +868,7 @@ def emit_body(builder, func):
 
     try:
         for node in func_body:
+            node = UnpackAugAssign().visit(node)
             b.visit(node)
 
     except TranslationError, e:
