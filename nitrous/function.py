@@ -505,12 +505,26 @@ class FunctionBuilder(ast.NodeVisitor):
         self.push(v)
 
     def visit_BinOp(self, node):
+        from .types import BINARY_INST, type_key, types_equal
+
         ast.NodeVisitor.generic_visit(self, node)
+
         rhs = self.pop()
         lhs = self.pop()
+        op = node.op
 
-        v = emit_binary_op(self.builder, node.op, lhs, rhs, self.opts["cdiv"])
-        self.push(v)
+        ty = llvm.TypeOf(lhs)
+        if not types_equal(ty, llvm.TypeOf(rhs)):
+            raise TypeError("Conflicting operand types for {0}: {1} and {2}"
+                            .format(op, lhs, rhs))
+
+        if isinstance(op, ast.Div) and llvm.GetTypeKind(ty) == llvm.IntegerTypeKind:
+            inst = llvm.BuildSDiv if self.opts["cdiv"] else llvm.build_py_idiv
+        else:
+            inst = BINARY_INST[type_key(ty)][type(op)]
+
+        v = inst(self.builder, lhs, rhs, type(op).__name__.lower())
+        self.push(v, ty)
 
     def visit_BoolOp(self, node):
         ast.NodeVisitor.generic_visit(self, node)
@@ -944,22 +958,6 @@ def resolve_constants(symbols):
         except TypeError:
             # Not a constant, something else will handle this.
             yield k, v
-
-
-def emit_binary_op(builder, op, lhs, rhs, cdiv):
-    from .types import BINARY_INST, type_key, types_equal
-
-    ty = llvm.TypeOf(lhs)
-    if not types_equal(ty, llvm.TypeOf(rhs)):
-        raise TypeError("Conflicting operand types for {0}: {1} and {2}"
-                        .format(op, lhs, rhs))
-
-    if isinstance(op, ast.Div) and llvm.GetTypeKind(ty) == llvm.IntegerTypeKind:
-        inst = llvm.BuildSDiv if cdiv else llvm.build_py_idiv
-    else:
-        inst = BINARY_INST[type_key(ty)][type(op)]
-
-    return inst(builder, lhs, rhs, type(op).__name__.lower())
 
 
 def emit_nonzero(builder, v):
