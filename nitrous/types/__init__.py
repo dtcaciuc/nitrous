@@ -1,7 +1,7 @@
 import ctypes
 import ast
 
-from . import llvm
+from .. import llvm
 
 
 def type_key(ty):
@@ -34,7 +34,7 @@ class ScalarType(object):
 
     def __call__(self, v):
         """Nicer equivalent to ``cast(v, Type)``"""
-        from .lib import cast
+        from nitrous.lib import cast
         return cast(v, self)
 
 
@@ -272,7 +272,7 @@ class StaticArray(Pointer):
     # TODO abstract element access interface into a mixin?
 
     def emit_getattr(self, builder, ref, attr):
-        from .function import entry_alloca
+        from nitrous.function import entry_alloca
 
         if attr == "ndim":
             return const_index(len(self.shape)), None
@@ -320,8 +320,8 @@ class StaticArray(Pointer):
         return ctypes.cast(p, pointer_type)
 
     def __call__(self):
-        from .lib import value_emitter
-        from .function import entry_array_alloca
+        from nitrous.lib import value_emitter
+        from nitrous.function import entry_array_alloca
         from operator import mul
 
         @value_emitter
