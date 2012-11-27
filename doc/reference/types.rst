@@ -3,15 +3,23 @@
 
 .. automodule:: nitrous.types
 
-Scalar Types
-------------
+Scalars
+-------
 
 .. autoclass:: ScalarType
+
+
+Vectors
+-------
+
+.. automodule:: nitrous.types.vector
+    :members:
+
 
 
 Type Utilities
 --------------
 
-.. autofunction:: type_key
+.. autofunction:: nitrous.types.type_key
 
-.. autofunction:: types_equal
+.. autofunction:: nitrous.types.types_equal

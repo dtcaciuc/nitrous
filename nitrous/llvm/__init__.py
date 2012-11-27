@@ -89,6 +89,7 @@ _func("GetIntTypeWidth", ctypes.c_uint, [TypeRef])
 
 # Sequential types
 _func("PointerType", TypeRef, [TypeRef, ctypes.c_uint])
+_func("VectorType", TypeRef, [TypeRef, ctypes.c_uint])
 
 _func("GetElementType", TypeRef, [TypeRef])
 
@@ -265,6 +266,9 @@ _func("BuildCall", ValueRef, [BuilderRef, ValueRef,
                               ctypes.POINTER(ValueRef), ctypes.c_uint,
                               ctypes.c_char_p])
 
+_func("BuildExtractElement", ValueRef, [BuilderRef, ValueRef, ValueRef, ctypes.c_char_p])
+_func("BuildInsertElement", ValueRef, [BuilderRef, ValueRef, ValueRef, ValueRef, ctypes.c_char_p])
+
 
 # Analysis
 VerifierFailureAction = ctypes.c_int
@@ -395,3 +399,15 @@ def build_pow(builder, a, b, name):
     from ..lib.math import pow
     v, ty = pow(a, b)(builder)
     return v
+
+
+def ensure_name(builder, v, ty, name):
+    # XXX even though results of some operations (eg.
+    # BuildPointerCast, InsertElement), have names, the resulting
+    # value doensn't? Returning a temporary instead fixes that.
+    from ..function import entry_alloca
+    func = GetBasicBlockParent(GetInsertBlock(builder))
+    a = entry_alloca(func, ty.llvm_type, "v.tmp")
+    BuildStore(builder, v, a)
+
+    return BuildLoad(builder, a, name)

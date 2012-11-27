@@ -518,13 +518,18 @@ class FunctionBuilder(ast.NodeVisitor):
             raise TypeError("Conflicting operand types for {0}: {1} and {2}"
                             .format(op, lhs, rhs))
 
+        # Vectors use same ops as their element types.
+        if llvm.GetTypeKind(ty) == llvm.VectorTypeKind:
+            ty = llvm.GetElementType(ty)
+
         if isinstance(op, ast.Div) and llvm.GetTypeKind(ty) == llvm.IntegerTypeKind:
             inst = llvm.BuildSDiv if self.opts["cdiv"] else llvm.build_py_idiv
         else:
             inst = BINARY_INST[type_key(ty)][type(op)]
 
         v = inst(self.builder, lhs, rhs, type(op).__name__.lower())
-        self.push(v, ty)
+        # Assuming binary operations return values of the same type as operands.
+        self.push(v, self.typeof(lhs))
 
     def visit_BoolOp(self, node):
         ast.NodeVisitor.generic_visit(self, node)
