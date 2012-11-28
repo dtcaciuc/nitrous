@@ -91,7 +91,6 @@ def function(restype=None, **kwargs):
     """
     def wrapper(pyfunc):
         from .exceptions import AnnotationError
-        from .function import Function
         from .lib import _range
         import functools
         import inspect
@@ -857,7 +856,7 @@ class UnpackAugAssign(ast.NodeTransformer):
     """
 
     def visit_AugAssign(self, node):
-        from ast import BinOp, Assign, Load, copy_location
+        from ast import BinOp, copy_location
         from copy import copy
 
         load_target = copy(node.target)
