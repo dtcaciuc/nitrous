@@ -46,6 +46,23 @@ class AnnotationTests(unittest.TestCase):
 
 class SymbolTests(unittest.TestCase):
 
+    def test_global_attr(self):
+        """Resolve global constant attributes."""
+
+        class Foo(object):
+            y = 3
+
+            class Baz(object):
+                z = 11
+
+        @function(Long, a=Long)
+        def f(a):
+            x = a + Foo.y + Foo.Baz.z
+            return x
+
+        m = module([f])
+        self.assertEqual(m.f(10), 24)
+
     def test_unsupported_context(self):
         """Raise error on unsupported context (eg. `del x`)."""
 

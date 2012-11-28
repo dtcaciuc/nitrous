@@ -373,7 +373,13 @@ class FunctionBuilder(ast.NodeVisitor):
         else:
             # Assume regular python object
             if isinstance(node.ctx, ast.Load):
-                self.push(getattr(v, node.attr))
+                av = getattr(v, node.attr)
+                try:
+                    # Try to resolve known constant types.
+                    av = emit_constant(av)
+                except TypeError:
+                    pass
+                self.push(av)
             else:
                 raise NotImplementedError("Unsupported attribute context {0}".format(node.ctx))
 

@@ -100,13 +100,10 @@ def load(T):
 
     """
 
-    # FIXME only directly named constants are currently resolved.
-    N = T.n
-
     @function(T, p=Pointer(T.element_type))
     def load_(p):
         v = T()
-        for i in range(N):
+        for i in range(T.n):
             v = set_element(T)(v, i, p[i])
         return v
 
@@ -121,12 +118,9 @@ def store(T):
 
     """
 
-    # FIXME only directly named constants are currently resolved.
-    N = T.n
-
     @function(v=T, p=Pointer(T.element_type))
     def store_(v, p):
-        for i in range(N):
+        for i in range(T.n):
             p[i] = get_element(T)(v, i)
 
     return store_
