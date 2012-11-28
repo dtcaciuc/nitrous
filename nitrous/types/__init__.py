@@ -26,29 +26,39 @@ def types_equal(tx, ty):
 class ScalarType(object):
     """Base for all scalar data types."""
 
-    __slots__ = ("c_type", "llvm_type")
-
-    def __init__(self, c_type, llvm_type):
+    def __init__(self, c_type, llvm_type, descr=None):
         self.c_type = c_type
         self.llvm_type = llvm_type
+        self.descr = descr or c_type.__name__
 
     def __call__(self, v):
         """Nicer equivalent to ``cast(v, Type)``"""
         from nitrous.lib import cast
         return cast(v, self)
 
+    def __str__(self):
+        return self.descr
 
-Double = ScalarType(ctypes.c_double, llvm.DoubleType())
 
-Float = ScalarType(ctypes.c_float, llvm.FloatType())
 
-Long = ScalarType(ctypes.c_long, llvm.IntType(ctypes.sizeof(ctypes.c_long) * 8))
+def _int_type(c_type, descr):
+    """Creates a new integral type"""
+    w = llvm.IntType(ctypes.sizeof(c_type) * 8)
+    return ScalarType(c_type, w, descr)
 
-Int = ScalarType(ctypes.c_int, llvm.IntType(ctypes.sizeof(ctypes.c_int) * 8))
 
-Bool = ScalarType(ctypes.c_bool, llvm.IntType(8))
+Double = ScalarType(ctypes.c_double, llvm.DoubleType(), "double")
 
-Byte = ScalarType(ctypes.c_byte, llvm.IntType(8))
+Float = ScalarType(ctypes.c_float, llvm.FloatType(), "float")
+
+
+Long = _int_type(ctypes.c_long, "long")
+
+Int = _int_type(ctypes.c_int, "int")
+
+Bool = _int_type(ctypes.c_bool, "bool")
+
+Byte = _int_type(ctypes.c_byte, "byte")
 
 
 # Akin to size_t in C, this is used for all memory accessing operations.

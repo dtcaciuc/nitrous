@@ -398,7 +398,7 @@ class FunctionBuilder(ast.NodeVisitor):
             try:
                 rhs_len = len(rhs)
             except TypeError:
-                raise TypeError("{0} is not an interable".format(rhs))
+                raise TypeError("Value of type '{0}' is not an iterable".format(self.typeof(rhs)))
 
             if len(node.elts) != rhs_len:
                 raise ValueError("Cannot unpack {0} values into {1}".format(rhs_len, len(node.elts)))
@@ -521,7 +521,7 @@ class FunctionBuilder(ast.NodeVisitor):
         ty = llvm.TypeOf(lhs)
         if not types_equal(ty, llvm.TypeOf(rhs)):
             raise TypeError("Conflicting operand types for {0}: {1} and {2}"
-                            .format(op, lhs, rhs))
+                            .format(op, self.typeof(lhs), self.typeof(rhs)))
 
         # Vectors use same ops as their element types.
         if llvm.GetTypeKind(ty) == llvm.VectorTypeKind:
@@ -561,7 +561,7 @@ class FunctionBuilder(ast.NodeVisitor):
         ty = llvm.TypeOf(lhs)
         if not types_equal(ty, llvm.TypeOf(rhs)):
             raise TypeError("Conflicting operand types for {0}: {1} and {2}"
-                            .format(op, lhs, rhs))
+                            .format(op, self.typeof(lhs), self.typeof(rhs)))
 
         # FIXME move this reponsibility to individual types.
         if llvm.GetTypeKind(ty) == llvm.PointerTypeKind:

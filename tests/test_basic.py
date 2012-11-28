@@ -840,6 +840,16 @@ class UnpackTests(unittest.TestCase):
 
         self.assertEqual(m.foo(d), 5000 + 600 + 20)
 
+    def test_not_iterable(self):
+
+        @function(a=Long)
+        def foo(a):
+            b, = a
+
+        message = "Value of type 'long' is not an iterable"
+        with self.assertRaisesRegexp(TypeError, message):
+            module([foo])
+
     def test_shape_mismatch(self):
         """Raise error if packed/unpacked tuple lengths differ"""
 
