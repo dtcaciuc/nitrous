@@ -181,6 +181,20 @@ class AssignTests(unittest.TestCase):
         m = module([f])
         self.assertEqual(m.f(10), 15)
 
+    def test_reassign_global_const(self):
+        """Override global symbol with a local one."""
+
+        y = 5
+
+        @function(Long, a=Long)
+        def f(a):
+            y = 20
+            return y + a
+
+        m = module([f])
+        self.assertEqual(m.f(100), 120)
+        self.assertEqual(y, 5)
+
 
 class SubscriptTests(unittest.TestCase):
 
