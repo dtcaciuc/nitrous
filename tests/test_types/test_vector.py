@@ -34,6 +34,9 @@ def axpy(a, p, y, z):
 
 class VectorTests(unittest.TestCase):
 
+    def test_repr(self):
+        self.assertEqual(repr(Float4), "<Vector [4 x Float]>")
+
     def test_get_set(self):
 
         m = module([hadd4])

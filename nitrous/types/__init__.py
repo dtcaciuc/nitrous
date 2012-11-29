@@ -26,10 +26,10 @@ def types_equal(tx, ty):
 class ScalarType(object):
     """Base for all scalar data types."""
 
-    def __init__(self, c_type, llvm_type, descr=None):
+    def __init__(self, c_type, llvm_type, name=None):
         self.c_type = c_type
         self.llvm_type = llvm_type
-        self.descr = descr or c_type.__name__
+        self.name = name or c_type.__name__
 
     def __call__(self, v):
         """Nicer equivalent to ``cast(v, Type)``"""
@@ -37,28 +37,30 @@ class ScalarType(object):
         return cast(v, self)
 
     def __str__(self):
-        return self.descr
+        return self.name
+
+    def __repr__(self):
+        return "<Scalar '{0.name}'>".format(self)
 
 
-
-def _int_type(c_type, descr):
+def _int_type(c_type, name):
     """Creates a new integral type"""
     w = llvm.IntType(ctypes.sizeof(c_type) * 8)
-    return ScalarType(c_type, w, descr)
+    return ScalarType(c_type, w, name)
 
 
-Double = ScalarType(ctypes.c_double, llvm.DoubleType(), "double")
+Double = ScalarType(ctypes.c_double, llvm.DoubleType(), "Double")
 
-Float = ScalarType(ctypes.c_float, llvm.FloatType(), "float")
+Float = ScalarType(ctypes.c_float, llvm.FloatType(), "Float")
 
 
-Long = _int_type(ctypes.c_long, "long")
+Long = _int_type(ctypes.c_long, "Long")
 
-Int = _int_type(ctypes.c_int, "int")
+Int = _int_type(ctypes.c_int, "Int")
 
-Bool = _int_type(ctypes.c_bool, "bool")
+Bool = _int_type(ctypes.c_bool, "Bool")
 
-Byte = _int_type(ctypes.c_byte, "byte")
+Byte = _int_type(ctypes.c_byte, "Byte")
 
 
 # Akin to size_t in C, this is used for all memory accessing operations.
@@ -169,6 +171,9 @@ class Pointer(object):
         self.element_type = element_type
         self.shape = shape
 
+    def __repr__(self):
+        return "<Pointer {0}>".format(shape_repr(self.element_type, self.shape))
+
     @property
     def llvm_type(self):
         return llvm.PointerType(self.element_type.llvm_type, 0)
@@ -247,6 +252,9 @@ class Structure(object):
         llvm_fields = (llvm.TypeRef * len(fields))(*(t.llvm_type for f, t in fields))
         llvm.StructSetBody(self.llvm_type, llvm_fields, len(fields), False)
 
+    def __repr__(self):
+        return "<Structure '{0}', {1} fields>".format(self.name, len(self.fields))
+
     @property
     def argtype(self):
         # Pass by reference if directly used as argument type.
@@ -280,6 +288,9 @@ def array(element_type, shape, *args, **kwargs):
 class StaticArray(Pointer):
     # TODO add a guard against None/Dynamic dimensions
     # TODO abstract element access interface into a mixin?
+
+    def __repr__(self):
+        return "<StaticArray {0}>".format(shape_repr(self.element_type, self.shape))
 
     def emit_getattr(self, builder, ref, attr):
         from nitrous.function import entry_alloca
@@ -366,6 +377,9 @@ class DynamicArray(Structure):
             ("shape", Pointer(Index)),
             ("ndim", Index)
         )
+
+    def __repr__(self):
+        return "<DynamicArray {0}>".format(shape_repr(self.element_type, self.shape))
 
     def convert(self, p):
         pointer_type = ctypes.POINTER(self.element_type.c_type)
@@ -470,3 +484,9 @@ def ctypes_shape(x):
         return (dim,) + ctypes_shape(x[0])
     except AttributeError:
         return ()
+
+
+def shape_repr(element_type, shape):
+    dim_0 = "?" if shape[0] in (Dynamic, None) else shape[0]
+    sub_shape = element_type if len(shape) == 1 else shape_repr(element_type, shape[1:])
+    return "[{0} x {1}]".format(dim_0, sub_shape)

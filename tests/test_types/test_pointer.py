@@ -11,6 +11,13 @@ except ImportError:
     np = None
 
 
+class InitTests(unittest.TestCase):
+
+    def test_repr(self):
+        self.assertEqual(repr(Pointer(Double)), "<Pointer [? x Double]>")
+        self.assertEqual(repr(Pointer(Double, shape=(2, 3))), "<Pointer [2 x [3 x Double]]>")
+
+
 class ComparisonTests(unittest.TestCase):
 
     def test(self):

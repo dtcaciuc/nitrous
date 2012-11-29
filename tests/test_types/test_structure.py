@@ -11,6 +11,9 @@ Coord = Structure("Coord", ("x", Double), ("y", Double), ("z", Double))
 
 class StructureTests(unittest.TestCase):
 
+    def test_repr(self):
+        self.assertEqual(repr(Coord), "<Structure 'Coord', 3 fields>")
+
     def test_load_fields(self):
         import ctypes
 

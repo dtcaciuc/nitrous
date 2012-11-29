@@ -20,6 +20,9 @@ class Vector(object):
         self.element_type = element_type
         self.n = n
 
+    def __repr__(self):
+        return "<Vector [{0.n} x {0.element_type}]>".format(self)
+
     @property
     def llvm_type(self):
         return llvm.VectorType(self.element_type.llvm_type, self.n)

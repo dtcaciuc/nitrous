@@ -64,11 +64,19 @@ class DynamicArrayTests(ArrayTests, unittest.TestCase):
     A = DynamicArray(Long, (Dynamic,) * 3)
     B = DynamicArray(Long)
 
+    def test_repr(self):
+        self.assertEqual(repr(self.A), "<DynamicArray [? x [? x [? x Long]]]>")
+        self.assertEqual(repr(self.B), "<DynamicArray [? x Long]>")
+
 
 class StaticArrayTests(ArrayTests, unittest.TestCase):
 
     A = StaticArray(Long, (2, 3, 2))
     B = StaticArray(Long, (12,))
+
+    def test_repr(self):
+        self.assertEqual(repr(self.A), "<StaticArray [2 x [3 x [2 x Long]]]>")
+        self.assertEqual(repr(self.B), "<StaticArray [12 x Long]>")
 
 
 class StaticAllocTests(unittest.TestCase):

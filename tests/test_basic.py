@@ -846,7 +846,7 @@ class UnpackTests(unittest.TestCase):
         def foo(a):
             b, = a
 
-        message = "Value of type 'long' is not an iterable"
+        message = "Value of type 'Long' is not an iterable"
         with self.assertRaisesRegexp(TypeError, message):
             module([foo])
 
