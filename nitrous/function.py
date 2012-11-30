@@ -140,43 +140,18 @@ def options(cdiv=False, inline=False):
     return wrapper
 
 
-# TODO reenable
-class ExternalFunction(object):
-    """Stores information about externally defined function included in the module."""
-
-    def __init__(self, name, func, restype, argtypes):
-        self.__name__ = name
-        self.__n2o_func__ = func
-        self.__n2o_restype__ = restype
-        self.__n2o_argtypes__ = argtypes
-
-
-# FIXME restore included functions
-def include_function(self, name, restype, argtypes, lib=None, libdir=None):
-    """Includes externally defined function for use with the module.
-
-    Typically this is a function in an external shared or static library. C and
-    Fortran functions should be good to interface with; unfortunately C++ should
-    be kept at a distance from for the time being.
+def c_function(name, restype, argtypes):
+    """Declares a external C function.
 
     :param name: function name as it's listed in library symbols.
     :param restype: function return value type
     :param argtypes: sequence of function argument types
-    :param lib: library name where function is defined and we'll link with
-    :param libdir: directory where library is located
 
     """
-    from .function import ExternalFunction
-
-    func = _create_function(self.module, name, restype, argtypes)
-
-    if lib is not None:
-        self.libs.append(lib)
-
-    if libdir is not None:
-        self.libdirs.append(libdir)
-
-    return ExternalFunction(name, func, restype, argtypes)
+    # Since argtypes is a list, `args` will be integers to act as keys
+    decl = FunctionDecl(restype, argtypes, range(len(argtypes)), pyfunc=None)
+    decl.__name__ = name
+    return decl
 
 
 class ScopedVars(object):
@@ -840,7 +815,10 @@ class FunctionBuilder(ast.NodeVisitor):
 
         """
         module = llvm.GetParentModule__(self.builder)
-        llvm_func, exists = _get_or_create_function(module, decl)
+        # XXX hack; have a better way to determine whether
+        # function name should be qualified or not.
+        qualify = decl.pyfunc is not None
+        llvm_func, exists = _get_or_create_function(module, decl, qualify)
 
         if not exists:
             self.new_funcs.append(Function(decl, llvm_func))
@@ -994,9 +972,9 @@ def _qualify(module, symbol):
     return "__".join((llvm.GetModuleName(module), symbol))
 
 
-def _get_or_create_function(module, decl):
+def _get_or_create_function(module, decl, qualify=True):
     """Gets or declares an an LLVM function based on its declaration."""
-    name = _qualify(module, decl.__name__)
+    name = _qualify(module, decl.__name__) if qualify else decl.__name__
     llvm_func = llvm.GetNamedFunction(module, name)
     exists = bool(llvm_func)
 
@@ -1030,15 +1008,17 @@ def _validate_function_args(decl, args):
         raise TypeError("{0}() takes exactly {1} argument(s) ({2} given)"
                         .format(decl.__name__, len(decl.argtypes), len(args)))
 
-    spec = inspect.getargspec(decl.pyfunc)
-    mask = map(types_equal,
-               (decl.argtypes[name].llvm_type for name in spec.args),
-               (llvm.TypeOf(val) for val in args))
+    if decl.pyfunc:
+        # External functions (eg. c_function) don't have PyFunc associated with them.
+        spec = inspect.getargspec(decl.pyfunc)
+        mask = map(types_equal,
+                   (decl.argtypes[name].llvm_type for name in spec.args),
+                   (llvm.TypeOf(val) for val in args))
 
-    if not all(mask):
-        wrong_args = ", ".join((a for a, ok in zip(spec.args, mask) if not ok))
-        raise TypeError("{0}() called with wrong argument type(s) for {1}"
-                        .format(decl.__name__, wrong_args))
+        if not all(mask):
+            wrong_args = ", ".join((a for a, ok in zip(spec.args, mask) if not ok))
+            raise TypeError("{0}() called with wrong argument type(s) for {1}"
+                            .format(decl.__name__, wrong_args))
 
 
 def _unpack_translation_error(func_lines, args, before=2, after=5):

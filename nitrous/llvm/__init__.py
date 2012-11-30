@@ -426,3 +426,17 @@ def ensure_name(builder, v, ty, name):
     BuildStore(builder, v, a)
 
     return BuildLoad(builder, a, name)
+
+
+def link_modules(dst, src):
+    """Link source module into destination one.
+
+    Source module is destroyed.
+
+    """
+    message = ctypes.c_char_p()
+    status = LinkModules__(dst, src, LinkerDestroySource, ctypes.byref(message))
+    if status != 0:
+        error = RuntimeError("Could not link modules: {0}".format(message.value))
+        llvm.DisposeMessage(message)
+        raise error

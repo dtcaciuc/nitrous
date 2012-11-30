@@ -28,6 +28,10 @@ def so_module(decls, libs=[], libdirs=[], name=None):
 
     module, funcs = _create_module(decls, name)
 
+    for lib in libs:
+        if not isinstance(lib, basestring):
+            llvm.link_modules(module, lib.create_module())
+
     if llvm.InitializeNativeTarget__():
         raise SystemError("Cannot initialize LLVM target")
 
@@ -53,7 +57,7 @@ def so_module(decls, libs=[], libdirs=[], name=None):
     # Path to output shared library.
     # Getting module name again since _create_module may have used a default.
     so_path = format(os.path.join(build_dir, llvm.GetModuleName(module)))
-    libs = tuple("-l{0}".format(lib) for lib in libs)
+    libs = tuple("-l{0}".format(lib) for lib in libs if isinstance(lib, basestring))
     libdirs = tuple("-L{0}".format(d) for d in libdirs)
 
     # TODO get target data from TargetMachine?
@@ -95,12 +99,15 @@ def so_module(decls, libs=[], libdirs=[], name=None):
     return out
 
 
-def jit_module(decls, name=None):
+def jit_module(decls, name=None, libs=[]):
     """Build a module backed by JIT execution engine."""
 
     from functools import partial
 
     module, funcs = _create_module(decls, name)
+
+    for lib in libs:
+        llvm.link_modules(module, lib.create_module())
 
     if llvm.InitializeNativeTarget__():
         raise SystemError("Cannot initialize LLVM target")
@@ -149,16 +156,8 @@ class CppLibrary(object):
             raise ValueError("No source files")
 
         module = self._compile_source(self.sources[0])
-        message = ctypes.c_char_p()
-
         for source in self.sources[1:]:
-            status = llvm.LinkModules__(module, self._compile_source(source),
-                                        llvm.LinkerDestroySource,
-                                        ctypes.byref(message))
-            if status != 0:
-                error = RuntimeError("Could not link modules: {0}".format(message.value))
-                llvm.DisposeMessage(message)
-                raise error
+            llvm.link_modules(module, self._compile_source(source))
 
         return module
 
@@ -225,12 +224,14 @@ def _create_module(decls, name):
         for other_func in funcs:
             func.globals[other_func.__name__] = other_func.decl
 
-        # Add functions used but not prevously declared.
-        new_funcs = emit_body(ir_builder, func)
-        funcs.extend(new_funcs)
+        # Emit new defined functions.
+        if func.decl.pyfunc is not None:
 
-        if llvm.VerifyFunction(func.llvm_func, llvm.PrintMessageAction):
-            raise RuntimeError("Could not compile {0}()".format(func.__name__))
+            new_funcs = emit_body(ir_builder, func)
+            funcs.extend(new_funcs)
+
+            if llvm.VerifyFunction(func.llvm_func, llvm.PrintMessageAction):
+                raise RuntimeError("Could not compile {0}()".format(func.__name__))
 
         i += 1
 
