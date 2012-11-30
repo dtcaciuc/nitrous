@@ -137,6 +137,62 @@ def dump(module):
 module = so_module
 
 
+class CppLibrary(object):
+    """Creates a library from C/C++ sources."""
+
+    def __init__(self, sources, compile_args=[]):
+        self.sources = sources
+        self.compile_args = tuple(compile_args)
+
+    def create_module(self):
+        if not self.sources:
+            raise ValueError("No source files")
+
+        module = self._compile_source(self.sources[0])
+        message = ctypes.c_char_p()
+
+        for source in self.sources[1:]:
+            status = llvm.LinkModules__(module, self._compile_source(source),
+                                        llvm.LinkerDestroySource,
+                                        ctypes.byref(message))
+            if status != 0:
+                error = RuntimeError("Could not link modules: {0}".format(message.value))
+                llvm.DisposeMessage(message)
+                raise error
+
+        return module
+
+    def _compile_source(self, source):
+        from subprocess import call
+
+        buffer = llvm.MemoryBufferRef()
+        message = ctypes.c_char_p()
+
+        with tempfile.NamedTemporaryFile(suffix=".bc") as tmp_bc:
+            if call(("clang", "-c", "-emit-llvm", "-o", tmp_bc.name, source) + self.compile_args):
+                raise RuntimeError("Could not compile {0}".format(source))
+
+            status = llvm.CreateMemoryBufferWithContentsOfFile(
+                tmp_bc.name, ctypes.byref(buffer),
+                ctypes.byref(message)
+            )
+            if status != 0:
+                error = RuntimeError("Could not load module: {0}".format(message.value))
+                llvm.DisposeMessage(message)
+                raise error
+
+        lib_module = llvm.ModuleRef()
+
+        status = llvm.ParseBitcode(buffer, ctypes.byref(lib_module), message)
+        llvm.DisposeMemoryBuffer(buffer)
+        if status != 0:
+            error = RuntimeError("Could not parse bitcode: {0}".format(message.value))
+            llvm.DisposeMessage(message)
+            raise error
+
+        return lib_module
+
+
 def _create_module(decls, name):
     from .function import emit_body, _create_function, Function
     from uuid import uuid4

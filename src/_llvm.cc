@@ -13,6 +13,7 @@
 #include <llvm/Support/TargetRegistry.h>
 #include <llvm/Support/raw_ostream.h>
 #include <llvm/Target/TargetMachine.h>
+#include <llvm/Linker.h>
 
 #include <vector>
 
@@ -108,5 +109,24 @@ extern "C" {
         }
         return llvm::wrap(target);
     }
+
+
+    /* Copied from LLVM 3.2 trunk */
+
+    enum LLVMLinkerMode__ {
+      DestroySource = 0, // Allow source module to be destroyed.
+      PreserveSource = 1 // Preserve the source module.
+    };
+
+    LLVMBool
+    LLVMLinkModules__(LLVMModuleRef Dest, LLVMModuleRef Src, LLVMLinkerMode__ Mode, char **OutMessages) {
+        std::string Messages;
+        LLVMBool Result = llvm::Linker::LinkModules
+            (llvm::unwrap(Dest), llvm::unwrap(Src), Mode, OutMessages? &Messages : 0);
+        if (OutMessages)
+            *OutMessages = strdup(Messages.c_str());
+        return Result;
+    }
+
 
 }

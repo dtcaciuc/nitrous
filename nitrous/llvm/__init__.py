@@ -70,6 +70,13 @@ _func("DisposeModule", None, [ModuleRef])
 _func("DisposeMessage", None, [ctypes.c_char_p])
 
 
+# Linker
+(LinkerDestroySource, LinkerPreserveSource) = range(2)
+
+_func("LinkModules__", Bool,
+      [ModuleRef, ModuleRef, ctypes.c_int, ctypes.POINTER(ctypes.c_char_p)])
+
+
 # Type
 class OpaqueType(ctypes.Structure):
     pass
@@ -113,6 +120,7 @@ _func("ConstReal", ValueRef, [TypeRef, ctypes.c_double])
 _func("ConstArray", ValueRef, [TypeRef, ctypes.POINTER(ValueRef), ctypes.c_uint])
 
 _func("IsATerminatorInst", ValueRef, [ValueRef])
+
 
 Opcode = ctypes.c_int
 
@@ -349,6 +357,22 @@ _func("GetExecutionEngineTargetData", TargetDataRef, [ExecutionEngineRef])
 _func("GetPointerToGlobal", ctypes.c_void_p, [ExecutionEngineRef, ValueRef])
 
 _func("DisposeExecutionEngine", None, [ExecutionEngineRef])
+
+
+# Memory Buffers
+class OpaqueMemoryBuffer(ctypes.Structure):
+    pass
+
+MemoryBufferRef = ctypes.POINTER(OpaqueMemoryBuffer)
+
+_func("CreateMemoryBufferWithContentsOfFile", Bool,
+      [ctypes.c_char_p, ctypes.POINTER(MemoryBufferRef), ctypes.POINTER(ctypes.c_char_p)])
+_func("DisposeMemoryBuffer", None, [MemoryBufferRef])
+
+
+# Bitcode Readers
+_func("ParseBitcode", Bool,
+      [MemoryBufferRef, ctypes.POINTER(ModuleRef), ctypes.POINTER(ctypes.c_char_p)])
 
 
 # Command line options
