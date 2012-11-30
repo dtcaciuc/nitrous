@@ -277,15 +277,6 @@ VerifierFailureAction = ctypes.c_int
 _func("VerifyFunction", Bool, [ValueRef, VerifierFailureAction])
 
 
-# Execution engine
-class OpaqueExecutionEngine(ctypes.Structure):
-    pass
-
-ExecutionEngineRef = ctypes.POINTER(OpaqueExecutionEngine)
-
-_func("CreateExecutionEngineForModule", ExecutionEngineRef)
-
-
 # Target
 class OpaqueTarget(ctypes.Structure):
     pass
