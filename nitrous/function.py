@@ -839,16 +839,10 @@ class FunctionBuilder(ast.NodeVisitor):
         creates one if it doesn't exist yet.
 
         """
-        # XXX this function may be another one already registered which happened
-        # to have the same unqualified name (e.g. imported from another module.)
-        # Check and disallow repetition of unqualified names in one module.
-
         module = llvm.GetParentModule__(self.builder)
-        name = _qualify(module, decl.__name__)
-        llvm_func = llvm.GetNamedFunction(module, name)
+        llvm_func, exists = _get_or_create_function(module, decl)
 
-        if not llvm_func:
-            llvm_func = _create_function(module, decl)
+        if not exists:
             self.new_funcs.append(Function(decl, llvm_func))
 
         return llvm_func
@@ -1000,26 +994,31 @@ def _qualify(module, symbol):
     return "__".join((llvm.GetModuleName(module), symbol))
 
 
-def _create_function(module, decl, name=None):
-    """Declares an an LLVM function based on its declaration."""
-    name = name or _qualify(module, decl.__name__)
-    argtypes = [decl.argtypes[arg] for arg in decl.args]
-    restype = decl.restype
+def _get_or_create_function(module, decl):
+    """Gets or declares an an LLVM function based on its declaration."""
+    name = _qualify(module, decl.__name__)
+    llvm_func = llvm.GetNamedFunction(module, name)
+    exists = bool(llvm_func)
 
-    llvm_restype = restype.llvm_type if restype is not None else llvm.VoidType()
+    if not exists:
 
-    llvm_argtypes = (llvm.TypeRef * len(argtypes))()
-    for i, ty in enumerate(argtypes):
-        llvm_argtypes[i] = ty.llvm_type
+        argtypes = [decl.argtypes[arg] for arg in decl.args]
+        restype = decl.restype
 
-    llvm_func_type = llvm.FunctionType(llvm_restype, llvm_argtypes, len(llvm_argtypes), 0)
-    llvm_func = llvm.AddFunction(module, name, llvm_func_type)
-    llvm.SetLinkage(llvm_func, llvm.ExternalLinkage)
+        llvm_restype = restype.llvm_type if restype is not None else llvm.VoidType()
 
-    if decl.options["inline"]:
-        llvm.AddFunctionAttr(llvm_func, llvm.AlwaysInlineAttribute)
+        llvm_argtypes = (llvm.TypeRef * len(argtypes))()
+        for i, ty in enumerate(argtypes):
+            llvm_argtypes[i] = ty.llvm_type
 
-    return llvm_func
+        llvm_func_type = llvm.FunctionType(llvm_restype, llvm_argtypes, len(llvm_argtypes), 0)
+        llvm_func = llvm.AddFunction(module, name, llvm_func_type)
+        llvm.SetLinkage(llvm_func, llvm.ExternalLinkage)
+
+        if decl.options["inline"]:
+            llvm.AddFunctionAttr(llvm_func, llvm.AlwaysInlineAttribute)
+
+    return llvm_func, exists
 
 
 def _validate_function_args(decl, args):

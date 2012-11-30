@@ -20,6 +20,26 @@ float multiply(float a, float b) {
 """
 
 
+class ModuleTests(unittest.TestCase):
+
+    def test_duplicate_function(self):
+        from nitrous.module import module
+        from nitrous.function import function
+        from nitrous.types import Long
+
+        def get_foo():
+
+            @function(Long, a=Long)
+            def foo(a):
+                return 1
+
+            return foo
+
+        message = "Duplicate function name: foo"
+        with self.assertRaisesRegexp(RuntimeError, message):
+            module([get_foo(), get_foo()])
+
+
 class CppLibraryTests(unittest.TestCase):
 
     def setUp(self):

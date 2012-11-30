@@ -194,7 +194,7 @@ class CppLibrary(object):
 
 
 def _create_module(decls, name):
-    from .function import emit_body, _create_function, Function
+    from .function import emit_body, _get_or_create_function, Function
     from uuid import uuid4
 
     if not name:
@@ -205,7 +205,10 @@ def _create_module(decls, name):
 
     # Translate all registered functions
     for decl in decls:
-        funcs.append(Function(decl, _create_function(module, decl)))
+        func, exists = _get_or_create_function(module, decl)
+        if exists:
+            raise RuntimeError("Duplicate function name: {0}" .format(decl.__name__))
+        funcs.append(Function(decl, func))
 
     ir_builder = llvm.CreateBuilder()
 
