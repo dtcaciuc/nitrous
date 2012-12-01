@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 #
-# NOS documentation build configuration file, created by
+# Nitrous documentation build configuration file, created by
 # sphinx-quickstart on Sun Jun 10 01:54:43 2012.
 #
 # This file is execfile()d with the current directory set to its containing dir.
@@ -40,7 +40,7 @@ source_suffix = '.rst'
 master_doc = 'index'
 
 # General information about the project.
-project = u'NOS'
+project = u'Nitrous'
 copyright = u'2012, Dimitri Tcaciuc'
 
 # The version info for the project you're documenting, acts as replacement for
@@ -165,7 +165,7 @@ html_static_path = ['_static']
 #html_file_suffix = None
 
 # Output file base name for HTML help builder.
-htmlhelp_basename = 'NOSdoc'
+htmlhelp_basename = 'nitrousdoc'
 
 
 # -- Options for LaTeX output --------------------------------------------------
@@ -184,7 +184,7 @@ latex_elements = {
 # Grouping the document tree into LaTeX files. List of tuples
 # (source start file, target name, title, author, documentclass [howto/manual]).
 latex_documents = [
-  ('index', 'NOS.tex', u'NOS Documentation',
+  ('index', 'nitrous.tex', u'Nitrous Documentation',
    u'Dimitri Tcaciuc', 'manual'),
 ]
 
@@ -228,8 +228,8 @@ man_pages = [
 # (source start file, target name, title, author,
 #  dir menu entry, description, category)
 texinfo_documents = [
-  ('index', 'NOS', u'NOS Documentation',
-   u'Dimitri Tcaciuc', 'NOS', 'One line description of project.',
+  ('index', 'nitrous', u'Nitrous Documentation',
+   u'Dimitri Tcaciuc', 'Nitrous', 'One line description of project.',
    'Miscellaneous'),
 ]
 
