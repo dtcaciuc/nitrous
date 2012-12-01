@@ -1,3 +1,7 @@
+from nitrous.module import module
+from nitrous.function import function
+from nitrous.types import Long
+
 import unittest
 
 
@@ -22,10 +26,29 @@ float multiply(float a, float b) {
 
 class ModuleTests(unittest.TestCase):
 
+    def test_exposed(self):
+        """Interface only functions from decls given to module constructor."""
+
+        @function(Long, a=Long)
+        def add1(a):
+            return a + 1
+
+        @function(Long, a=Long)
+        def add2(a):
+            return add1(add1(a))
+
+        @function(Long, a=Long)
+        def add3(a):
+            return add1(add2(a))
+
+        m = module([add1, add3])
+
+        self.assertEqual(m.add1(5), 6)
+        self.assertEqual(m.add3(11), 14)
+
+        self.assertFalse(hasattr(m, "add2"))
+
     def test_duplicate_function(self):
-        from nitrous.module import module
-        from nitrous.function import function
-        from nitrous.types import Long
 
         def get_foo():
 
@@ -38,6 +61,20 @@ class ModuleTests(unittest.TestCase):
         message = "Duplicate function name: foo"
         with self.assertRaisesRegexp(RuntimeError, message):
             module([get_foo(), get_foo()])
+
+
+class JITTests(unittest.TestCase):
+
+    def test(self):
+        from nitrous.module import jit_module
+
+        @function(Long, a=Long, b=Long)
+        def add(a, b):
+            return a + b
+
+        m = jit_module([add])
+
+        self.assertEqual(m.add(3, 7), 10)
 
 
 class CppLibraryTests(unittest.TestCase):

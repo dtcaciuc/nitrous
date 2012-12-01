@@ -7,31 +7,6 @@ from nitrous.module import module
 from nitrous.function import function
 
 
-class ModuleTests(unittest.TestCase):
-
-    def test_exposed(self):
-        """Interface only functions from decls given to module constructor."""
-
-        @function(Long, a=Long)
-        def add1(a):
-            return a + 1
-
-        @function(Long, a=Long)
-        def add2(a):
-            return add1(add1(a))
-
-        @function(Long, a=Long)
-        def add3(a):
-            return add1(add2(a))
-
-        m = module([add1, add3])
-
-        self.assertEqual(m.add1(5), 6)
-        self.assertEqual(m.add3(11), 14)
-
-        self.assertFalse(hasattr(m, "add2"))
-
-
 class AnnotationTests(unittest.TestCase):
 
     def test_args_mismatch(self):
@@ -710,40 +685,6 @@ class CallTests(unittest.TestCase):
             module([f2])
 
 
-# FIXME restore
-# class ExternalCallTests(unittest.TestCase):
-# 
-#     def setUp(self):
-#         from distutils.ccompiler import new_compiler
-#         import tempfile
-#         import shutil
-# 
-#         self.libdir = tempfile.mkdtemp()
-#         compiler = new_compiler()
-# 
-#         with tempfile.NamedTemporaryFile(suffix=".c", dir=self.libdir, delete=False) as src:
-#             src.write("#include <math.h>\ndouble my_pow(double x, double y) { return pow(x, y); }\n")
-# 
-#         obj = compiler.compile([src.name], extra_preargs=["-fPIC"], output_dir=self.libdir)
-#         compiler.create_static_lib(obj, "foo", output_dir=self.libdir)
-# 
-#         self.addCleanup(shutil.rmtree, self.libdir, ignore_errors=True)
-# 
-#     def test_shlib(self):
-#         """Calling functions from arbitrary shared libraries."""
-# 
-#         # Test call to functions in LLVM library itself
-#         lib_args = dict(lib="foo", libdir=self.libdir)
-#         my_pow = self.m.include_function("my_pow", Double, [Double, Double], **lib_args)
-# 
-#         @self.m.function(Double, x=Double, y=Double)
-#         def wrapper(x, y):
-#             return my_pow(x, y)
-# 
-#         self.m.build()
-#         self.assertEqual(wrapper(3, 5), 3 ** 5)
-
-
 class ScopedVarsTests(unittest.TestCase):
 
     def test_scope(self):
@@ -875,18 +816,3 @@ class InlineTests(unittest.TestCase):
 
         m = module([foo])
         self.assertRegexpMatches(dump(m), "alwaysinline")
-
-
-class JITTests(unittest.TestCase):
-
-    def test(self):
-        from nitrous.module import jit_module
-        from nitrous.function import function
-
-        @function(Long, a=Long, b=Long)
-        def add(a, b):
-            return a + b
-
-        m = jit_module([add])
-
-        self.assertEqual(m.add(3, 7), 10)
