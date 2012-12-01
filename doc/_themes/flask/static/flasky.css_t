@@ -90,7 +90,6 @@ div.sphinxsidebar {
 
 div.sphinxsidebarwrapper {
     padding: 5px 0 0 0;
-    text-align: right;
 }
 
 div.sphinxsidebarwrapper p.logo {

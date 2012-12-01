@@ -27,6 +27,7 @@ API Reference
    :maxdepth: 2
 
    reference/module
+   reference/function
    reference/types
    reference/lib
 

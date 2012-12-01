@@ -37,7 +37,7 @@ need to augment the code as following::
     from time import time
     from nitrous.module import module      # (1)
     from nitrous.function import function
-    from nitrous.types import Long         #
+    from nitrous.types import Long
 
     @function(Long, n=Long)                # (2)
     def fib(n):
@@ -77,7 +77,16 @@ library using ``ctypes``.
 Language Constraints
 ====================
 
-TODO
+Unsupported Features
+--------------------
+
+The following Python features are not yet implemented or do not fit into the
+general pattern of the framework:
+
+* Classes, methods and inheritance
+* List, set, and dictionary comprehensions
+* Generator functions
+* Closures
 
 Assignments
 -----------
@@ -117,7 +126,8 @@ making a call to the destination type::
 Variable Scope
 --------------
 
-Variable lifetime and visibility is limited to the innermost enclosing conditional/loop block rather than the function::
+Variable lifetime and visibility is limited to the innermost enclosing
+conditional/loop block rather than the function::
 
     z = 0.0
 
@@ -128,30 +138,92 @@ Variable lifetime and visibility is limited to the innermost enclosing condition
     x = z               # OK, z is in the current scope
     x = y               # Error, y scope is limited to `if` block
 
+
 Types
 =====
 
 TODO
+
+Scalars
+-------
+
+TODO
+
+Pointers and Arrays
+-------------------
+
+TODO
+
+Vectors
+-------
+
+TODO
+
 
 Functions
 =========
 
 TODO
 
-.. External Functions
-.. ==================
-.. 
-.. The :meth:`~nitrous.module.Module.include_function` method can be used to call functions defined in external static or shared libraries alongside the natively defined ones::
-.. 
-..     _atol = m.include_function("atol", Long, [Pointer(Char)], lib="c")
-.. 
-..     @m.function(Long, s=Pointer(Char))
-..     def atol(s):
-..         return _atol(s)
-.. 
-..     assert out.atol(ctypes.c_char_p("42")) == 42
-.. 
-.. Note that, currently, included functions can be called from functions in Nitrous mode, however they don't automatically get a Python interface and thus cannot be called by themselves without a wrapper like the one above.
+Interfacing C Libraries
+=======================
+
+The :meth:`~nitrous.function.c_function` can be used to call functions defined
+in static or shared libraries::
+
+
+    _atol = c_function("atol", Long, [Pointer(Char)])
+
+    @function(Long, s=Pointer(Char))
+    def atol(s):
+        return _atol(s)
+
+    m = module([atol], libs=["c"])
+    assert m.atol("42") == 42
+
+
+The optional ``libs`` argument is similar to ``-l`` argument to GCC or Clang
+and instructs Nitrous to look for symbols in specified libraries.
+
+.. note::
+
+    Using already built libraries is currently limited to shared object-backed modules.
+
+Building From Source
+--------------------
+
+If you're working with source files rather than already built libraries, the
+``libs`` argument can accept an instance of
+:class:`~nitrous.module.CppLibrary`. Source files are transparently compiled
+into objects and are linked together with the target module. Extending the
+previous example:
+
+.. code-block:: cpp
+
+    // write_long.c
+
+    #include <stdio.h>
+
+    void write_long(long x) {
+        printf(" value of x: %li\n", x);
+    }
+
+.. code-block:: python
+
+    # print_atol.py
+
+    _atol = c_function("atol", Long, [Pointer(Char)])
+    _write_long = c_function("write_long", None, [Long])
+
+    @function(s=Pointer(Char))
+    def print_atol(s):
+        _write_long(_atol(s))
+
+    m = module([print_atol], libs=[CppLibrary(["write_long.c"]), "c"])
+
+    # Prints out `value of x: 42`
+    m.print_atol("42")
+
 
 Extending the Framework
 =======================
@@ -164,26 +236,37 @@ TODO
 Metafunctions and Emitters
 --------------------------
 
-Another type of callable that usually appears in a Nitrous code is a *metafunction*. These are native Python routines that get executed at module compile time and emit code which goes into the compiled binary.
+Another type of callable that usually appears in a Nitrous code is a
+*metafunction*. These are native Python routines that get executed at module
+compile time and emit code which goes into the compiled binary.
 
 The :func:`~nitrous.lib.cast` is one example of such functions::
 
     x = cast(y, Double)
 
-The challenge here is that the cast (an the majority of other metafunctions) needs access to the function builder object to actually produce the IR. However, these sort of objects should be invisible to whoever's writing the code and it would be incredibly tacky to pass them around everywhere.
+The challenge here is that the cast (an the majority of other metafunctions)
+needs access to the function builder object to actually produce the IR, which
+is unavailable in the function body and thus cannot be referenced directly.
 
-For that reason, metafunctions return *emitters* as their result. Emitters are callables which accept two arguments: LLVM :class:`~nitrous.llvm.ModuleRef` and :class:`~nitrous.llvm.BuilderRef` instances. Because not every call results in an emitter, Nitrous recognizes them by reading the `__n2o_emitter__` magic attribute on the result object. If so, the compiler silently inserts another call which actually results in final IR::
+For that reason, metafunctions return *emitters* as their result. Emitters are
+callables which accept the :class:`~nitrous.llvm.BuilderRef` instance. Because
+not every call results in an emitter, Nitrous recognizes them by reading the
+`__n2o_emitter__` magic attribute on the result object. If so, the compiler
+silently inserts another call which actually results in final IR::
 
     def cast(value, target_type):
         """Casts *value* to a specified *target_type*."""
 
         @value_emitter                                                         # 1
-        def emit(module, builder):
+        def emit(builder):
             target_type_ = target_type.llvm_type
             cast_op = _get_cast(llvm.TypeOf(value), target_type_)              # 2
             return llvm.BuildCast(builder, cast_op, value, target_type_, "")
 
         return emit
 
-1. :func:`~nitrous.lib.value_emitter` decorates a function with the magic emitter attribute.
-2. Emitter is a closure that captures the metafunction arguments and uses them when it is called by Nitrous compiler.
+1. :func:`~nitrous.lib.value_emitter` decorates a function with the magic
+   emitter attribute.
+
+2. Emitter is a closure that captures the metafunction arguments and uses them
+   when it is called by Nitrous compiler.
