@@ -293,8 +293,6 @@ class StaticArray(Pointer):
         return "<StaticArray {0}>".format(shape_repr(self.element_type, self.shape))
 
     def emit_getattr(self, builder, ref, attr):
-        from nitrous.function import entry_alloca
-
         if attr == "ndim":
             return const_index(len(self.shape)), None
 
@@ -314,14 +312,8 @@ class StaticArray(Pointer):
                 llvm.SetInitializer(shape, shape_init)
                 llvm.SetGlobalConstant(shape, llvm.TRUE)
 
-            # XXX even though BuildPointerCast has a name, the resulting
-            # value doensn't? Returning a temporary instead fixes that.
-            func = llvm.GetBasicBlockParent(llvm.GetInsertBlock(builder))
-            cast = llvm.BuildPointerCast(builder, shape, Pointer(Index).llvm_type, "")
-            cast_shape = entry_alloca(func, Pointer(Index).llvm_type, "")
-            llvm.BuildStore(builder, cast, cast_shape)
-
-            return llvm.BuildLoad(builder, cast_shape, "shape"), Pointer(Index)
+            cast_shape = llvm.BuildPointerCast(builder, shape, Pointer(Index).llvm_type, "")
+            return llvm.ensure_name(builder, cast_shape, Pointer(Index), "shape"), Pointer(Index)
 
         else:
             raise AttributeError(attr)
