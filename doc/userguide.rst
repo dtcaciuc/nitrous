@@ -181,13 +181,13 @@ Calling Other Functions
 Functions can call other Nitrous functions by referring to them directly, as
 expected::
 
-    @function(Long, a=Long, b=Long)
+    @function(Double, a=Double, b=Double)
     def add2(a, b):
         return a + b
 
-    @function(Long, a=Long, b=Long)
+    @function(Double, a=Double, b=Double)
     def avg2(a, b):
-        return add2(a, b) / 2
+        return add2(a, b) / 2.0
 
 
 Calling Python Functions
