@@ -88,6 +88,22 @@ general pattern of the framework:
 * Generator functions
 * Closures
 
+Constant Types
+--------------
+
+Numeric constants are associated with a default type. The current mapping
+follows the underlying C datatypes used internally by CPython implementation.
+
++-------------+---------+---------------+
+| Python type | Example | Nitrous Type  |
++=============+=========+===============+
+| IntType     | 3       | Long          |
++-------------+---------+---------------+
+| FloatType   | 1.0     | Double        |
++-------------+---------+---------------+
+| StringType  | "abcd"  | Pointer(Char) |
++-------------+---------+---------------+
+
 Assignments
 -----------
 
@@ -106,22 +122,15 @@ The variable can be reassigned, but only with the value of the same type::
 Casting
 -------
 
-The type system necessitates the exact match without any implicit casting. The
-:func:`nitrous.lib.cast` can be used to perform the conversions when
-necessary::
-
-    from nitrous.lib import cast
-    ...
+The type system necessitates the exact match without any implicit casting.
+When necessary, casting can be performed by making a call to the destination
+type::
 
     x = 5.0              # type Double
     y = 1                # type Long
 
-    x = cast(y, Double)  # OK, assignment through explicit cast
-
-For simple types, such as scalars, casting can be performed more eloquently by
-making a call to the destination type::
-
     x = Double(y)        # OK, assignment through explicit cast
+
 
 Variable Scope
 --------------
@@ -138,6 +147,81 @@ conditional/loop block rather than the function::
     x = z               # OK, z is in the current scope
     x = y               # Error, y scope is limited to `if` block
 
+Functions
+=========
+
+The :func:`~nitrous.function.function` decorator accepts return type in the
+first positional argument; the rest are keyword arguments describing the
+compiled function arguments in order independent manner. ``None`` is used to
+indicate the absense of return value.
+
+Both can be omitted for brevity. For example,
+
+.. code-block:: python
+
+    @function(Long)
+    def const1():
+        return 1
+
+accepts no arguments and returns constant and
+
+
+.. code-block:: python
+
+    @function(x=Pointer(Double))
+    def normalize(x):
+        ...
+
+is a function without a return value.
+
+
+Calling Other Functions
+-----------------------
+
+Functions can call other Nitrous functions by referring to them directly, as
+expected::
+
+    @function(Long, a=Long, b=Long)
+    def add2(a, b):
+        return a + b
+
+    @function(Long, a=Long, b=Long)
+    def avg2(a, b):
+        return add2(a, b) / 2
+
+
+Calling Python Functions
+------------------------
+
+Python functions can also be called. The limitation here is that the call chain
+has to end up with a Nitrous function or an *emitter* (more on those later).
+This, for example, can be used to implement simple templates. Given
+
+.. code-block:: python
+
+    def element_sum(T):
+        """
+        ``element_sum(T)(p, n) -> v``
+
+        Sums an array of *n* elements of type *T*.
+
+        """
+        @function(T, p=Pointer(T), n=Long)
+        def sum_(p, n):
+            s = T()
+            for i in range(n):
+                s += p[i]
+            return s
+
+        return sum_
+
+we can write
+
+.. code-block:: python
+
+    @function(x=Pointer(Float))
+    def somefunc(x, n):
+        s = element_sum(Float)(x, n)
 
 Types
 =====
@@ -154,21 +238,21 @@ Pointers and Arrays
 
 TODO
 
+Structures
+----------
+
+TODO
+
 Vectors
 -------
 
 TODO
 
 
-Functions
-=========
-
-TODO
-
 Interfacing C Libraries
 =======================
 
-The :meth:`~nitrous.function.c_function` can be used to call functions defined
+The :func:`~nitrous.function.c_function` can be used to call functions defined
 in static or shared libraries::
 
 
@@ -242,7 +326,7 @@ compile time and emit code which goes into the compiled binary.
 
 The :func:`~nitrous.lib.cast` is one example of such functions::
 
-    x = cast(y, Double)
+    x = cast(y, Double)    # equivalent to x = Double(y)
 
 The challenge here is that the cast (an the majority of other metafunctions)
 needs access to the function builder object to actually produce the IR, which
