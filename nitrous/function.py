@@ -315,6 +315,12 @@ class FunctionBuilder(ast.NodeVisitor):
         finally:
             self.node_stack.pop()
 
+    def r_visit(self, node):
+        """Visits given node; pops and returns the last value."""
+        self.visit(node)
+        v = self.pop()
+        return v
+
     def visit_Num(self, node):
         self.push(emit_constant(node.n))
 
@@ -329,9 +335,7 @@ class FunctionBuilder(ast.NodeVisitor):
     def visit_Attribute(self, node):
         from .types import Reference
 
-        self.generic_visit(node)
-
-        v = self.pop()
+        v = self.r_visit(node.value)
         vt = self.typeof(v)
 
         if isinstance(vt, Reference):
@@ -361,12 +365,7 @@ class FunctionBuilder(ast.NodeVisitor):
     def visit_Tuple(self, node):
 
         if isinstance(node.ctx, ast.Load):
-            v = []
-            for e_node in node.elts:
-                self.visit(e_node)
-                v.append(self.pop())
-
-            self.push(tuple(v))
+            self.push(tuple(self.r_visit(e) for e in node.elts))
 
         elif isinstance(node.ctx, ast.Store):
             rhs = self.pop()
@@ -389,11 +388,10 @@ class FunctionBuilder(ast.NodeVisitor):
     def visit_Index(self, node):
         if isinstance(node.value, ast.Tuple):
             # Tuple visitor will push the value onto the stack itself
-            ast.NodeVisitor.generic_visit(self, node)
+            self.visit(node.value)
         else:
             # Assume everything else will produce a single index value.
-            ast.NodeVisitor.generic_visit(self, node)
-            self.push((self.pop(),))
+            self.push((self.r_visit(node.value),))
 
     def visit_Subscript(self, node):
         """Label subscript of form `var_expr[index_expr]`.
@@ -405,15 +403,14 @@ class FunctionBuilder(ast.NodeVisitor):
         """
         from .types import Reference
 
-        ast.NodeVisitor.generic_visit(self, node)
-        i = self.pop()
-        v = self.pop()
-
-        # Index is a nd tuple
+        v = self.r_visit(node.value)
         vt = self.typeof(v)
 
         if isinstance(vt, Reference):
             vt = vt.value_type
+
+        # Index is a nd tuple
+        i = self.r_visit(node.slice)
 
         if isinstance(node.ctx, ast.Load):
             self.push(*vt.emit_getitem(self.builder, v, i))
@@ -443,19 +440,17 @@ class FunctionBuilder(ast.NodeVisitor):
     def visit_Return(self, node):
         from .types import Bool, types_equal
 
-        ast.NodeVisitor.generic_visit(self, node)
-
         func = llvm.GetBasicBlockParent(llvm.GetInsertBlock(self.builder))
         return_type = llvm.function_return_type(func)
 
         if llvm.GetTypeKind(return_type) == llvm.VoidTypeKind:
-            if len(self.stack) > 0:
+            if node.value is not None:
                 raise ValueError("No return value expected")
 
             llvm.BuildRetVoid(self.builder)
 
         else:
-            v = self.pop()
+            v = self.r_visit(node.value)
             t = llvm.TypeOf(v)
             # Special case; if we're returning boolean, cast to i8
             # FIXME Move this to Bool.emit_cast_to or similar?
@@ -470,8 +465,7 @@ class FunctionBuilder(ast.NodeVisitor):
     def visit_UnaryOp(self, node):
         from .types import UNARY_INST, type_key
 
-        ast.NodeVisitor.generic_visit(self, node)
-        rhs = self.pop()
+        rhs = self.r_visit(node.operand)
 
         op_type = type(node.op)
         if op_type == ast.Not:
@@ -487,10 +481,8 @@ class FunctionBuilder(ast.NodeVisitor):
     def visit_BinOp(self, node):
         from .types import BINARY_INST, type_key, types_equal
 
-        ast.NodeVisitor.generic_visit(self, node)
-
-        rhs = self.pop()
-        lhs = self.pop()
+        lhs = self.r_visit(node.left)
+        rhs = self.r_visit(node.right)
         op = node.op
 
         ty = llvm.TypeOf(lhs)
@@ -512,14 +504,12 @@ class FunctionBuilder(ast.NodeVisitor):
         self.push(v, self.typeof(lhs))
 
     def visit_BoolOp(self, node):
-        ast.NodeVisitor.generic_visit(self, node)
-
-        rhs = emit_nonzero(self.builder, self.pop())
+        rhs = emit_nonzero(self.builder, self.r_visit(node.values[0]))
         # Expressions like `a > 1 or b > 1 or c > 1` collapse into one `or` with 3 .values
-        for _ in range(len(node.values) - 1):
-            rhs = BOOL_INST[type(node.op)](self.builder,
-                                           emit_nonzero(self.builder, self.pop()),
-                                           rhs, "cmp")
+        for v in node.values[1:]:
+            lhs = emit_nonzero(self.builder, self.r_visit(v))
+            rhs = BOOL_INST[type(node.op)](self.builder, lhs, rhs, "cmp")
+
         self.push(rhs)
 
     def visit_Compare(self, node):
@@ -528,9 +518,8 @@ class FunctionBuilder(ast.NodeVisitor):
         if len(node.ops) > 1 or len(node.comparators) > 1:
             raise NotImplementedError("Only simple `if` expressions are supported")
 
-        ast.NodeVisitor.generic_visit(self, node)
-        rhs = self.pop()
-        lhs = self.pop()
+        lhs = self.r_visit(node.left)
+        rhs = self.r_visit(node.comparators[0])
         op = node.ops[0]
 
         ty = llvm.TypeOf(lhs)
@@ -551,8 +540,7 @@ class FunctionBuilder(ast.NodeVisitor):
     def visit_IfExp(self, node):
         from .types import types_equal
 
-        self.visit(node.test)
-        test_expr = truncate_bool(self.builder, self.pop())
+        test_expr = truncate_bool(self.builder, self.r_visit(node.test))
 
         func = llvm.GetBasicBlockParent(llvm.GetInsertBlock(self.builder))
         if_branch_bb = llvm.AppendBasicBlock(func, "if")
@@ -562,16 +550,14 @@ class FunctionBuilder(ast.NodeVisitor):
         llvm.BuildCondBr(self.builder, test_expr, if_branch_bb, else_branch_bb)
 
         llvm.PositionBuilderAtEnd(self.builder, if_branch_bb)
-        self.visit(node.body)
-        if_expr = self.pop()
+        if_expr = self.r_visit(node.body)
         llvm.BuildBr(self.builder, merge_bb)
 
         # Getting updated insertion block in case of nested conditionals
         if_branch_bb = llvm.GetInsertBlock(self.builder)
 
         llvm.PositionBuilderAtEnd(self.builder, else_branch_bb)
-        self.visit(node.orelse)
-        else_expr = self.pop()
+        else_expr = self.r_visit(node.orelse)
         llvm.BuildBr(self.builder, merge_bb)
 
         # Getting updated insertion block in case of nested conditionals
@@ -589,8 +575,7 @@ class FunctionBuilder(ast.NodeVisitor):
         self.push(phi)
 
     def visit_If(self, node):
-        self.visit(node.test)
-        test_expr = truncate_bool(self.builder, self.pop())
+        test_expr = truncate_bool(self.builder, self.r_visit(node.test))
 
         func = llvm.GetBasicBlockParent(llvm.GetInsertBlock(self.builder))
         if_branch_bb = llvm.AppendBasicBlock(func, "if")
@@ -664,8 +649,7 @@ class FunctionBuilder(ast.NodeVisitor):
         llvm.BuildBr(self.builder, test_bb)
         llvm.PositionBuilderAtEnd(self.builder, test_bb)
 
-        self.visit(node.test)
-        test = self.pop()
+        test = self.r_visit(node.test)
 
         true_ = llvm.ConstInt(llvm.IntType(1), 1, True)
         t = llvm.BuildICmp(self.builder, llvm.IntEQ, test, true_, "t")
@@ -736,8 +720,7 @@ class FunctionBuilder(ast.NodeVisitor):
         # Loop header; get loop variable, iteration limits.
         llvm.PositionBuilderAtEnd(self.builder, start_bb)
 
-        self.visit(node.iter)
-        start, stop, step = self.pop()
+        start, stop, step = self.r_visit(node.iter)
 
         # Loop counter
         if not isinstance(node.target, ast.Name):
@@ -786,10 +769,8 @@ class FunctionBuilder(ast.NodeVisitor):
         llvm.BuildBr(self.builder, exit_bb)
 
     def visit_Call(self, node):
-        ast.NodeVisitor.generic_visit(self, node)
-        args = [self.pop() for _ in range(len(node.args))][::-1]
-        func = self.pop()
-
+        func = self.r_visit(node.func)
+        args = [self.r_visit(a) for a in node.args]
         result_type = None
 
         if isinstance(func, FunctionDecl):
