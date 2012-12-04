@@ -99,7 +99,7 @@ def so_module(decls, libs=[], libdirs=[], name=None):
     return out
 
 
-def jit_module(decls, name=None, libs=[]):
+def jit_module(decls, libs=[], name=None):
     """Build a module backed by JIT execution engine."""
 
     from functools import partial
