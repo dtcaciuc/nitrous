@@ -122,7 +122,7 @@ class StructureTests(unittest.TestCase):
 
         @function(Double, a=Coord)
         def _norm(a):
-            return sqrt(a.x * a.x + a.y * a.y + a.z * a.z)
+            return sqrt(Double)(a.x * a.x + a.y * a.y + a.z * a.z)
 
         @function(Double, a=Coord)
         def norm(a):

@@ -27,27 +27,19 @@ def value_emitter(func):
 class IntrinsicEmitter(object):
     """Convenicnce emitter for wrapping ``llvm.{name}`` intrinsic functions.
 
-    Optional *spec* lists arguments that are used to select particular
-    overloaded variant (all *args* are used by default).
+    The *spec* lists types that are used to select particular
+    overloaded variant.
 
     """
 
-    def __init__(self, name, args, spec=None):
+    def __init__(self, name, args, spec):
         self.name = name
-        self.args = args
-        self.spec = spec or args
+        self.args = (llvm.ValueRef * len(args))(*args)
+        self.spec = (llvm.TypeRef * len(spec))(*(t.llvm_type for t in spec))
 
     def __call__(self, builder):
-        n_args = len(self.args)
-        n_spec = len(self.spec)
-
-        module = llvm.GetParentModule__(builder)
-        i = llvm.INTRINSICS["llvm.{0}".format(self.name)]
-        spectypes = (llvm.TypeRef * n_spec)(*map(llvm.TypeOf, self.spec))
-        func = llvm.GetIntrinsicDeclaration(module, i, spectypes, n_spec)
-        args = (llvm.ValueRef * n_args)(*self.args)
-
-        return llvm.BuildCall(builder, func, args, n_args, ""), None
+        func = llvm.get_intrinsic(builder, self.name, self.spec)
+        return llvm.BuildCall(builder, func, self.args, len(self.args), "call"), None
 
 
 def cast(value, target_type):

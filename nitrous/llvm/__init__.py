@@ -381,6 +381,13 @@ if os.environ.get("NITROUS_LLVM_OPTS"):
     ParseEnvironmentOptions("nitrous", "NITROUS_LLVM_OPTS", None)
 
 
+def get_intrinsic(builder, name, spec):
+    """Return intrinsic declaration for name and specialization types."""
+    module = GetParentModule__(builder)
+    i = INTRINSICS["llvm.{0}".format(name)]
+    return GetIntrinsicDeclaration(module, i, spec, len(spec))
+
+
 def build_py_idiv(builder, a, b, name):
     """Build expression for floor integer division.
 
@@ -411,8 +418,8 @@ def build_py_idiv(builder, a, b, name):
 
 
 def build_pow(builder, a, b, name):
-    from ..lib.math import pow
-    v, ty = pow(a, b)(builder)
+    pow = get_intrinsic(builder, "pow", (TypeRef * 1)(TypeOf(a)))
+    v = BuildCall(builder, pow, (ValueRef * 2)(a, b), 2, "call")
     return v
 
 

@@ -1,43 +1,51 @@
 from __future__ import absolute_import
 import math as _pymath
 
-from .. import llvm
-from . import IntrinsicEmitter, value_emitter
+from . import IntrinsicEmitter
 
 pi = _pymath.pi
 e = _pymath.e
 
 
-def _pymath_doc(f):
-    """Copies docstring from Python stdlib `math` function of the same name."""
-    f.__doc__ = getattr(_pymath, f.__name__).__doc__
-    return f
+def exp(T):
+    """``exp(T)(x) -> y``
+
+    Return e raised to the power of x.
+
+    """
+    def exp_(x):
+        return IntrinsicEmitter("exp", (x,), (T,))
+    return exp_
 
 
-@_pymath_doc
-def exp(x):
-    return IntrinsicEmitter("exp", (x,))
+def pow(T):
+    """``pow(T)(x, y) -> z``
+
+    Return *x* raised to the power of *y*.
+
+    """
+    def pow_(x, y):
+        return IntrinsicEmitter("pow", (x, y), (T,))
+    return pow_
 
 
-@_pymath_doc
-def pow(x, y):
-    return IntrinsicEmitter("pow", (x, y), spec=(x,))
+def log(T):
+    """``log(T)(x) -> y``
+
+    Return the natural logarithm of *x*.
+
+    """
+    def log_(x):
+        return IntrinsicEmitter("log", (x,), (T,))
+    return log_
 
 
-@_pymath_doc
-def log(x, base=None):
+def sqrt(T):
+    """``sqrt(T)(x) -> y``
 
-    @value_emitter
-    def emit(builder):
-        n, n_ty = IntrinsicEmitter("log", (x,))(builder)
-        if base is not None:
-            d, _ = IntrinsicEmitter("log", (base,))(builder)
-            n = llvm.BuildFDiv(builder, n, d, "")
-        return n, n_ty
+    Return the square root of *x*.
 
-    return emit
-
-
-@_pymath_doc
-def sqrt(x):
-    return IntrinsicEmitter("sqrt", (x,))
+    """
+    def sqrt_(x):
+        return IntrinsicEmitter("sqrt", (x,), (T,))
+    return sqrt_

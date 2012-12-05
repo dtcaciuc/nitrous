@@ -15,7 +15,7 @@ class MathTests(unittest.TestCase):
 
         @function(Double, x=Double, y=Double)
         def pow(x, y):
-            return nitrous.lib.math.pow(x, y)
+            return nitrous.lib.math.pow(Double)(x, y)
 
         m = module([pow])
         self.assertAlmostEqual(math.pow(3.0, 5.0), m.pow(3.0, 5.0))
@@ -24,7 +24,7 @@ class MathTests(unittest.TestCase):
 
         @function(Double, x=Double)
         def sqrt(x):
-            return nitrous.lib.math.sqrt(x)
+            return nitrous.lib.math.sqrt(Double)(x)
 
         m = module([sqrt])
         self.assertAlmostEqual(math.sqrt(10.0), m.sqrt(10.0))
@@ -33,7 +33,7 @@ class MathTests(unittest.TestCase):
 
         @function(Double, x=Double)
         def exp(x):
-            return nitrous.lib.math.exp(x)
+            return nitrous.lib.math.exp(Double)(x)
 
         m = module([exp])
         self.assertAlmostEqual(math.exp(10.0), m.exp(10.0))
@@ -42,21 +42,11 @@ class MathTests(unittest.TestCase):
 
         @function(Double, x=Double)
         def log(x):
-            return nitrous.lib.math.log(x)
+            return nitrous.lib.math.log(Double)(x)
 
         m = module([log])
         self.assertAlmostEqual(math.log(10.0), m.log(10.0))
         self.assertAlmostEqual(math.log(1.0), m.log(1.0))
-
-    def test_base_log(self):
-
-        @function(Double, x=Double, b=Double)
-        def log(x, b):
-            return nitrous.lib.math.log(x, b)
-
-        m = module([log])
-        self.assertAlmostEqual(math.log(10.0, 4.0), m.log(10.0, 4.0))
-        self.assertAlmostEqual(math.log(1.0, 4.0), m.log(1.0, 4.0))
 
 
 class CastTests(unittest.TestCase):

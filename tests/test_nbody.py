@@ -72,7 +72,7 @@ class NBodyTests(unittest.TestCase):
                     dz = xyz[i, Z] - xyz[j, Z]
 
                     d2 = dx * dx + dy * dy + dz * dz
-                    e -= mass[i] * mass[j] / sqrt(d2)
+                    e -= mass[i] * mass[j] / sqrt(Double)(d2)
 
             return e
 
@@ -85,7 +85,7 @@ class NBodyTests(unittest.TestCase):
                     dz = xyz[i, Z] - xyz[j, Z]
 
                     d2 = dx * dx + dy * dy + dz * dz
-                    mag = dt / (d2 * sqrt(d2))
+                    mag = dt / (d2 * sqrt(Double)(d2))
 
                     vxyz[i, X] -= dx * mass[j] * mag
                     vxyz[i, Y] -= dy * mass[j] * mag
