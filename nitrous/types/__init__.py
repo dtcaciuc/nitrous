@@ -62,6 +62,8 @@ Bool = _int_type(ctypes.c_bool, "Bool")
 
 Byte = _int_type(ctypes.c_byte, "Byte")
 
+Char = _int_type(ctypes.c_char, "Char")
+
 
 # Akin to size_t in C, this is used for all memory accessing operations.
 # TODO switch this to Int by default?
@@ -440,6 +442,16 @@ class Reference(object):
         return ctypes.byref(self.value_type.convert(v)
                             if hasattr(self.value_type, "convert")
                             else v)
+
+
+String = ScalarType(ctypes.c_char_p, Pointer(Char).llvm_type, 0)
+"""Null-terminated byte string.
+
+This is virtually equivalent to Pointer(Char), except
+that it provides a better Python interop by mapping to
+``ctypes.c_char_p``
+
+"""
 
 
 def flatten_index(builder, index, const_shape):

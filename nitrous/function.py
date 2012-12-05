@@ -322,7 +322,11 @@ class FunctionBuilder(ast.NodeVisitor):
         return v
 
     def visit_Num(self, node):
-        self.push(emit_constant(node.n))
+        self.push(emit_constant(self.builder, node.n))
+
+    def visit_Str(self, node):
+        from .types import String
+        self.push(emit_constant_string(self.builder, node.s), String)
 
     def visit_Name(self, node):
         if isinstance(node.ctx, ast.Load):
@@ -355,7 +359,7 @@ class FunctionBuilder(ast.NodeVisitor):
                 av = getattr(v, node.attr)
                 try:
                     # Try to resolve known constant types.
-                    av = emit_constant(av)
+                    av = emit_constant(self.builder, av)
                 except TypeError:
                     pass
                 self.push(av)
@@ -843,8 +847,10 @@ def emit_body(builder, func):
     func_body = ast.parse(func_source).body[0].body
 
     # Emit function body IR
-    b = FunctionBuilder(builder, dict(resolve_constants(func.globals)), func.decl.options)
     llvm.PositionBuilderAtEnd(builder, llvm.AppendBasicBlock(func.llvm_func, "entry"))
+    resolved_globals = dict(resolve_constants(builder, func.globals))
+
+    b = FunctionBuilder(builder, resolved_globals, func.decl.options)
 
     # Store function parameters as locals
     for i, name in enumerate(func.decl.args):
@@ -898,7 +904,7 @@ def entry_array_alloca(func, element_type, n, name):
     return a
 
 
-def emit_constant(value):
+def emit_constant(builder, value):
     """Emit constant IR for known value types."""
     from .types import Bool, Long, Double
 
@@ -909,15 +915,32 @@ def emit_constant(value):
         return llvm.ConstInt(Bool.llvm_type, value, True)
     elif isinstance(value, int):
         return llvm.ConstInt(Long.llvm_type, value, True)
+    elif isinstance(value, basestring):
+        return emit_constant_string(builder, value)
     else:
         raise TypeError("Unknown Number type {0!s}".format(type(value)))
 
 
-def resolve_constants(symbols):
+def emit_constant_string(builder, value):
+    from .types import String
+
+    module = llvm.GetParentModule__(builder)
+    init = llvm.ConstString(value, len(value), False)
+
+    s = llvm.AddGlobal(module, llvm.TypeOf(init), "")
+    llvm.SetInitializer(s, init)
+    llvm.SetGlobalConstant(s, llvm.TRUE)
+    llvm.SetLinkage(s, llvm.PrivateLinkage)
+
+    sp = llvm.BuildPointerCast(builder, s, String.llvm_type, "")
+    return llvm.ensure_name(builder, sp, String, "str")
+
+
+def resolve_constants(builder, symbols):
     """Converts eligible values in a dictionary to LLVM constant objects."""
     for k, v in symbols.iteritems():
         try:
-            yield k, emit_constant(v)
+            yield k, emit_constant(builder, v)
         except TypeError:
             # Not a constant, something else will handle this.
             yield k, v

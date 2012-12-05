@@ -117,6 +117,7 @@ _func("ConstNull", ValueRef, [TypeRef])
 _func("ConstInt", ValueRef, [TypeRef, ctypes.c_ulonglong, Bool])
 _func("ConstReal", ValueRef, [TypeRef, ctypes.c_double])
 
+_func("ConstString", ValueRef, [ctypes.c_char_p, ctypes.c_uint, Bool])
 _func("ConstArray", ValueRef, [TypeRef, ctypes.POINTER(ValueRef), ctypes.c_uint])
 
 _func("IsATerminatorInst", ValueRef, [ValueRef])
@@ -162,7 +163,8 @@ if "GetIntrinsicCount__" in globals():
     """Intrinsic map; from name to intrinsic ID to use with GetIntrinsicDeclaration."""
 
 
-(ExternalLinkage,) = range(1)
+ExternalLinkage = 0
+PrivateLinkage = 8
 
 # Structure Types
 _func("StructType", TypeRef, [ctypes.POINTER(TypeRef), ctypes.c_uint, ctypes.c_bool])
