@@ -88,8 +88,8 @@ def cast(value, target_type):
     return emit
 
 
-def _range(*args):
-    """range() built-in implementation.
+def range_(*args):
+    """``range([start,] stop[, step])``
 
     Returns (start, stop, step) LLVM value tuple which is then can be used
     by the compiler to emit the ``for`` loop code.
@@ -126,13 +126,13 @@ def _range(*args):
 
 
 def print_(*args, **kwargs):
-    """Implements ``print`` intrinsic.
+    """``print_(value, ..., end='\\n', file=sys.stdout)``
 
-    Currently supports only several basic types, namely strings,
-    integers of different widths, floats and doubles.
+    Also available through ``print`` built-in.
 
-    *file* argument accepts only file objects with ``fileno()`` method. *sep*
-    argument is currently unsupported.
+    Currently supports only several basic types, namely strings, integers of
+    different widths, floats and doubles. *file* argument accepts only file
+    objects with ``fileno()`` method. *sep* argument is currently unsupported.
 
     """
     from nitrous.function import c_function, _get_or_create_function, emit_constant_string
@@ -146,7 +146,7 @@ def print_(*args, **kwargs):
     dprintf = c_function("dprintf", Int, [Int, String])
 
     @value_emitter
-    def print__(builder):
+    def emit(builder):
 
         module = llvm.GetParentModule__(builder)
         llvm_printf, _ = _get_or_create_function(module, dprintf, qualify=False, var_args=True)
@@ -194,4 +194,4 @@ def print_(*args, **kwargs):
 
         return None, None
 
-    return print__
+    return emit

@@ -10,6 +10,11 @@
 
 .. automodule:: nitrous.lib
 
+Input/Output
+------------
+
+.. autofunction:: print_
+
 Type Conversions
 ----------------
 

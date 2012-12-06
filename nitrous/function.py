@@ -91,7 +91,7 @@ def function(restype=None, **kwargs):
     """
     def wrapper(pyfunc):
         from .exceptions import AnnotationError
-        from .lib import _range
+        from .lib import range_
         import functools
         import inspect
 
@@ -114,7 +114,7 @@ def function(restype=None, **kwargs):
 
         # Immutable global symbols.
         # - Built-ins
-        decl.globals["range"] = _range
+        decl.globals["range"] = range_
         # - Other symbols available at the point of function
         #   definition; try to resolve as many constants as possible.
         parent_frame = inspect.currentframe().f_back
