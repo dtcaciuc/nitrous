@@ -123,3 +123,75 @@ def _range(*args):
         return data, None
 
     return emit
+
+
+def print_(*args, **kwargs):
+    """Implements ``print`` intrinsic.
+
+    Currently supports only several basic types, namely strings,
+    integers of different widths, floats and doubles.
+
+    *file* argument accepts only file objects with ``fileno()`` method. *sep*
+    argument is currently unsupported.
+
+    """
+    from nitrous.function import c_function, _get_or_create_function, emit_constant_string
+    from nitrous.types import Int, Long, Double, String, types_equal
+    from sys import stdout
+
+    # TODO add support for .sep parameter; this will require
+    # to implement string joining or have one printf for every arg.
+
+    # Move this somewhere, maybe `nitrous.lib.c`?
+    dprintf = c_function("dprintf", Int, [Int, String])
+
+    @value_emitter
+    def print__(builder):
+
+        module = llvm.GetParentModule__(builder)
+        llvm_printf, _ = _get_or_create_function(module, dprintf, qualify=False, var_args=True)
+
+        cast_args = []
+        formats = []
+
+        # Getting file descriptor
+        file_ = kwargs['file'] or stdout
+        fileno = llvm.ConstInt(Int.llvm_type, file_.fileno(), True)
+
+        # Performing certain casts for simplicity.
+        for a in args:
+            ty = llvm.TypeOf(a)
+            if types_equal(ty, String.llvm_type):
+                formats.append("%s")
+            elif llvm.GetTypeKind(ty) == llvm.IntegerTypeKind:
+                formats.append("%ld")
+                a, _ = cast(a, Long)(builder)
+            elif llvm.GetTypeKind(ty) == llvm.DoubleTypeKind:
+                formats.append("%lf")
+            elif llvm.GetTypeKind(ty) == llvm.FloatTypeKind:
+                formats.append("%lf")
+                # XXX for some reason floats are not printing. Looking
+                # at Clang disassembly of printf("%f", (float)2.0), the
+                # resulting constant type is double... Why?
+                a, _ = cast(a, Double)(builder)
+            else:
+                raise TypeError("Unknown argument type")
+
+            cast_args.append(a)
+
+        # Appending end terminator, if any, else a newline.
+        end = kwargs['end']
+        if end is None:
+            end = emit_constant_string(builder, "\n")
+
+        cast_args.append(end)
+
+        # Creating final format string, args and making the call.
+        format_ = emit_constant_string(builder, " ".join(formats) + "%s")
+        args_ = (llvm.ValueRef * (len(cast_args) + 2))(fileno, format_, *cast_args)
+
+        llvm.BuildCall(builder, llvm_printf, args_, len(args_), "print")
+
+        return None, None
+
+    return print__

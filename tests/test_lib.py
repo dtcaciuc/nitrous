@@ -147,3 +147,25 @@ class CastTests(unittest.TestCase):
 
         with self.assertRaisesRegexp(TypeError, "Cannot cast"):
             module([int_to_long])
+
+
+class PrintTests(unittest.TestCase):
+
+    def test_various(self):
+        from nitrous.types import Float, Int, Byte
+        from tempfile import NamedTemporaryFile
+
+        with NamedTemporaryFile() as fout:
+
+            @function()
+            def print_test():
+                print >>fout.file, "string0",
+                print >>fout.file, 1, Int(1), Byte(1),
+                print >>fout.file, 2.0, Float(2.0)
+                print >>fout.file, "end"
+
+            m = module([print_test])
+            m.print_test()
+
+            fout.seek(0)
+            self.assertEqual(fout.read(), "string01 1 12.000000 2.000000\nend\n")

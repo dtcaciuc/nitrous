@@ -794,6 +794,12 @@ class FunctionBuilder(ast.NodeVisitor):
 
         self.push(result, result_type)
 
+    def visit_Print(self, node):
+        from .lib import print_
+        dest = self.r_visit(node.dest)
+        end = emit_constant_string(self.builder, "\n" if node.nl else "")
+        print_(*map(self.r_visit, node.values), end=end, file=dest)(self.builder)
+
     def _get_or_create_function(self, decl):
         """Returns LLVM function value for given declaration;
         creates one if it doesn't exist yet.
@@ -976,7 +982,7 @@ def _qualify(module, symbol):
     return "__".join((llvm.GetModuleName(module), symbol))
 
 
-def _get_or_create_function(module, decl, qualify=True):
+def _get_or_create_function(module, decl, qualify=True, var_args=False):
     """Gets or declares an an LLVM function based on its declaration."""
     name = _qualify(module, decl.__name__) if qualify else decl.__name__
     llvm_func = llvm.GetNamedFunction(module, name)
@@ -993,7 +999,7 @@ def _get_or_create_function(module, decl, qualify=True):
         for i, ty in enumerate(argtypes):
             llvm_argtypes[i] = ty.llvm_type
 
-        llvm_func_type = llvm.FunctionType(llvm_restype, llvm_argtypes, len(llvm_argtypes), 0)
+        llvm_func_type = llvm.FunctionType(llvm_restype, llvm_argtypes, len(llvm_argtypes), var_args)
         llvm_func = llvm.AddFunction(module, name, llvm_func_type)
         llvm.SetLinkage(llvm_func, llvm.ExternalLinkage)
 
