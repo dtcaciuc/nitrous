@@ -96,6 +96,23 @@ def set_element(T):
     return set_element_
 
 
+def fill(T):
+    """``fill(T)(e) -> v``
+
+    Creates a vector with *e* value in every element.
+
+    """
+
+    @function(T, e=T.element_type)
+    def fill_(e):
+        v = T()
+        for i in range(T.n):
+            v = set_element(T)(v, i, e)
+        return v
+
+    return fill_
+
+
 def load(T):
     """``load(T)(p) -> v``
 

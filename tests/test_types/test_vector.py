@@ -3,7 +3,7 @@ import unittest2 as unittest
 from nitrous.module import module
 from nitrous.function import function
 from nitrous.types import Float, Pointer
-from nitrous.types.vector import Vector, load, store, get_element, set_element
+from nitrous.types.vector import Vector, load, store, get_element, set_element, fill
 
 FloatP = Pointer(Float)
 Float4 = Vector(Float, 4)
@@ -13,6 +13,8 @@ store4f = store(Float4)
 
 get4f = get_element(Float4)
 set4f = set_element(Float4)
+
+fill4f = fill(Float4)
 
 
 @function(Float, a=Float, b=Float, c=Float, d=Float)
@@ -30,6 +32,11 @@ def hadd4(a, b, c, d):
 @function(a=FloatP, p=FloatP, y=FloatP, z=FloatP)
 def axpy(a, p, y, z):
     store4f(load4f(a) * load4f(p) + load4f(y), z)
+
+
+@function(v=FloatP, e=Float)
+def fill(v, e):
+    store4f(fill4f(e), v)
 
 
 class VectorTests(unittest.TestCase):
@@ -53,3 +60,12 @@ class VectorTests(unittest.TestCase):
         # a * a + y -> z
         m.axpy(a, a, y, z)
         self.assertEqual(list(z), [101, 204, 309, 416])
+
+    def test_fill(self):
+
+        m = module([fill])
+
+        v = (Float.c_type * 4)(1, 2, 3, 4)
+        m.fill(v, 100.0)
+
+        self.assertEqual(list(v), [100.0] * 4)
