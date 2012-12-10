@@ -57,7 +57,7 @@ class Array(object):
 
     def emit_getattr(self, builder, ref, attr):
         if attr == "ndim":
-            return const_index(len(self.shape)), None
+            return const_index(self.ndim), None
 
         elif attr == "shape":
             # First time, initialize a global constant array
@@ -67,16 +67,16 @@ class Array(object):
             shape = llvm.GetNamedGlobal(module, shape_name)
 
             if not shape:
-                n_dims = len(self.shape)
-                dims = (llvm.ValueRef * n_dims)(*(const_index(d) for d in self.shape))
-                shape_init = llvm.ConstArray(Index.llvm_type, dims, n_dims)
+                dims = (llvm.ValueRef * self.ndim)(*(const_index(d) for d in self.shape))
+                shape_init = llvm.ConstArray(Index.llvm_type, dims, self.ndim)
 
                 shape = llvm.AddGlobal(module, llvm.TypeOf(shape_init), shape_name)
                 llvm.SetInitializer(shape, shape_init)
                 llvm.SetGlobalConstant(shape, llvm.TRUE)
 
             cast_shape = llvm.BuildPointerCast(builder, shape, Pointer(Index).llvm_type, "")
-            return llvm.ensure_name(builder, cast_shape, Pointer(Index), "shape"), Pointer(Index)
+            return (llvm.ensure_name(builder, cast_shape, Pointer(Index), "shape"),
+                    Array(Index, (self.ndim,)))
 
         else:
             raise AttributeError(attr)
@@ -123,7 +123,7 @@ class Slice(Structure):
             # TODO better way to generate structure name
             "Array" + str(id(self)),
             ("data", Pointer(element_type)),
-            ("shape", Pointer(Index)),
+            ("shape", Array(Index, (len(shape),))),
             ("ndim", Index)
         )
 

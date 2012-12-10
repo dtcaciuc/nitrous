@@ -1,7 +1,8 @@
 import unittest2 as unittest
 
 from nitrous.exceptions import AnnotationError
-from nitrous.types import Bool, Long, Double, Pointer
+from nitrous.types import Bool, Long, Double
+from nitrous.types.array import Array
 
 from nitrous.module import module
 from nitrous.function import function
@@ -137,7 +138,7 @@ class AssignTests(unittest.TestCase):
     def test_aug(self):
         """Augmented assignment."""
 
-        @function(Long, a=Long, b=Pointer(Long))
+        @function(Long, a=Long, b=Array(Long, (1,)))
         def f(a, b):
             a += 5
             b[0] += 7
@@ -208,7 +209,7 @@ class IndexTests(unittest.TestCase):
     def test_nd_index(self):
         import ctypes
 
-        @function(Long, y=Pointer(Long, shape=(2, 3, 2)), i=Long, j=Long, k=Long)
+        @function(Long, y=Array(Long, shape=(2, 3, 2)), i=Long, j=Long, k=Long)
         def x(y, i, j, k):
             return y[i, j, k]
 
@@ -216,7 +217,7 @@ class IndexTests(unittest.TestCase):
 
         dtype = (((ctypes.c_long * 2) * 3) * 2)
         data = dtype(((1, 2), (3, 4), (5, 6)), ((7, 8), (9, 10), (11, 12)))
-        c_data = ctypes.cast(data, Pointer(Long).c_type)
+        c_data = ctypes.cast(data, Array(Long, (1,)).c_type)
 
         for i in range(2):
             for j in range(3):
@@ -433,7 +434,7 @@ class MemoryTests(unittest.TestCase):
     def test_load_element(self):
         import ctypes
 
-        @function(Long, data=Pointer(Long), i=Long)
+        @function(Long, data=Array(Long, (5,)), i=Long)
         def get_i(data, i):
             e = data[i]
             return e
@@ -449,7 +450,7 @@ class MemoryTests(unittest.TestCase):
     def test_store_element(self):
         import ctypes
 
-        @function(Long, data=Pointer(Long), i=Long, e=Long)
+        @function(Long, data=Array(Long, (5,)), i=Long, e=Long)
         def set_i(data, i, e):
             data[i] = e
             return 0
@@ -475,7 +476,7 @@ class LoopTests(unittest.TestCase):
         """Simple for loop given range stop value."""
         import ctypes
 
-        @function(Long, data=Pointer(Long), n=Long)
+        @function(Long, data=Array(Long, (6,)), n=Long)
         def loop_1(data, n):
             for i in range(n):
                 data[i] = (i if i < 3 else 99)
@@ -509,14 +510,16 @@ class LoopTests(unittest.TestCase):
         """More advanced loop ranges."""
         import ctypes
 
-        @function(Long, data=Pointer(Long), start=Long, end=Long)
+        Long8 = Array(Long, (8,))
+
+        @function(Long, data=Long8, start=Long, end=Long)
         def loop_1(data, start, end):
             for i in range(start, end):
                 data[i] = i
 
             return 0
 
-        @function(Long, data=Pointer(Long), start=Long, end=Long, step=Long)
+        @function(Long, data=Long8, start=Long, end=Long, step=Long)
         def loop_2(data, start, end, step):
             for i in range(start, end, step):
                 data[i] = i
@@ -555,7 +558,7 @@ class LoopTests(unittest.TestCase):
     def test_double_for(self):
         import ctypes
 
-        @function(Long, data=Pointer(Long), n=Long)
+        @function(Long, data=Array(Long, (9,)), n=Long)
         def loop_1(data, n):
             j = 0
             for i in range(n):
@@ -578,7 +581,7 @@ class LoopTests(unittest.TestCase):
     def test_while(self):
         import ctypes
 
-        @function(Long, data=Pointer(Long), n=Long)
+        @function(Long, data=Array(Long, (6,)), n=Long)
         def loop_1(data, n):
             i = 0
             while i < n:
@@ -620,7 +623,7 @@ class LoopTests(unittest.TestCase):
     def test_double_while(self):
         import ctypes
 
-        @function(data=Pointer(Long), n=Long)
+        @function(data=Array(Long, (9,)), n=Long)
         def loop_1(data, n):
             i = 0
             while i < n:
@@ -771,7 +774,7 @@ class UnpackTests(unittest.TestCase):
 
         A, B, C = range(3)
 
-        @function(Long, d=Pointer(Long))
+        @function(Long, d=Array(Long, (3,)))
         def foo(d):
             d[C], d[A], d[B] = d[A], d[B], d[C]
             return d[B] * 10 + d[A] * 100 + d[C] * 1000

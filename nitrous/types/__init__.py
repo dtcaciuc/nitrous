@@ -153,29 +153,14 @@ Dynamic = object()
 
 
 class Pointer(object):
-    """Pointer to memory block, each element of type `element_type`.
-
-    Fixed-size blocks can be allocated by calling the type object inside
-    a compiled function::
-
-        from nitrous import Float, Pointer
-
-        Vec3f = Pointer(Float, shape=(3,))
-
-        @m.function(e0=Float)
-        def func(e0):
-
-            v = Vec3f()
-            v[0] = e0
-
-    """
+    """Pointer to memory block, each element of type `element_type`."""
 
     def __init__(self, element_type, shape=(None,)):
         self.element_type = element_type
         self.shape = shape
 
     def __repr__(self):
-        return "<Pointer {0}>".format(shape_repr(self.element_type, self.shape))
+        return "<Pointer to {0}>".format(self.element_type)
 
     @property
     def llvm_type(self):
@@ -211,30 +196,6 @@ class Pointer(object):
             return ctypes.cast(addr, pointer_type)
 
         return p
-
-    def emit_getitem(self, builder, v, i):
-        gep = self._item_gep(builder, v, i)
-        if isinstance(self.element_type, Structure):
-            return gep, Reference(self.element_type)
-        else:
-            return llvm.BuildLoad(builder, gep, "v"), self.element_type
-
-    def emit_setitem(self, builder, v, i, e):
-        addr = self._item_gep(builder, v, i)
-        llvm.BuildStore(builder, e, addr)
-
-    def _item_gep(self, builder, v, i):
-        if len(i) != len(self.shape):
-            raise TypeError("Index and pointer shapes don't match ({0} != {1})"
-                            .format(len(i), len(self.shape)))
-
-        # TODO check const shape dimension values?
-
-        # Build conversion from ND-index to flat memory offset
-        # FIXME currently assumes row-major memory alignment, first dimension can vary
-        const_shape = [const_index(d) for d in self.shape[1:]]
-        ii = flatten_index(builder, i, const_shape)
-        return llvm.BuildGEP(builder, v, ctypes.byref(ii), 1, "addr")
 
 
 class Structure(object):
@@ -311,36 +272,3 @@ that it provides a better Python interop by mapping to
 ``ctypes.c_char_p``
 
 """
-
-
-def flatten_index(builder, index, const_shape):
-    """Converts N-dimensional index into 1-dimensional one.
-
-    index is of a form ``(i0, i1, ... iN)``, where *i* is ValueRefs
-    holding individual dimension indices.
-
-    First dimension is considered to be variable. Given array shape
-    ``(d0, d1, ... dN)``, *const_shape* contains ``(d1, d2, ... dN)``.
-
-    If array is 1-dimensional, *const_shape* is an empty tuple.
-
-    """
-    mul_ = lambda x, y: llvm.BuildMul(builder, x, y, "v")
-
-    # out = 0
-    out = const_index(0)
-
-    for i in range(0, len(const_shape)):
-        # out += index[i-1] * reduce(mul, const_shape[i:], 1)
-        tmp = reduce(mul_, const_shape[i:], const_index(1))
-        rhs = llvm.BuildMul(builder, index[i], tmp, "v")
-        out = llvm.BuildAdd(builder, out, rhs, "v")
-
-    # return out + index[-1]
-    return llvm.BuildAdd(builder, out, index[-1], "v")
-
-
-def shape_repr(element_type, shape):
-    dim_0 = "?" if shape[0] in (Dynamic, None) else shape[0]
-    sub_shape = element_type if len(shape) == 1 else shape_repr(element_type, shape[1:])
-    return "[{0} x {1}]".format(dim_0, sub_shape)

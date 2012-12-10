@@ -14,8 +14,7 @@ except ImportError:
 class InitTests(unittest.TestCase):
 
     def test_repr(self):
-        self.assertEqual(repr(Pointer(Double)), "<Pointer [? x Double]>")
-        self.assertEqual(repr(Pointer(Double, shape=(2, 3))), "<Pointer [2 x [3 x Double]]>")
+        self.assertEqual(repr(Pointer(Double)), "<Pointer to Double>")
 
 
 class ComparisonTests(unittest.TestCase):
@@ -39,9 +38,9 @@ class ConverterTests(unittest.TestCase):
 
     def setUp(self):
 
-        @function(Double, x=Pointer(Double))
+        @function(Pointer(Double), x=Pointer(Double))
         def f(x):
-            return x[0]
+            return x
 
         self.m = module([f])
 
@@ -49,70 +48,15 @@ class ConverterTests(unittest.TestCase):
         """Pointer() accepts array.array objects."""
         from array import array
         x = array('d', (3,))
-        self.assertEqual(self.m.f(x), 3)
+        self.assertEqual(self.m.f(x).contents.value, 3)
 
     @unittest.skipIf(not np, "NumPy integration feature")
     def test_numpy_array(self):
         """Pointer() accepts NumPy ndarray objects."""
         x = np.double((3,))
-        self.assertEqual(self.m.f(x), 3)
+        self.assertEqual(self.m.f(x).contents.value, 3)
 
     def test_invalid_param(self):
         """Raise error if an incompatible data structure is supplied"""
         with self.assertRaises(ctypes.ArgumentError):
             self.m.f([1])
-
-
-class CTypesPointerTests(unittest.TestCase):
-
-    def test_pointer(self):
-        from nitrous.types import Long, Pointer
-
-        @function(Long, d=Pointer(Long), i=Long)
-        def f(d, i):
-            return d[i]
-
-        m = module([f])
-
-        d1 = (((Long.c_type * 2) * 2) * 2)(
-            ((0, 1), (2, 3)), ((4, 5), (6, 7))
-        )
-
-        for i in range(8):
-            self.assertEqual(m.f(d1[0][0], i), i)
-
-        for i in range(2):
-            for j in range(2):
-                for k in range(2):
-                    self.assertEqual(m.f(d1[i][j], k), i * 2 * 2 + j * 2 + k)
-
-    def test_argtype_check(self):
-        from nitrous.types import Long, Pointer
-
-        @function(Long, d=Pointer(Long))
-        def f(d):
-            return d[0]
-
-        m = module([f])
-
-        # Different variations of valid pointers
-        self.assertEqual(m.f(ctypes.byref(ctypes.c_long(5))), 5)
-        self.assertEqual(m.f(ctypes.pointer(ctypes.c_long(5))), 5)
-        self.assertEqual(m.f((ctypes.c_long * 1)(5)), 5)
-
-        # ctypes automatically takes pointer of an object if target type is a pointer.
-        self.assertEqual(m.f(ctypes.c_long(5)), 5)
-
-        # One pointer too many.
-        with self.assertRaises(ctypes.ArgumentError):
-            m.f(ctypes.byref(ctypes.pointer(ctypes.c_long(5))))
-
-        # Integral type, but different width
-        with self.assertRaises(ctypes.ArgumentError):
-            m.f(ctypes.byref(ctypes.c_byte(5)))
-
-        # Different type altogether
-        with self.assertRaises(ctypes.ArgumentError):
-            m.f(ctypes.byref(ctypes.c_float(5)))
-        with self.assertRaises(ctypes.ArgumentError):
-            m.f(ctypes.c_float(5))

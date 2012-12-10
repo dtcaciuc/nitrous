@@ -3,10 +3,12 @@ import unittest2 as unittest
 
 from nitrous.module import module
 from nitrous.function import function
-from nitrous.types import Double, Long, Structure, Pointer
+from nitrous.types import Double, Long, Structure
+from nitrous.types.array import Array
 
 
 Coord = Structure("Coord", ("x", Double), ("y", Double), ("z", Double))
+Coords = Array(Coord, (2,))
 
 
 class StructureTests(unittest.TestCase):
@@ -18,12 +20,12 @@ class StructureTests(unittest.TestCase):
         import ctypes
 
         # Attribute load from subscript
-        @function(Double, a=Pointer(Coord), i=Long)
+        @function(Double, a=Coords, i=Long)
         def sum_1(a, i):
             return a[i].x + a[i].y + a[i].z
 
         # Subscript, reference assignment, then attribute load
-        @function(Double, a=Pointer(Coord), i=Long)
+        @function(Double, a=Coords, i=Long)
         def sum_2(a, i):
             ai = a[i]
             return ai.x + ai.y + ai.z
@@ -46,14 +48,14 @@ class StructureTests(unittest.TestCase):
     def test_store_fields(self):
 
         # Attribute store to subscript
-        @function(None, a=Pointer(Coord), i=Long, x=Double, y=Double, z=Double)
+        @function(None, a=Coords, i=Long, x=Double, y=Double, z=Double)
         def store_1(a, i, x, y, z):
             a[i].x = x
             a[i].y = y
             a[i].z = z
 
         # Subscript, reference assignment, then attribute store
-        @function(None, a=Pointer(Coord), i=Long, x=Double, y=Double, z=Double)
+        @function(None, a=Coords, i=Long, x=Double, y=Double, z=Double)
         def store_2(a, i, x, y, z):
             ai = a[i]
             ai.x = x
@@ -94,7 +96,7 @@ class StructureTests(unittest.TestCase):
     def test_aug_assign(self):
         """Augmented attribute assignment"""
 
-        @function(None, a=Pointer(Coord), i=Long, j=Long)
+        @function(None, a=Coords, i=Long, j=Long)
         def add_i(a, i, j):
             a[i].x += a[j].x
             a[i].y += a[j].y

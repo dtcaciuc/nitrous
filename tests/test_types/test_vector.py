@@ -2,10 +2,11 @@ import unittest2 as unittest
 
 from nitrous.module import module
 from nitrous.function import function
-from nitrous.types import Float, Pointer
+from nitrous.types import Float
+from nitrous.types.array import Slice
 from nitrous.types.vector import Vector, load, store, get_element, set_element, fill
 
-FloatP = Pointer(Float)
+FloatP = Slice(Float, (4,))
 Float4 = Vector(Float, 4)
 
 load4f = load(Float4)
