@@ -111,6 +111,29 @@ class AllocTests(unittest.TestCase):
         self.assertEqual(m.f(x), 43.0)
 
 
+class SliceReferenceTests(unittest.TestCase):
+
+    def test_reference_arg(self):
+        """Slice is treated as reference type."""
+        # Since slices don't directly inherit structs,
+        # make sure that they are returned by reference
+        # in array item access.
+
+        @function(x=Array(Slice(Long), (1,)), i=Long, v=Long)
+        def set_i(x, i, v):
+            x0 = x[0]
+            x0[i] = v
+
+        m = module([set_i])
+
+        x = (Long.c_type * 3)(3, 11, 13)
+        px = (ctypes.POINTER(Long.c_type) * 1)(x)
+
+        m.set_i(px, 1, 12)
+
+        self.assertEqual(list(x), [3, 12, 13])
+
+
 class IndexTests(unittest.TestCase):
 
     def setUp(self):

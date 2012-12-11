@@ -14,7 +14,7 @@ class _ItemAccessor(object):
 
     def emit_getitem(self, builder, v, i):
         gep = self._item_gep(builder, v, i)
-        if isinstance(self.element_type, Structure):
+        if is_aggregate(self.element_type):
             return gep, Reference(self.element_type)
         else:
             return llvm.BuildLoad(builder, gep, "getitem"), self.element_type
@@ -114,21 +114,7 @@ class Array(_ItemAccessor):
 _slice_types = {}
 
 
-class _SliceMeta(type):
-
-    def __call__(cls, element_type, shape=(Any,)):
-        # Prevent distinct slice types being allocated every single
-        # time one declares them. This is a problem in places like
-        # templates where only the data types being passed in and slice
-        # type gets derived from it. Key slices on their data type and shape.
-        k = hash((type_key(element_type.llvm_type), shape))
-        try:
-            return _slice_types[k]
-        except KeyError:
-            return _slice_types.setdefault(k, type.__call__(cls, element_type, shape))
-
-
-class Slice(Structure, _ItemAccessor):
+class Slice(_ItemAccessor):
     # Wraps incoming np.array or ctypes array into a structure
     # with standard shape/number-of-dimensions attributes that can be
     # used from compiled function.
@@ -136,23 +122,40 @@ class Slice(Structure, _ItemAccessor):
     # The resulting structure supports getitem/setitem so that there's
     # no need to address it's `data` attribute.
 
-    __metaclass__ = _SliceMeta
-
     def __init__(self, element_type, shape=(Any,)):
         self.element_type = element_type
         self.shape = shape
         self.ndim = len(shape)
 
-        super(Slice, self).__init__(
-            # TODO better way to generate structure name
-            "Slice" + str(id(self)),
-            ("data", Pointer(element_type)),
-            ("shape", Array(Index, (len(shape),))),
-            ("ndim", Index)
-        )
+        # Prevent distinct slice LLVM types being allocated every single
+        # time one declares them. This is a problem in places like
+        # templates where only the data types being passed in and slice
+        # type gets derived from it. Key types on their data type and shape.
+        k = (type_key(element_type.llvm_type), shape)
+        try:
+            self._struct = _slice_types[k]
+        except KeyError:
+            self._struct = _slice_types.setdefault(
+                k, Structure("Slice",
+                             ("data", Pointer(element_type)),
+                             ("shape", Array(Index, (len(shape),))),
+                             ("ndim", Index))
+            )
 
     def __repr__(self):
         return "<Slice {0}>".format(shape_repr(self.element_type, self.shape))
+
+    @property
+    def llvm_type(self):
+        return self._struct.llvm_type
+
+    @property
+    def c_type(self):
+        return self._struct.c_type
+
+    @property
+    def argtype(self):
+        return Reference(self)
 
     def convert(self, p):
         pointer_type = ctypes.POINTER(self.element_type.c_type)
@@ -162,15 +165,22 @@ class Slice(Structure, _ItemAccessor):
         try:
             import numpy as np
             if isinstance(p, np.ndarray):
-                return self.c_type(p.ctypes.data_as(pointer_type),
-                                   (Index.c_type * len(p.shape))(*p.shape),
-                                   p.ndim)
+                return self._struct.c_type(p.ctypes.data_as(pointer_type),
+                                           (Index.c_type * len(p.shape))(*p.shape),
+                                           p.ndim)
+
         except ImportError:
             pass
 
         shape = ctypes_shape(p)
         conv_p = ctypes.cast(p, pointer_type)
-        return self.c_type(conv_p, (Index.c_type * len(shape))(*shape), self.ndim)
+        return self._struct.c_type(conv_p, (Index.c_type * len(shape))(*shape), self.ndim)
+
+    def emit_getattr(self, builder, ref, attr):
+        return self._struct.emit_getattr(builder, ref, attr)
+
+    def emit_setattr(self, builder, ref, attr, v):
+        raise TypeError("Slice is immutable")
 
     def _item_gep(self, builder, v, i):
         # Get array shape from struct value
@@ -190,6 +200,13 @@ class Slice(Structure, _ItemAccessor):
         const_shape = [emit_dimension(d) for d in range(1, self.ndim)]
         ii = flatten_index(builder, i, const_shape)
         return llvm.BuildGEP(builder, data_value, ctypes.byref(ii), 1, "addr")
+
+
+def is_aggregate(ty):
+    """Returns True if type is an aggregate."""
+    kind = llvm.GetTypeKind(ty.llvm_type)
+    # For now the only aggregates we have are Structs
+    return kind == llvm.StructTypeKind
 
 
 def flatten_index(builder, index, const_shape):
