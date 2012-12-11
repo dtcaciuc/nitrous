@@ -121,10 +121,10 @@ def load(T):
     """
 
     @function(T, s=Slice(T.element_type, (T.n,)))
-    def load_(p):
+    def load_(s):
         v = T()
         for i in range(T.n):
-            v = set_element(T)(v, i, p[i])
+            v = set_element(T)(v, i, s[i])
         return v
 
     return load_
@@ -138,10 +138,10 @@ def store(T):
 
     """
 
-    @function(v=T, p=Slice(T.element_type, (T.n,)))
-    def store_(v, p):
+    @function(v=T, s=Slice(T.element_type, (T.n,)))
+    def store_(v, s):
         for i in range(T.n):
-            p[i] = get_element(T)(v, i)
+            s[i] = get_element(T)(v, i)
 
     return store_
 

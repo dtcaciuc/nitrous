@@ -1,4 +1,4 @@
-from . import Pointer, Structure, Reference, Index, const_index
+from . import Pointer, Structure, Reference, Index, const_index, type_key
 from .. import llvm
 import ctypes
 
@@ -106,6 +106,23 @@ class Array(object):
         return llvm.BuildGEP(builder, v, ctypes.byref(ii), 1, "addr")
 
 
+_slice_types = {}
+
+
+class _SliceMeta(type):
+
+    def __call__(cls, element_type, shape=(Any,)):
+        # Prevent distinct slice types being allocated every single
+        # time one declares them. This is a problem in places like
+        # templates where only the data types being passed in and slice
+        # type gets derived from it. Key slices on their data type and shape.
+        k = hash((type_key(element_type.llvm_type), shape))
+        try:
+            return _slice_types[k]
+        except KeyError:
+            return _slice_types.setdefault(k, type.__call__(cls, element_type, shape))
+
+
 class Slice(Structure):
     # Wraps incoming np.array or ctypes array into a structure
     # with standard shape/number-of-dimensions attributes that can be
@@ -114,6 +131,8 @@ class Slice(Structure):
     # The resulting structure supports getitem/setitem so that there's
     # no need to address it's `data` attribute.
 
+    __metaclass__ = _SliceMeta
+
     def __init__(self, element_type, shape=(Any,)):
         self.element_type = element_type
         self.shape = shape
@@ -121,7 +140,7 @@ class Slice(Structure):
 
         super(Slice, self).__init__(
             # TODO better way to generate structure name
-            "Array" + str(id(self)),
+            "Slice" + str(id(self)),
             ("data", Pointer(element_type)),
             ("shape", Array(Index, (len(shape),))),
             ("ndim", Index)
