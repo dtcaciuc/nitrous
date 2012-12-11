@@ -168,7 +168,7 @@ accepts no arguments and returns constant and
 
 .. code-block:: python
 
-    @function(x=Pointer(Double))
+    @function(x=Slice(Double))
     def normalize(x):
         ...
 
@@ -206,7 +206,7 @@ This, for example, can be used to implement simple templates. Given
         Sums an array of *n* elements of type *T*.
 
         """
-        @function(T, p=Pointer(T), n=Long)
+        @function(T, p=Slice(T), n=Long)
         def sum_(p, n):
             s = T()
             for i in range(n):
@@ -219,7 +219,7 @@ we can write
 
 .. code-block:: python
 
-    @function(x=Pointer(Float))
+    @function(x=Slice(Float))
     def somefunc(x, n):
         s = element_sum(Float)(x, n)
 
@@ -233,8 +233,8 @@ Scalars
 
 TODO
 
-Pointers and Arrays
--------------------
+Pointers, Arrays, and Slices
+----------------------------
 
 TODO
 

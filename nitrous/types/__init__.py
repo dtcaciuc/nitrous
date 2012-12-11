@@ -211,7 +211,7 @@ class Structure(object):
                            (ctypes.Structure,),
                            {"_fields_": [(f, t.c_type) for f, t in fields]})
 
-        # TODO check if name exists or does it unique it automatically?
+        # LLVM type name is uniqued automatically.
         self.llvm_type = llvm.StructCreateNamed(llvm.GetGlobalContext(), name)
         llvm_fields = (llvm.TypeRef * len(fields))(*(t.llvm_type for f, t in fields))
         llvm.StructSetBody(self.llvm_type, llvm_fields, len(fields), False)
@@ -240,7 +240,7 @@ class Structure(object):
 
 
 class Reference(object):
-    """Special type to denote reference to an aggregate value / vector."""
+    """Special type to denote reference to an aggregate value."""
 
     def __init__(self, value_type):
         self.value_type = value_type
