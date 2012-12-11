@@ -141,8 +141,11 @@ _func("SetLinkage", None, [ValueRef, ctypes.c_int])
 _func("GetParam", ValueRef, [ValueRef, ctypes.c_uint])
 _func("GetReturnType", TypeRef, [TypeRef])
 
+_func("AddAttribute", None, [ValueRef, ctypes.c_int]);
+
 _func("AddFunctionAttr", None, [ValueRef, ctypes.c_int])
 
+NoAliasAttribute = 1 << 6
 AlwaysInlineAttribute = 1 << 12
 
 

@@ -238,6 +238,12 @@ Pointers and Arrays
 
 TODO
 
+Pointer Aliasing
+****************
+
+.. warning:: Nitrous currently requires all arrays and slices to use unaliased
+    memory blocks. Ignoring this rule will likely result in undefined behaviour.
+
 Structures
 ----------
 
