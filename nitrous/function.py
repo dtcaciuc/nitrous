@@ -91,6 +91,7 @@ def function(restype=None, **kwargs):
     """
     def wrapper(pyfunc):
         from .exceptions import AnnotationError
+        from .types import Reference, is_aggregate
         from .lib import range_
         import functools
         import inspect
@@ -99,7 +100,7 @@ def function(restype=None, **kwargs):
         # as an argument type (eg. Structure needs to be implicitly
         # passed as Reference() to said structure.
         argtypes = dict(
-            (k, t.argtype if hasattr(t, "argtype") else t)
+            (k, Reference(t) if is_aggregate(t) else t)
             for k, t in kwargs.items()
         )
 

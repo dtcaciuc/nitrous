@@ -219,11 +219,6 @@ class Structure(object):
     def __repr__(self):
         return "<Structure '{0}', {1} fields>".format(self.name, len(self.fields))
 
-    @property
-    def argtype(self):
-        # Pass by reference if directly used as argument type.
-        return Reference(self)
-
     def emit_getattr(self, builder, ref, attr):
         """IR: Emits attribute value load from structure reference."""
         gep, t = self._field_gep(builder, ref, attr)
@@ -272,3 +267,10 @@ that it provides a better Python interop by mapping to
 ``ctypes.c_char_p``
 
 """
+
+
+def is_aggregate(ty):
+    """Returns True if type is an aggregate."""
+    kind = llvm.GetTypeKind(ty.llvm_type)
+    # For now the only aggregates we have are Structs
+    return kind == llvm.StructTypeKind

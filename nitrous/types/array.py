@@ -1,4 +1,4 @@
-from . import Pointer, Structure, Reference, Index, const_index, type_key
+from . import Pointer, Structure, Reference, Index, const_index, type_key, is_aggregate
 from .. import llvm
 import ctypes
 
@@ -153,10 +153,6 @@ class Slice(_ItemAccessor):
     def c_type(self):
         return self._struct.c_type
 
-    @property
-    def argtype(self):
-        return Reference(self)
-
     def convert(self, p):
         pointer_type = ctypes.POINTER(self.element_type.c_type)
         # FIXME conversions are unsafe, since they force-cast
@@ -200,13 +196,6 @@ class Slice(_ItemAccessor):
         const_shape = [emit_dimension(d) for d in range(1, self.ndim)]
         ii = flatten_index(builder, i, const_shape)
         return llvm.BuildGEP(builder, data_value, ctypes.byref(ii), 1, "addr")
-
-
-def is_aggregate(ty):
-    """Returns True if type is an aggregate."""
-    kind = llvm.GetTypeKind(ty.llvm_type)
-    # For now the only aggregates we have are Structs
-    return kind == llvm.StructTypeKind
 
 
 def flatten_index(builder, index, const_shape):
