@@ -2,13 +2,29 @@ from . import Pointer, Structure, Reference, Index, const_index, type_key
 from .. import llvm
 import ctypes
 
+
 __all__ = ["Any", "Array", "Slice"]
 
 
 Any = object()
 
 
-class Array(object):
+class _ItemAccessor(object):
+    """Mixin for common Array/Slice item accessing routines."""
+
+    def emit_getitem(self, builder, v, i):
+        gep = self._item_gep(builder, v, i)
+        if isinstance(self.element_type, Structure):
+            return gep, Reference(self.element_type)
+        else:
+            return llvm.BuildLoad(builder, gep, "getitem"), self.element_type
+
+    def emit_setitem(self, builder, v, i, e):
+        gep = self._item_gep(builder, v, i)
+        llvm.BuildStore(builder, e, gep)
+
+
+class Array(_ItemAccessor):
 
     def __init__(self, element_type, shape=(Any,)):
         self.element_type = element_type
@@ -81,17 +97,6 @@ class Array(object):
         else:
             raise AttributeError(attr)
 
-    def emit_getitem(self, builder, v, i):
-        gep = self._item_gep(builder, v, i)
-        if isinstance(self.element_type, Structure):
-            return gep, Reference(self.element_type)
-        else:
-            return llvm.BuildLoad(builder, gep, "v"), self.element_type
-
-    def emit_setitem(self, builder, v, i, e):
-        addr = self._item_gep(builder, v, i)
-        llvm.BuildStore(builder, e, addr)
-
     def _item_gep(self, builder, v, i):
         if len(i) != len(self.shape):
             raise TypeError("Index and pointer shapes don't match ({0} != {1})"
@@ -123,7 +128,7 @@ class _SliceMeta(type):
             return _slice_types.setdefault(k, type.__call__(cls, element_type, shape))
 
 
-class Slice(Structure):
+class Slice(Structure, _ItemAccessor):
     # Wraps incoming np.array or ctypes array into a structure
     # with standard shape/number-of-dimensions attributes that can be
     # used from compiled function.
@@ -166,17 +171,6 @@ class Slice(Structure):
         shape = ctypes_shape(p)
         conv_p = ctypes.cast(p, pointer_type)
         return self.c_type(conv_p, (Index.c_type * len(shape))(*shape), self.ndim)
-
-    def emit_getitem(self, builder, v, i):
-        gep = self._item_gep(builder, v, i)
-        if isinstance(self.element_type, Structure):
-            return gep, Reference(self.element_type)
-        else:
-            return llvm.BuildLoad(builder, gep, "v"), self.element_type
-
-    def emit_setitem(self, builder, v, i, e):
-        addr = self._item_gep(builder, v, i)
-        llvm.BuildStore(builder, e, addr)
 
     def _item_gep(self, builder, v, i):
         # Get array shape from struct value
