@@ -243,7 +243,8 @@ standard library).
 Slices
 ------
 
-Slice is the official way to access a typed block of memory. They are constructed with two pieces of information: element type and shape.
+Slice is the main way to access a typed block of memory. They are constructed
+with two pieces of information: element type and shape.
 
 .. code-block:: python
 
@@ -282,6 +283,29 @@ Memory Aliasing
 
 .. warning:: Nitrous currently requires all arrays and slices to use unaliased
     memory blocks. Ignoring this rule will likely result in undefined behaviour.
+
+
+Arrays
+------
+
+Arrays can be used when all of the dimensions of the memory block (with an
+exception of the major dimension, see note below) are known. This allows
+compiler to reduce amount of data passed around through function arguments and
+like, which in turn results in performance gains (although not *that*
+substantial).
+
+Major Dimension
+***************
+
+The major Array dimension is the only one that can be declared as ``Any``,
+because it is actually not used in index calculations. There, however, two
+incurred limitations:
+
+1. Since the total memory size is not known at compile time, you cannot
+   allocate arrays inside Nitrous functions.
+
+2. It is impossible to guard against row index overflows and, thus, caution has
+   to be exercised.
 
 Structures
 ----------
