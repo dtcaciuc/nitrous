@@ -2,6 +2,11 @@ from . import Pointer, Structure, Reference, Index, const_index, type_key, is_ag
 from .. import llvm
 import ctypes
 
+try:
+    import numpy as np
+except ImportError:
+    np = None
+
 
 __all__ = ["Any", "Array", "Slice"]
 
@@ -72,12 +77,8 @@ class Array(_ItemAccessor):
         # FIXME conversions are unsafe, since they force-cast
         # anything to pointer to element_type.
 
-        try:
-            import numpy as np
-            if isinstance(p, np.ndarray):
-                return p.ctypes.data_as(pointer_type)
-        except ImportError:
-            pass
+        if np and isinstance(p, np.ndarray):
+            return p.ctypes.data_as(pointer_type)
 
         return ctypes.cast(p, pointer_type)
 
@@ -171,15 +172,10 @@ class Slice(_ItemAccessor):
         # FIXME conversions are unsafe, since they force-cast
         # anything to pointer to element_type.
 
-        try:
-            import numpy as np
-            if isinstance(p, np.ndarray):
-                return self._struct.c_type(p.ctypes.data_as(pointer_type),
-                                           (Index.c_type * len(p.shape))(*p.shape),
-                                           p.ndim)
-
-        except ImportError:
-            pass
+        if np and isinstance(p, np.ndarray):
+            return self._struct.c_type(p.ctypes.data_as(pointer_type),
+                                       (Index.c_type * len(p.shape))(*p.shape),
+                                       p.ndim)
 
         shape = ctypes_shape(p)
         conv_p = ctypes.cast(p, pointer_type)
