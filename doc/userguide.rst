@@ -253,7 +253,7 @@ with two pieces of information: element type and shape.
 
     Coords = Slice(Double, (Any, 3))  # Two dimensional array, any number of rows by 3 columns.
 
-Shape specification is a tuple, where each element is either a numeric constant
+Shape specification is a tuple where each element is either a numeric constant
 or a special object ``Any``. If specified, it means that the length of a
 particular dimension(s) will only be known at runtime. Default slice object is
 one-dimensional and of arbitrary length.
@@ -264,7 +264,7 @@ one-dimensional and of arbitrary length.
 
 
 Concrete shape dimensions are preferable from the performance standpoint, since
-optimizer is then able to eliminate a lot of additions/multiplications,
+the optimizer is then able to eliminate a lot of additions/multiplications,
 especially for high number of dimensions.
 
 Similar to NumPy arrays or Python lists, slice elements can be accessed though item notation::
@@ -282,7 +282,7 @@ Memory Aliasing
 ***************
 
 .. warning:: Nitrous currently requires all arrays and slices to use unaliased
-    memory blocks. Ignoring this rule will likely result in undefined behaviour.
+    memory blocks. Ignoring this rule will result in undefined behaviour.
 
 
 Arrays
@@ -290,16 +290,15 @@ Arrays
 
 Arrays can be used when all of the dimensions of the memory block (with an
 exception of the major dimension, see note below) are known. This allows
-compiler to reduce amount of data passed around through function arguments and
-like, which in turn results in performance gains (although not *that*
-substantial).
+compiler to reduce the amount of data passed around through function arguments,
+which in turn results in performance gains.
 
 Major Dimension
 ***************
 
 The major Array dimension is the only one that can be declared as ``Any``,
-because it is actually not used in index calculations. There, however, two
-incurred limitations:
+because it is not used in index calculations. There, however, two incurred
+limitations:
 
 1. Since the total memory size is not known at compile time, you cannot
    allocate arrays inside Nitrous functions.
@@ -370,8 +369,7 @@ the result back as a whole without resorting to element fiddling, which is what
 square bracket accessors are good for.
 
 Another peculiarity with vectors is that they are *immutable*. For example,
-setting and element does not modify the existing vector, but returns a new
-one::
+setting an element does not modify the existing vector, but returns a new one::
 
     from nitrous.types.vector import set_element
 
