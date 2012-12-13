@@ -3,7 +3,8 @@ import ctypes
 
 from nitrous.module import module
 from nitrous.function import function
-from nitrous.types import DynamicArray, StaticArray, Long, Dynamic
+from nitrous.types import Long
+from nitrous.types.array import Array, Slice, Any
 
 try:
     import numpy as np
@@ -59,33 +60,41 @@ class ArrayTests(object):
         self.assertEqual(list(b), range(1, 13))
 
 
-class DynamicArrayTests(ArrayTests, unittest.TestCase):
+class SliceTests(ArrayTests, unittest.TestCase):
 
-    A = DynamicArray(Long, (Dynamic,) * 3)
-    B = DynamicArray(Long)
-
-    def test_repr(self):
-        self.assertEqual(repr(self.A), "<DynamicArray [? x [? x [? x Long]]]>")
-        self.assertEqual(repr(self.B), "<DynamicArray [? x Long]>")
-
-
-class StaticArrayTests(ArrayTests, unittest.TestCase):
-
-    A = StaticArray(Long, (2, 3, 2))
-    B = StaticArray(Long, (12,))
+    A = Slice(Long, (Any,) * 3)
+    B = Slice(Long)
 
     def test_repr(self):
-        self.assertEqual(repr(self.A), "<StaticArray [2 x [3 x [2 x Long]]]>")
-        self.assertEqual(repr(self.B), "<StaticArray [12 x Long]>")
+        self.assertEqual(repr(self.A), "Slice(Long, shape=(Any, Any, Any))")
+        self.assertEqual(repr(self.B), "Slice(Long, shape=(Any,))")
+
+    def test_str(self):
+        self.assertEqual(str(self.A), "<Slice [? x [? x [? x Long]]]>")
+        self.assertEqual(str(self.B), "<Slice [? x Long]>")
 
 
-class StaticAllocTests(unittest.TestCase):
+class ArrayTests(ArrayTests, unittest.TestCase):
+
+    A = Array(Long, (2, 3, 2))
+    B = Array(Long, (12,))
+
+    def test_repr(self):
+        self.assertEqual(repr(self.A), "Array(Long, shape=(2, 3, 2))")
+        self.assertEqual(repr(self.B), "Array(Long, shape=(12,))")
+
+    def test_str(self):
+        self.assertEqual(str(self.A), "<Array [2 x [3 x [2 x Long]]]>")
+        self.assertEqual(str(self.B), "<Array [12 x Long]>")
+
+
+class AllocTests(unittest.TestCase):
 
     def test_alloc(self):
         """Stack allocation of a fixed size array by calling its type"""
-        from nitrous.types import Double, StaticArray
+        from nitrous.types import Double
 
-        Mat2d = StaticArray(Double, shape=(2, 2))
+        Mat2d = Array(Double, shape=(2, 2))
 
         @function(Double)
         def f():
@@ -110,6 +119,29 @@ class StaticAllocTests(unittest.TestCase):
         self.assertEqual(m.f(x), 43.0)
 
 
+class SliceReferenceTests(unittest.TestCase):
+
+    def test_reference_arg(self):
+        """Slice is treated as reference type."""
+        # Since slices don't directly inherit structs,
+        # make sure that they are returned by reference
+        # in array item access.
+
+        @function(x=Array(Slice(Long), (1,)), i=Long, v=Long)
+        def set_i(x, i, v):
+            x0 = x[0]
+            x0[i] = v
+
+        m = module([set_i])
+
+        x = (Long.c_type * 3)(3, 11, 13)
+        px = (ctypes.POINTER(Long.c_type) * 1)(x)
+
+        m.set_i(px, 1, 12)
+
+        self.assertEqual(list(x), [3, 12, 13])
+
+
 class IndexTests(unittest.TestCase):
 
     def setUp(self):
@@ -123,7 +155,7 @@ class IndexTests(unittest.TestCase):
         """Replace access to known dimensions with direct constants"""
         from nitrous.module import dump
 
-        D = DynamicArray(Long, shape=(Dynamic, 3, 3))
+        D = Slice(Long, shape=(Any, 3, 3))
         X, Y, Z = range(3)
 
         @function(Long, a=D)
@@ -139,7 +171,7 @@ class IndexTests(unittest.TestCase):
         """All dimensions are dynamic, no indices can be resolved at runtime"""
         from nitrous.module import dump
 
-        D = DynamicArray(Long, shape=(Dynamic, Dynamic, Dynamic))
+        D = Slice(Long, shape=(Any, Any, Any))
         X, Y, Z = range(3)
 
         @function(Long, a=D)
@@ -155,7 +187,7 @@ class IndexTests(unittest.TestCase):
         """Some dimensions are dynamic, other than major one"""
         from nitrous.module import dump
 
-        D = DynamicArray(Long, shape=(Dynamic, 3, Dynamic))
+        D = Slice(Long, shape=(Any, 3, Any))
         X, Y, Z = range(3)
 
         @function(Long, a=D)

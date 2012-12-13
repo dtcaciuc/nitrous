@@ -13,7 +13,8 @@ class NBodyTests(unittest.TestCase):
         """N-body benchmark adaptation from http://shootout.alioth.debian.org"""
         from nitrous.module import module
         from nitrous.function import function
-        from nitrous.types import Long, Double, Pointer
+        from nitrous.types import Long, Double
+        from nitrous.types.array import Slice, Any
         from nitrous.lib.math import sqrt
 
         X, Y, Z = range(3)
@@ -29,8 +30,8 @@ class NBodyTests(unittest.TestCase):
         # - Uranus
         # - Neptune
 
-        DoubleNx3 = Pointer(Double, shape=(None, 3))
-        DoubleN = Pointer(Double)
+        DoubleNx3 = Slice(Double, shape=(Any, 3))
+        DoubleN = Slice(Double)
 
         common_args = {
             "xyz": DoubleNx3,

@@ -91,6 +91,7 @@ def function(restype=None, **kwargs):
     """
     def wrapper(pyfunc):
         from .exceptions import AnnotationError
+        from .types import Reference, is_aggregate
         from .lib import range_
         import functools
         import inspect
@@ -99,7 +100,7 @@ def function(restype=None, **kwargs):
         # as an argument type (eg. Structure needs to be implicitly
         # passed as Reference() to said structure.
         argtypes = dict(
-            (k, t.argtype if hasattr(t, "argtype") else t)
+            (k, Reference(t) if is_aggregate(t) else t)
             for k, t in kwargs.items()
         )
 
@@ -1002,6 +1003,10 @@ def _get_or_create_function(module, decl, qualify=True, var_args=False):
         llvm_func_type = llvm.FunctionType(llvm_restype, llvm_argtypes, len(llvm_argtypes), var_args)
         llvm_func = llvm.AddFunction(module, name, llvm_func_type)
         llvm.SetLinkage(llvm_func, llvm.ExternalLinkage)
+
+        for i, ty in enumerate(argtypes):
+            if llvm.GetTypeKind(ty.llvm_type) == llvm.PointerTypeKind:
+                llvm.AddAttribute(llvm.GetParam(llvm_func, i), llvm.NoAliasAttribute)
 
         if decl.options["inline"]:
             llvm.AddFunctionAttr(llvm_func, llvm.AlwaysInlineAttribute)

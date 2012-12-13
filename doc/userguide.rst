@@ -168,7 +168,7 @@ accepts no arguments and returns constant and
 
 .. code-block:: python
 
-    @function(x=Pointer(Double))
+    @function(x=Slice(Double))
     def normalize(x):
         ...
 
@@ -206,7 +206,7 @@ This, for example, can be used to implement simple templates. Given
         Sums an array of *n* elements of type *T*.
 
         """
-        @function(T, p=Pointer(T), n=Long)
+        @function(T, p=Slice(T), n=Long)
         def sum_(p, n):
             s = T()
             for i in range(n):
@@ -219,7 +219,7 @@ we can write
 
 .. code-block:: python
 
-    @function(x=Pointer(Float))
+    @function(x=Slice(Float))
     def somefunc(x, n):
         s = element_sum(Float)(x, n)
 
@@ -233,20 +233,168 @@ Scalars
 
 TODO
 
-Pointers and Arrays
--------------------
+Pointers
+--------
 
-TODO
+As opposed to C dialects, Nitrous pointers do not support indexing. They are
+mostly used internally and, occasionally, for library inter-operation (eg.
+standard library).
+
+Slices
+------
+
+Slice is the main way to access a typed block of memory. They are constructed
+with two pieces of information: element type and shape.
+
+.. code-block:: python
+
+    from nitrous.types.array import Slice, Any
+    from nitrous.types import Double
+
+    Coords = Slice(Double, (Any, 3))  # Two dimensional array, any number of rows by 3 columns.
+
+Shape specification is a tuple where each element is either a numeric constant
+or a special object ``Any``. If specified, it means that the length of a
+particular dimension(s) will only be known at runtime. Default slice object is
+one-dimensional and of arbitrary length.
+
+.. code-block:: python
+
+    Coords = Slice(Double)  # Equivalent to `Slice(Double, (Any,))`
+
+
+Concrete shape dimensions are preferable from the performance standpoint, since
+the optimizer is then able to eliminate a lot of additions/multiplications,
+especially for high number of dimensions.
+
+Similar to NumPy arrays or Python lists, slice elements can be accessed though item notation::
+
+    x = coords[i, 0]  # x is now of type Double
+
+Furthermore, it is possible to access shape and number of dimensions from the
+compiled functions through familiar ``shape`` and ``ndim`` attibutes::
+
+    for i in range(coords.shape[0]):
+        x = coords[i, 0]
+
+
+Memory Aliasing
+***************
+
+.. warning:: Nitrous currently requires all arrays and slices to use unaliased
+    memory blocks. Ignoring this rule will result in undefined behaviour.
+
+
+Arrays
+------
+
+Arrays can be used when all of the dimensions of the memory block (with an
+exception of the major dimension, see note below) are known. This allows
+compiler to reduce the amount of data passed around through function arguments,
+which in turn results in performance gains.
+
+Major Dimension
+***************
+
+The major Array dimension is the only one that can be declared as ``Any``,
+because it is not used in index calculations. There, however, two incurred
+limitations:
+
+1. Since the total memory size is not known at compile time, you cannot
+   allocate arrays inside Nitrous functions.
+
+2. It is impossible to guard against row index overflows and, thus, caution has
+   to be exercised.
 
 Structures
 ----------
 
-TODO
+A familiar sight to many other languages, Structures are a way to tie together
+serveral pieces of potentially different types. One good example of such would
+be a toy implementation of a Slice::
+
+    from nitrous.types import Structure
+
+    DoubleSlice = Structure("TestSlice",
+                            ("data", Pointer(Double)),
+                            ("shape", Pointer(Index)),
+                            ("ndim", Index))
+
+
+Here we have a slice structure with 3 elements: a pointer to data memory, a
+pointer to shape information and the number of slice dimensions.  Inside
+Nitrous functions, these can be accessed with regular attribute notation. We
+already saw that in the previous section where ``shape`` attribute was
+accessed.  Similarly,
+
+.. code-block:: python
+
+    @function(x=DoubleSlice)
+    def f(x):
+        n = x.ndim
+        ...
 
 Vectors
 -------
 
-TODO
+Vectors are mainly used to perform math operations on several scalar values in
+one go. Although they can be of arbitrary length, typically, modern computer
+hardware is optimized to handle multiples of 4 the best.
+
+.. code-block:: python
+
+    from nitrous.types.vector import Vector
+    from nitrous.types import Float
+
+    Float16 = Vector(Float, 16)
+
+    @function(x=Slice(Float16), i=Index, j=Index)
+    def f(x, i, j):
+        diff = x[i] - x[j]  # 16 elements are subtracted at the same time.
+
+
+Vector Operations
+*****************
+
+Vectors are a bit different from other data structures because, for one, they do not
+support regular indexing. To get/set an element, special functions are used::
+
+    from nitrous.types.vector import get_element
+
+    e7 = get_element(Float16)(v, 7)
+
+Vectors are not generally meant for frequent element access. Once loaded from
+memory, the idea is to perform as many operations as possible before storing
+the result back as a whole without resorting to element fiddling, which is what
+square bracket accessors are good for.
+
+Another peculiarity with vectors is that they are *immutable*. For example,
+setting an element does not modify the existing vector, but returns a new one::
+
+    from nitrous.types.vector import set_element
+
+    v = Float16()  # Declare new vector.
+    for i in range(16):
+        v = set_element(Float16)(v, i, i + Float(1))
+
+    # Vector v is (1, 2, 3, ..., 16)
+
+Vector Math
+***********
+
+Most functions from standard math library can be used directly::
+
+    from nitrous.lib.math import sqrt
+
+    ...
+
+    w = sqrt(Float16)(v)
+
+
+Note that some operations, like ``sqrt``, are translated into optimized
+hardware instructions and are very fast. Some, on the other hand, like ``log``
+do not have such mappings and are translated into equivalent number of scalar
+opeartions on individual vector elements.
 
 
 Interfacing C Libraries

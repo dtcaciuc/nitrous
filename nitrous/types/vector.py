@@ -1,7 +1,7 @@
 from nitrous import llvm
 from nitrous.function import function
 from nitrous.lib import value_emitter
-from nitrous.types import Pointer
+from nitrous.types.array import Slice
 
 
 __all__ = ["Vector", "get_element", "set_element", "load", "store"]
@@ -114,34 +114,34 @@ def fill(T):
 
 
 def load(T):
-    """``load(T)(p) -> v``
+    """``load(T)(s) -> v``
 
-    Load vector elements from pointer *p*
+    Load vector elements from slice *s*
 
     """
 
-    @function(T, p=Pointer(T.element_type))
-    def load_(p):
+    @function(T, s=Slice(T.element_type, (T.n,)))
+    def load_(s):
         v = T()
         for i in range(T.n):
-            v = set_element(T)(v, i, p[i])
+            v = set_element(T)(v, i, s[i])
         return v
 
     return load_
 
 
 def store(T):
-    """``store(T)(v, p) -> None``
+    """``store(T)(v, s) -> None``
 
     Stores vector elements in sequential locations
-    starting at pointer *p*
+    in slice *s*
 
     """
 
-    @function(v=T, p=Pointer(T.element_type))
-    def store_(v, p):
+    @function(v=T, s=Slice(T.element_type, (T.n,)))
+    def store_(v, s):
         for i in range(T.n):
-            p[i] = get_element(T)(v, i)
+            s[i] = get_element(T)(v, i)
 
     return store_
 
