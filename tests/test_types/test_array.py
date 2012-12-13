@@ -66,8 +66,12 @@ class SliceTests(ArrayTests, unittest.TestCase):
     B = Slice(Long)
 
     def test_repr(self):
-        self.assertEqual(repr(self.A), "<Slice [? x [? x [? x Long]]]>")
-        self.assertEqual(repr(self.B), "<Slice [? x Long]>")
+        self.assertEqual(repr(self.A), "Slice(Long, shape=(Any, Any, Any))")
+        self.assertEqual(repr(self.B), "Slice(Long, shape=(Any,))")
+
+    def test_str(self):
+        self.assertEqual(str(self.A), "<Slice [? x [? x [? x Long]]]>")
+        self.assertEqual(str(self.B), "<Slice [? x Long]>")
 
 
 class ArrayTests(ArrayTests, unittest.TestCase):
@@ -76,8 +80,12 @@ class ArrayTests(ArrayTests, unittest.TestCase):
     B = Array(Long, (12,))
 
     def test_repr(self):
-        self.assertEqual(repr(self.A), "<Array [2 x [3 x [2 x Long]]]>")
-        self.assertEqual(repr(self.B), "<Array [12 x Long]>")
+        self.assertEqual(repr(self.A), "Array(Long, shape=(2, 3, 2))")
+        self.assertEqual(repr(self.B), "Array(Long, shape=(12,))")
+
+    def test_str(self):
+        self.assertEqual(str(self.A), "<Array [2 x [3 x [2 x Long]]]>")
+        self.assertEqual(str(self.B), "<Array [12 x Long]>")
 
 
 class AllocTests(unittest.TestCase):

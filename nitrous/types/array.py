@@ -6,7 +6,14 @@ import ctypes
 __all__ = ["Any", "Array", "Slice"]
 
 
-Any = object()
+class _AnyClass(object):
+
+    def __repr__(self):
+        return "Any"
+
+
+#: Used in in slice or array specification to indicate variable shape dimension.
+Any = _AnyClass()
 
 
 class _ItemAccessor(object):
@@ -32,7 +39,10 @@ class Array(_ItemAccessor):
         self.ndim = len(shape)
 
     def __repr__(self):
-        return "<Array {0}>".format(shape_repr(self.element_type, self.shape))
+        return "Array({0}, shape={1})".format(self.element_type, repr(self.shape))
+
+    def __str__(self):
+        return "<Array {0}>".format(shape_str(self.element_type, self.shape))
 
     def __call__(self):
         from nitrous.lib import value_emitter
@@ -143,7 +153,10 @@ class Slice(_ItemAccessor):
             )
 
     def __repr__(self):
-        return "<Slice {0}>".format(shape_repr(self.element_type, self.shape))
+        return "Slice({0}, shape={1})".format(self.element_type, repr(self.shape))
+
+    def __str__(self):
+        return "<Slice {0}>".format(shape_str(self.element_type, self.shape))
 
     @property
     def llvm_type(self):
@@ -234,7 +247,8 @@ def ctypes_shape(x):
         return ()
 
 
-def shape_repr(element_type, shape):
+def shape_str(element_type, shape):
+    """Return human-friendly description of array shape."""
     dim_0 = "?" if shape[0] in (Any, None) else shape[0]
-    sub_shape = element_type if len(shape) == 1 else shape_repr(element_type, shape[1:])
+    sub_shape = element_type if len(shape) == 1 else shape_str(element_type, shape[1:])
     return "[{0} x {1}]".format(dim_0, sub_shape)
