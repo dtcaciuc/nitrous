@@ -5,9 +5,52 @@ from contextlib import contextmanager
 from . import llvm
 
 
-BOOL_INST = {
+_BOOL_INST = {
     ast.And: llvm.BuildAnd,
     ast.Or: llvm.BuildOr
+}
+
+_INTEGER_COMPARE_INST = llvm.BuildICmp, {
+    ast.Eq: llvm.IntEQ,
+    ast.Gt: llvm.IntSGT,
+    ast.GtE: llvm.IntSGE,
+    ast.Lt: llvm.IntSLT,
+    ast.LtE: llvm.IntSLE,
+    ast.NotEq: llvm.IntNE
+}
+
+_FLOATING_COMPARE_INST = llvm.BuildFCmp, {
+    ast.Eq: llvm.RealUEQ,
+    ast.Gt: llvm.RealUGT,
+    ast.GtE: llvm.RealUGE,
+    ast.Lt: llvm.RealULT,
+    ast.LtE: llvm.RealULE,
+    ast.NotEq: llvm.RealUNE,
+}
+
+_INTEGER_BINARY_INST = {
+    ast.Add: llvm.BuildAdd,
+    ast.Sub: llvm.BuildSub,
+    ast.Mult: llvm.BuildMul,
+    ast.Pow: llvm.build_pow,
+    # Integer division is consciously left out and
+    # handled in function.py/emit_binary_op
+}
+
+_FLOATING_BINARY_INST = {
+    ast.Add: llvm.BuildFAdd,
+    ast.Sub: llvm.BuildFSub,
+    ast.Mult: llvm.BuildFMul,
+    ast.Div: llvm.BuildFDiv,
+    ast.Pow: llvm.build_pow,
+}
+
+_FLOATING_UNARY_INST = {
+    ast.USub: llvm.BuildFNeg
+}
+
+_INTEGRAL_UNARY_INST = {
+    ast.USub: llvm.BuildNeg
 }
 
 
@@ -468,23 +511,28 @@ class FunctionBuilder(ast.NodeVisitor):
             llvm.BuildRet(self.builder, v)
 
     def visit_UnaryOp(self, node):
-        from .types import UNARY_INST, type_key
-
         rhs = self.r_visit(node.operand)
 
+        kind = llvm.GetTypeKind(llvm.TypeOf(rhs))
         op_type = type(node.op)
+
         if op_type == ast.Not:
             # Boolean `not`
             rhs = emit_nonzero(self.builder, rhs)
             inst = llvm.BuildNot
+        elif kind == llvm.IntegerTypeKind:
+            inst = _INTEGRAL_UNARY_INST[op_type]
+        elif kind in (llvm.FloatTypeKind, llvm.DoubleTypeKind):
+            inst = _FLOATING_UNARY_INST[op_type]
         else:
-            inst = UNARY_INST[type_key(llvm.TypeOf(rhs))][op_type]
+            raise TypeError("Unsupported operand type for {0}: {1}"
+                            .format(node.op, self.typeof(rhs)))
 
         v = inst(self.builder, rhs, op_type.__name__.lower())
         self.push(v)
 
     def visit_BinOp(self, node):
-        from .types import BINARY_INST, type_key, types_equal
+        from .types import types_equal
 
         lhs = self.r_visit(node.left)
         rhs = self.r_visit(node.right)
@@ -499,10 +547,16 @@ class FunctionBuilder(ast.NodeVisitor):
         if llvm.GetTypeKind(ty) == llvm.VectorTypeKind:
             ty = llvm.GetElementType(ty)
 
-        if isinstance(op, ast.Div) and llvm.GetTypeKind(ty) == llvm.IntegerTypeKind:
-            inst = llvm.BuildSDiv if self.opts["cdiv"] else llvm.build_py_idiv
+        kind = llvm.GetTypeKind(ty)
+
+        if kind == llvm.IntegerTypeKind:
+            div = llvm.BuildSDiv if self.opts["cdiv"] else llvm.build_py_idiv
+            inst = div if isinstance(op, ast.Div) else _INTEGER_BINARY_INST[type(op)]
+        elif kind in (llvm.FloatTypeKind, llvm.DoubleTypeKind):
+            inst = _FLOATING_BINARY_INST[type(op)]
         else:
-            inst = BINARY_INST[type_key(ty)][type(op)]
+            raise TypeError("Unsupported operand types for {0}: {1} and {2}"
+                            .format(op, self.typeof(lhs), self.typeof(rhs)))
 
         v = inst(self.builder, lhs, rhs, type(op).__name__.lower())
         # Assuming binary operations return values of the same type as operands.
@@ -513,12 +567,12 @@ class FunctionBuilder(ast.NodeVisitor):
         # Expressions like `a > 1 or b > 1 or c > 1` collapse into one `or` with 3 .values
         for v in node.values[1:]:
             lhs = emit_nonzero(self.builder, self.r_visit(v))
-            rhs = BOOL_INST[type(node.op)](self.builder, lhs, rhs, "cmp")
+            rhs = _BOOL_INST[type(node.op)](self.builder, lhs, rhs, "cmp")
 
         self.push(rhs)
 
     def visit_Compare(self, node):
-        from .types import COMPARE_INST, _INTEGRAL_COMPARE_INST, type_key, types_equal
+        from .types import types_equal
 
         if len(node.ops) > 1 or len(node.comparators) > 1:
             raise NotImplementedError("Only simple `if` expressions are supported")
@@ -532,14 +586,20 @@ class FunctionBuilder(ast.NodeVisitor):
             raise TypeError("Conflicting operand types for {0}: {1} and {2}"
                             .format(op, self.typeof(lhs), self.typeof(rhs)))
 
-        # FIXME move this reponsibility to individual types.
-        if llvm.GetTypeKind(ty) == llvm.PointerTypeKind:
-            inst, ops = _INTEGRAL_COMPARE_INST
+        # Vectors use same ops as their element types.
+        if llvm.GetTypeKind(ty) == llvm.VectorTypeKind:
+            ty = llvm.GetElementType(ty)
+
+        kind = llvm.GetTypeKind(ty)
+        if kind in (llvm.IntegerTypeKind, llvm.PointerTypeKind):
+            inst, ops = _INTEGER_COMPARE_INST
+        elif kind in (llvm.FloatTypeKind, llvm.DoubleTypeKind):
+            inst, ops = _FLOATING_COMPARE_INST
         else:
-            inst, ops = COMPARE_INST[type_key(ty)]
+            raise TypeError("Cannot compare {0} with {1}"
+                            .format(self.typeof(lhs), self.typeof(rhs)))
 
-        v = inst(self.builder, ops[type(op)], lhs, rhs, "tmp")
-
+        v = inst(self.builder, ops[type(op)], lhs, rhs, "cmp")
         self.push(v)
 
     def visit_IfExp(self, node):

@@ -1,6 +1,5 @@
 from __future__ import absolute_import
 import ctypes
-import ast
 
 from .. import llvm
 
@@ -75,82 +74,6 @@ Index = Long
 def const_index(v):
     """Creates a new constant index value."""
     return llvm.ConstInt(Index.llvm_type, v, True)
-
-
-_FLOATING_BINARY_INST = {
-    ast.Add: llvm.BuildFAdd,
-    ast.Sub: llvm.BuildFSub,
-    ast.Mult: llvm.BuildFMul,
-    ast.Div: llvm.BuildFDiv,
-    ast.Pow: llvm.build_pow,
-}
-
-_INTEGRAL_BINARY_INST = {
-    ast.Add: llvm.BuildAdd,
-    ast.Sub: llvm.BuildSub,
-    ast.Mult: llvm.BuildMul,
-    ast.Pow: llvm.build_pow,
-    # Integer division is consciously left out and
-    # handled in function.py/emit_binary_op
-}
-
-BINARY_INST = {
-    type_key(Double.llvm_type): _FLOATING_BINARY_INST,
-    type_key(Float.llvm_type): _FLOATING_BINARY_INST,
-    type_key(Long.llvm_type): _INTEGRAL_BINARY_INST,
-    type_key(Byte.llvm_type): _INTEGRAL_BINARY_INST,
-}
-
-_FLOATING_UNARY_INST = {
-    ast.USub: llvm.BuildFNeg
-}
-
-_INTEGRAL_UNARY_INST = {
-    ast.USub: llvm.BuildNeg
-}
-
-UNARY_INST = {
-    type_key(Double.llvm_type): _FLOATING_UNARY_INST,
-    type_key(Float.llvm_type): _FLOATING_UNARY_INST,
-    type_key(Long.llvm_type): _INTEGRAL_UNARY_INST,
-    type_key(Byte.llvm_type): _INTEGRAL_UNARY_INST,
-}
-
-
-_FLOATING_COMPARE_INST = (
-    llvm.BuildFCmp, {
-        ast.Eq: llvm.RealUEQ,
-        ast.Gt: llvm.RealUGT,
-        ast.GtE: llvm.RealUGE,
-        ast.Lt: llvm.RealULT,
-        ast.LtE: llvm.RealULE,
-        ast.NotEq: llvm.RealUNE,
-    }
-)
-
-
-_INTEGRAL_COMPARE_INST = (
-    llvm.BuildICmp, {
-        ast.Eq: llvm.IntEQ,
-        ast.Gt: llvm.IntSGT,
-        ast.GtE: llvm.IntSGE,
-        ast.Lt: llvm.IntSLT,
-        ast.LtE: llvm.IntSLE,
-        ast.NotEq: llvm.IntNE
-    }
-)
-
-
-COMPARE_INST = {
-    type_key(Double.llvm_type): _FLOATING_COMPARE_INST,
-    type_key(Float.llvm_type): _FLOATING_COMPARE_INST,
-    type_key(Long.llvm_type): _INTEGRAL_COMPARE_INST,
-    type_key(Int.llvm_type): _INTEGRAL_COMPARE_INST,
-    type_key(Byte.llvm_type): _INTEGRAL_COMPARE_INST
-}
-
-
-Dynamic = object()
 
 
 class Pointer(object):
