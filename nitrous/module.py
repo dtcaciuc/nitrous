@@ -24,7 +24,7 @@ def so_module(decls, libs=[], libdirs=[], name=None):
 
     from functools import partial
     from subprocess import call
-    from uuid import uuid4
+    from tempfile import mkdtemp
 
     module, funcs = _create_module(decls, name)
 
@@ -51,8 +51,7 @@ def so_module(decls, libs=[], libdirs=[], name=None):
                                        llvm.RelocPIC,
                                        llvm.CodeModelDefault)
 
-    build_dir = os.path.join(tempfile.gettempdir(), "n2o", str(uuid4()))
-    os.makedirs(build_dir)
+    build_dir = mkdtemp(prefix="n2o-")
 
     # Path to output shared library.
     # Getting module name again since _create_module may have used a default.
