@@ -486,7 +486,7 @@ class FunctionBuilder(ast.NodeVisitor):
         raise RuntimeError("Encountered unexpected augmented assignment")
 
     def visit_Return(self, node):
-        from .types import Bool, types_equal
+        from .types import Bool
 
         func = llvm.GetBasicBlockParent(llvm.GetInsertBlock(self.builder))
         return_type = llvm.function_return_type(func)
@@ -505,7 +505,7 @@ class FunctionBuilder(ast.NodeVisitor):
             if (llvm.GetTypeKind(t) == llvm.IntegerTypeKind and llvm.GetIntTypeWidth(t) == 1):
                 v = llvm.BuildCast(self.builder, llvm.ZExt, v, Bool.llvm_type, "tmp")
 
-            if not types_equal(llvm.TypeOf(v), return_type):
+            if not llvm.types_equal(llvm.TypeOf(v), return_type):
                 raise TypeError("Unexpected return value type")
 
             llvm.BuildRet(self.builder, v)
@@ -532,14 +532,12 @@ class FunctionBuilder(ast.NodeVisitor):
         self.push(v)
 
     def visit_BinOp(self, node):
-        from .types import types_equal
-
         lhs = self.r_visit(node.left)
         rhs = self.r_visit(node.right)
         op = node.op
 
         ty = llvm.TypeOf(lhs)
-        if not types_equal(ty, llvm.TypeOf(rhs)):
+        if not llvm.types_equal(ty, llvm.TypeOf(rhs)):
             raise TypeError("Conflicting operand types for {0}: {1} and {2}"
                             .format(op, self.typeof(lhs), self.typeof(rhs)))
 
@@ -572,8 +570,6 @@ class FunctionBuilder(ast.NodeVisitor):
         self.push(rhs)
 
     def visit_Compare(self, node):
-        from .types import types_equal
-
         if len(node.ops) > 1 or len(node.comparators) > 1:
             raise NotImplementedError("Only simple `if` expressions are supported")
 
@@ -582,7 +578,7 @@ class FunctionBuilder(ast.NodeVisitor):
         op = node.ops[0]
 
         ty = llvm.TypeOf(lhs)
-        if not types_equal(ty, llvm.TypeOf(rhs)):
+        if not llvm.types_equal(ty, llvm.TypeOf(rhs)):
             raise TypeError("Conflicting operand types for {0}: {1} and {2}"
                             .format(op, self.typeof(lhs), self.typeof(rhs)))
 
@@ -603,8 +599,6 @@ class FunctionBuilder(ast.NodeVisitor):
         self.push(v)
 
     def visit_IfExp(self, node):
-        from .types import types_equal
-
         test_expr = truncate_bool(self.builder, self.r_visit(node.test))
 
         func = llvm.GetBasicBlockParent(llvm.GetInsertBlock(self.builder))
@@ -629,7 +623,7 @@ class FunctionBuilder(ast.NodeVisitor):
         else_branch_bb = llvm.GetInsertBlock(self.builder)
 
         expr_type = llvm.TypeOf(if_expr)
-        if not types_equal(expr_type, llvm.TypeOf(else_expr)):
+        if not llvm.types_equal(expr_type, llvm.TypeOf(else_expr)):
             raise TypeError("`if` expression clause return types don't match")
 
         llvm.PositionBuilderAtEnd(self.builder, merge_bb)
@@ -1096,7 +1090,6 @@ def _get_or_create_function(module, decl, vargs=False):
 
 def _validate_function_args(decl, args):
     """Raises TypeError if if *args* do not match function declaration."""
-    from .types import types_equal
     import inspect
 
     if len(args) != len(decl.argtypes):
@@ -1106,7 +1099,7 @@ def _validate_function_args(decl, args):
     if decl.pyfunc:
         # External functions (eg. c_function) don't have PyFunc associated with them.
         spec = inspect.getargspec(decl.pyfunc)
-        mask = map(types_equal,
+        mask = map(llvm.types_equal,
                    (decl.argtypes[name].llvm_type for name in spec.args),
                    (llvm.TypeOf(val) for val in args))
 

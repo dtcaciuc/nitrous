@@ -1,4 +1,4 @@
-from . import Pointer, Structure, Reference, Index, const_index, type_key, is_aggregate
+from . import Pointer, Structure, Reference, Index, const_index, is_aggregate
 from .. import llvm
 import ctypes
 
@@ -147,7 +147,7 @@ class Slice(_ItemAccessor):
         # time one declares them. This is a problem in places like
         # templates where only the data types being passed in and slice
         # type gets derived from it. Key types on their data type and shape.
-        k = (type_key(element_type.llvm_type), shape)
+        k = (llvm.type_key(element_type.llvm_type), shape)
         try:
             self._struct = _slice_types[k]
         except KeyError:

@@ -4,25 +4,6 @@ import ctypes
 from .. import llvm
 
 
-def type_key(ty):
-    """Returns unique key for type *ty*.
-
-    In LLVM, getting the same type (eg. IntType(32)) yields
-    same unique pointer value each time its invoked.
-
-    """
-    return ctypes.cast(ty, ctypes.c_void_p).value
-
-
-def types_equal(tx, ty):
-    """Returns True if *tx* is the same LLVMTypeRef as *ty*.
-
-    To check equality, retrieve and compare raw pointer values.
-
-    """
-    return type_key(tx) == type_key(ty)
-
-
 class Scalar(object):
     """Base for all scalar data types."""
 

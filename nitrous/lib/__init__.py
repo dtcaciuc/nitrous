@@ -47,14 +47,12 @@ def cast(value, target_type):
 
     @value_emitter
     def emit(builder):
-        from ..types import type_key
-
         # TODO support
         # * unsigned integers
 
         # No-op if type is the same
         value_type = llvm.TypeOf(value)
-        if type_key(target_type.llvm_type) == type_key(value_type):
+        if llvm.types_equal(target_type.llvm_type, value_type):
             return value, None
 
         value_kind = llvm.GetTypeKind(value_type)
@@ -136,7 +134,7 @@ def print_(*args, **kwargs):
 
     """
     from nitrous.function import c_function, _get_or_create_function, emit_constant_string
-    from nitrous.types import Int, Long, Double, String, types_equal
+    from nitrous.types import Int, Long, Double, String
     from sys import stdout
 
     # TODO add support for .sep parameter; this will require
@@ -161,7 +159,7 @@ def print_(*args, **kwargs):
         # Performing certain casts for simplicity.
         for a in args:
             ty = llvm.TypeOf(a)
-            if types_equal(ty, String.llvm_type):
+            if llvm.types_equal(ty, String.llvm_type):
                 formats.append("%s")
             elif llvm.GetTypeKind(ty) == llvm.IntegerTypeKind:
                 formats.append("%ld")
