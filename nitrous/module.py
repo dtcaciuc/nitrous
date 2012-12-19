@@ -52,6 +52,9 @@ def so_module(decls, libs=[], libdirs=[], name=None):
                                        llvm.CodeModelDefault)
 
     build_dir = mkdtemp(prefix="n2o-")
+    cleanup = [partial(llvm.DisposeModule, module), partial(shutil.rmtree, build_dir)]
+
+    out = Module(module, cleanup)
 
     # Path to output shared library.
     # Getting module name again since _create_module may have used a default.
@@ -85,10 +88,6 @@ def so_module(decls, libs=[], libdirs=[], name=None):
 
     # Compilation successful; build ctypes interface to new module.
     so = ctypes.cdll.LoadLibrary(so_path)
-
-    cleanup = [partial(llvm.DisposeModule, module), partial(shutil.rmtree, build_dir)]
-
-    out = Module(module, cleanup)
     out.__n2o_so__ = so
 
     for func in funcs:

@@ -29,6 +29,7 @@ class ArrayTests(object):
             return m
 
         self.m = module([f])
+        self.addCleanup(delattr, self, "m")
 
     def test_array(self):
 
@@ -150,6 +151,7 @@ class IndexTests(unittest.TestCase):
             ((18, 19, 20), (21, 22, 23), (24, 25, 26)),
             ((9, 10, 11), (12, 13, 14), (15, 16, 17)),
         )
+        self.addCleanup(delattr, self, "data")
 
     def test_static_dimension(self):
         """Replace access to known dimensions with direct constants"""

@@ -43,6 +43,7 @@ class ConverterTests(unittest.TestCase):
             return x
 
         self.m = module([f])
+        self.addCleanup(delattr, self, "m")
 
     def test_array(self):
         """Pointer() accepts array.array objects."""
