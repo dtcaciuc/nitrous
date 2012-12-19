@@ -807,10 +807,7 @@ class FunctionBuilder(ast.NodeVisitor):
 
         """
         module = llvm.GetParentModule__(self.builder)
-        # XXX hack; have a better way to determine whether
-        # function name should be qualified or not.
-        qualify = decl.pyfunc is not None
-        llvm_func, exists = _get_or_create_function(module, decl, qualify)
+        llvm_func, exists = _get_or_create_function(module, decl)
 
         if not exists:
             self.new_funcs.append(Function(decl, llvm_func))
@@ -978,14 +975,26 @@ def truncate_bool(builder, v):
     raise TypeError("Not a boolean variable")
 
 
-def _qualify(module, symbol):
-    """Qualifies symbol with parent module name."""
-    return "__".join((llvm.GetModuleName(module), symbol))
+def _qualified_name(module, decl):
+    """Returns qualified declaration name."""
+
+    if not decl.pyfunc:
+        # XXX hack; have a better way to determine whether
+        # function name should be qualified or not.
+        return decl.__name__
+
+    return "_".join((llvm.GetModuleName(module),
+                     decl.__module__,
+                     decl.__name__))
 
 
-def _get_or_create_function(module, decl, qualify=True, var_args=False):
-    """Gets or declares an an LLVM function based on its declaration."""
-    name = _qualify(module, decl.__name__) if qualify else decl.__name__
+def _get_or_create_function(module, decl, vargs=False):
+    """Gets or declares an an LLVM function based on its declaration.
+
+    Set *vargs* to True of the function accepts variadic arguments.
+
+    """
+    name = _qualified_name(module, decl)
     llvm_func = llvm.GetNamedFunction(module, name)
     exists = bool(llvm_func)
 
@@ -1000,7 +1009,7 @@ def _get_or_create_function(module, decl, qualify=True, var_args=False):
         for i, ty in enumerate(argtypes):
             llvm_argtypes[i] = ty.llvm_type
 
-        llvm_func_type = llvm.FunctionType(llvm_restype, llvm_argtypes, len(llvm_argtypes), var_args)
+        llvm_func_type = llvm.FunctionType(llvm_restype, llvm_argtypes, len(llvm_argtypes), vargs)
         llvm_func = llvm.AddFunction(module, name, llvm_func_type)
         llvm.SetLinkage(llvm_func, llvm.ExternalLinkage)
 

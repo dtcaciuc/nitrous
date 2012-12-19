@@ -194,10 +194,9 @@ class CppLibrary(object):
 
 def _create_module(decls, name):
     from .function import emit_body, _get_or_create_function, Function
-    from uuid import uuid4
 
     if not name:
-        name = "n2o_" + str(uuid4()).replace("-", "_")
+        name = "n2o_" + _random_hex()
 
     module = llvm.ModuleCreateWithName(name)
     funcs = []
@@ -258,3 +257,11 @@ def _optimize(module, target_data):
 
     llvm.PassManagerBuilderDispose(pm_builder)
     llvm.DisposePassManager(pm)
+
+
+def _random_hex(digits=8):
+    """Generates a random hexadecimal string *n* characters long"""
+    from string import hexdigits
+    from random import choice
+
+    return "".join(choice(hexdigits) for _ in range(digits))

@@ -149,7 +149,7 @@ def print_(*args, **kwargs):
     def emit(builder):
 
         module = llvm.GetParentModule__(builder)
-        llvm_printf, _ = _get_or_create_function(module, dprintf, qualify=False, var_args=True)
+        llvm_printf, _ = _get_or_create_function(module, dprintf, vargs=True)
 
         cast_args = []
         formats = []
