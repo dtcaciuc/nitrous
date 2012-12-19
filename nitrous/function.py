@@ -976,16 +976,27 @@ def truncate_bool(builder, v):
 
 
 def _qualified_name(module, decl):
-    """Returns qualified declaration name."""
+    """Returns qualified declaration name.
 
+    The scheme used is:
+
+        qualified-name: function-module-name "_" function-name "_" mangled-argtypes
+
+    *mangled-argtypes* is a string which uniquely encodes the sequence of
+    function argument types, similar to mangled C++ names. The name is unchanged
+    if declaration has no associated Python function.
+
+    """
     if not decl.pyfunc:
         # XXX hack; have a better way to determine whether
         # function name should be qualified or not.
         return decl.__name__
 
+    suffix = "".join(decl.argtypes[arg].tag for arg in decl.args)
     return "_".join((llvm.GetModuleName(module),
                      decl.__module__,
-                     decl.__name__))
+                     decl.__name__,
+                     suffix))
 
 
 def _get_or_create_function(module, decl, vargs=False):

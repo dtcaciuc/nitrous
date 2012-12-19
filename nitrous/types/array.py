@@ -72,6 +72,11 @@ class Array(_ItemAccessor):
     def c_type(self):
         return ctypes.POINTER(self.element_type.c_type)
 
+    @property
+    def tag(self):
+        shape_tag = "".join("d{0}".format(d) for d in self.shape)
+        return "A{0}{1}".format(shape_tag, self.element_type.tag)
+
     def convert(self, p):
         pointer_type = ctypes.POINTER(self.element_type.c_type)
         # FIXME conversions are unsafe, since they force-cast
@@ -166,6 +171,11 @@ class Slice(_ItemAccessor):
     @property
     def c_type(self):
         return self._struct.c_type
+
+    @property
+    def tag(self):
+        shape_tag = "".join("d{0}".format(d) for d in self.shape)
+        return "B{0}{1}".format(shape_tag, self.element_type.tag)
 
     def convert(self, p):
         pointer_type = ctypes.POINTER(self.element_type.c_type)

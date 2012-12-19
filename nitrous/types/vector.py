@@ -31,6 +31,10 @@ class Vector(object):
     def c_type(self):
         return (self.element_type.c_type * self.n)
 
+    @property
+    def tag(self):
+        return "V{0}{1}".format(self.n, self.element_type.tag)
+
     def __call__(self, *elements):
         """Create new vector with specified initial element values."""
         from nitrous.lib import cast

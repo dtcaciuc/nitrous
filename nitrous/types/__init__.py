@@ -27,10 +27,11 @@ def types_equal(tx, ty):
 class ScalarType(object):
     """Base for all scalar data types."""
 
-    def __init__(self, c_type, llvm_type, name=None):
+    def __init__(self, c_type, llvm_type, name, tag):
         self.c_type = c_type
         self.llvm_type = llvm_type
-        self.name = name or c_type.__name__
+        self.name = name
+        self.tag = tag
 
     def __call__(self, v):
         """Nicer equivalent to ``cast(v, Type)``"""
@@ -46,13 +47,13 @@ class ScalarType(object):
 
 def _int_type(c_type, name):
     """Creates a new integral type"""
-    w = llvm.IntType(ctypes.sizeof(c_type) * 8)
-    return ScalarType(c_type, w, name)
+    width = ctypes.sizeof(c_type)
+    return ScalarType(c_type, llvm.IntType(width * 8), name, "i{0}".format(width))
 
 
-Double = ScalarType(ctypes.c_double, llvm.DoubleType(), "Double")
+Double = ScalarType(ctypes.c_double, llvm.DoubleType(), "Double", "f8")
 
-Float = ScalarType(ctypes.c_float, llvm.FloatType(), "Float")
+Float = ScalarType(ctypes.c_float, llvm.FloatType(), "Float", "f4")
 
 
 Long = _int_type(ctypes.c_long, "Long")
@@ -171,6 +172,10 @@ class Pointer(object):
         return ctypes.POINTER(self.element_type.c_type)
 
     @property
+    def tag(self):
+        return "P{0}".format(self.element_type.tag)
+
+    @property
     def null(self):
         """Returns NULL value of current pointer type."""
         return llvm.ConstNull(self.llvm_type)
@@ -219,6 +224,12 @@ class Structure(object):
     def __repr__(self):
         return "<Structure '{0}', {1} fields>".format(self.name, len(self.fields))
 
+    @property
+    def tag(self):
+        # Reacquire name from created structure; it will get uniqued
+        # if specified name was already taken.
+        return "S{0}".format(llvm.GetStructName(self.llvm_type))
+
     def emit_getattr(self, builder, ref, attr):
         """IR: Emits attribute value load from structure reference."""
         gep, t = self._field_gep(builder, ref, attr)
@@ -253,13 +264,17 @@ class Reference(object):
     def llvm_type(self):
         return llvm.PointerType(self.value_type.llvm_type, 0)
 
+    @property
+    def tag(self):
+        return "R{0}".format(self.value_type.tag)
+
     def convert(self, v):
         return ctypes.byref(self.value_type.convert(v)
                             if hasattr(self.value_type, "convert")
                             else v)
 
 
-String = ScalarType(ctypes.c_char_p, Pointer(Char).llvm_type, 0)
+String = ScalarType(ctypes.c_char_p, Pointer(Char).llvm_type, "String", "S")
 """Null-terminated byte string.
 
 This is virtually equivalent to Pointer(Char), except
