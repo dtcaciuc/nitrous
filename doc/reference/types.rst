@@ -2,12 +2,13 @@
 ============================
 
 .. automodule:: nitrous.types
+    :members:
 
-Scalars
--------
+Arrays and Slices
+-----------------
 
-.. autoclass:: Scalar
-
+.. automodule:: nitrous.types.array
+    :members:
 
 Vectors
 -------

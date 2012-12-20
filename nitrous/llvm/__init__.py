@@ -31,7 +31,9 @@ except OSError:
     # Allows us to complete the module import when LLMV library
     # is not available; currently used for documentation building.
     def _func(func_name, restype, argtypes=[]):
-        pass
+        def mock(*args, **kwargs):
+            pass
+        return mock
 
 
 class owned_c_char_p(ctypes.c_char_p):
