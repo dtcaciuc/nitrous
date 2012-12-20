@@ -6,7 +6,7 @@
 Scalars
 -------
 
-.. autoclass:: ScalarType
+.. autoclass:: Scalar
 
 
 Vectors
@@ -14,12 +14,3 @@ Vectors
 
 .. automodule:: nitrous.types.vector
     :members:
-
-
-
-Type Utilities
---------------
-
-.. autofunction:: nitrous.types.type_key
-
-.. autofunction:: nitrous.types.types_equal

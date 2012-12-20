@@ -231,7 +231,32 @@ TODO
 Scalars
 -------
 
-TODO
+The following table summarizes the available scalar types and their
+counterparts. You'll notice the type names are mostly following their C/Python
+equivalents.
+
++---------+--------------+-------------+
+| Nitrous | ctypes       | Python      |
++=========+==============+=============+
+| Double  | c_double     | FloatType   |
++---------+--------------+-------------+
+| Float   | c_float      |             |
++---------+--------------+-------------+
+| Long    | c_long       | IntType     |
++---------+--------------+-------------+
+| Int     | c_int        |             |
++---------+--------------+-------------+
+| Byte    | c_byte       |             |
++---------+--------------+-------------+
+| Char    | c_char       |             |
++---------+--------------+-------------+
+| Bool    | c_bool       | BooleanType |
++---------+--------------+-------------+
+
+.. note:: Unsigned integer types are currently not supported.
+
+Different types can have the same size but are backed with different ctypes.
+
 
 Pointers
 --------
@@ -457,34 +482,27 @@ previous example:
     m.print_atol("42")
 
 
-Extending the Framework
-=======================
+Advanced Topics
+===============
 
-More on Types
--------------
+Emitters
+--------
 
-TODO
-
-Metafunctions and Emitters
---------------------------
-
-Another type of callable that usually appears in a Nitrous code is a
-*metafunction*. These are native Python routines that get executed at module
-compile time and emit code which goes into the compiled binary.
-
-The :func:`~nitrous.lib.cast` is one example of such functions::
+Sometimes it is necessary to construct IR by manipulating LLVM instructions
+directly. Consider the :func:`~nitrous.lib.cast` function::
 
     x = cast(y, Double)    # equivalent to x = Double(y)
 
-The challenge here is that the cast (an the majority of other metafunctions)
-needs access to the function builder object to actually produce the IR, which
-is unavailable in the function body and thus cannot be referenced directly.
+Casting is a primitive operation which cannot be composed of other exposed
+language elements. Instead, ``cast`` is implemented as an *emitter*, which are
+regular Python callables that accept a :class:`~nitrous.llvm.BuilderRef`
+instance as their argument. Because not every call results in an emitter,
+Nitrous recognizes them by reading the `__n2o_emitter__` magic attribute on the
+result object. If so, the compiler silently inserts another call which actually
+results in final IR.
 
-For that reason, metafunctions return *emitters* as their result. Emitters are
-callables which accept the :class:`~nitrous.llvm.BuilderRef` instance. Because
-not every call results in an emitter, Nitrous recognizes them by reading the
-`__n2o_emitter__` magic attribute on the result object. If so, the compiler
-silently inserts another call which actually results in final IR::
+Because emitters themselves only take a single argument, they're normally
+implemented as closures::
 
     def cast(value, target_type):
         """Casts *value* to a specified *target_type*."""
