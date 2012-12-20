@@ -238,7 +238,7 @@ class ScopedVars(object):
 
 class FunctionBuilder(ast.NodeVisitor):
 
-    def __init__(self, builder, globals_, opts):
+    def __init__(self, builder, opts):
         self.builder = builder
         self.opts = opts
 
@@ -248,7 +248,7 @@ class FunctionBuilder(ast.NodeVisitor):
         self.types = {}
 
         # Global immutable symbols
-        self.globals = globals_
+        self.globals = {}
         # Scoped local symbols (including parameters)
         self.locals = ScopedVars()
 
@@ -369,7 +369,7 @@ class FunctionBuilder(ast.NodeVisitor):
         return v
 
     def visit_Num(self, node):
-        self.push(emit_constant(self.builder, node.n))
+        self.push(*emit_constant(self.builder, node.n))
 
     def visit_Str(self, node):
         from .types import String
@@ -403,13 +403,7 @@ class FunctionBuilder(ast.NodeVisitor):
         else:
             # Assume regular python object
             if isinstance(node.ctx, ast.Load):
-                av = getattr(v, node.attr)
-                try:
-                    # Try to resolve known constant types.
-                    av = emit_constant(self.builder, av)
-                except TypeError:
-                    pass
-                self.push(av)
+                self.push(*try_emit_constant(self.builder, getattr(v, node.attr)))
             else:
                 raise NotImplementedError("Unsupported attribute context {0}".format(node.ctx))
 
@@ -908,10 +902,16 @@ def emit_body(builder, func):
     func_body = ast.parse(func_source).body[0].body
 
     # Emit function body IR
-    llvm.PositionBuilderAtEnd(builder, llvm.AppendBasicBlock(func.llvm_func, "entry"))
-    resolved_globals = dict(resolve_constants(builder, func.globals))
+    b = FunctionBuilder(builder, func.decl.options)
 
-    b = FunctionBuilder(builder, resolved_globals, func.decl.options)
+    entry_bb = llvm.AppendBasicBlock(func.llvm_func, "entry")
+    llvm.PositionBuilderAtEnd(builder, entry_bb)
+
+    # Populate global symbols
+    for k, v in func.globals.iteritems():
+        v, t = try_emit_constant(b.builder, v)
+        b.globals[k] = v
+        b.types[k] = t
 
     # Store function parameters as locals
     for i, name in enumerate(func.decl.args):
@@ -965,19 +965,27 @@ def entry_array_alloca(func, element_type, n, name):
     return a
 
 
+def try_emit_constant(builder, value):
+    """Same as emit_constant but does not raise TypeError."""
+    try:
+        return emit_constant(builder, value)
+    except TypeError:
+        return value, None
+
+
 def emit_constant(builder, value):
     """Emit constant IR for known value types."""
-    from .types import Bool, Long, Double
+    from .types import Bool, Long, Double, String
 
     if isinstance(value, float):
-        return llvm.ConstReal(Double.llvm_type, value)
+        return llvm.ConstReal(Double.llvm_type, value), Double
     elif isinstance(value, bool):
         # Check bool before integer since bool is also an int
-        return llvm.ConstInt(Bool.llvm_type, value, True)
+        return llvm.ConstInt(Bool.llvm_type, value, True), Bool
     elif isinstance(value, int):
-        return llvm.ConstInt(Long.llvm_type, value, True)
+        return llvm.ConstInt(Long.llvm_type, value, True), Long
     elif isinstance(value, basestring):
-        return emit_constant_string(builder, value)
+        return emit_constant_string(builder, value), String
     else:
         raise TypeError("Unknown Number type {0!s}".format(type(value)))
 
@@ -994,16 +1002,6 @@ def emit_constant_string(builder, value):
     llvm.SetLinkage(s, llvm.PrivateLinkage)
 
     return llvm.BuildPointerCast(builder, s, String.llvm_type, "")
-
-
-def resolve_constants(builder, symbols):
-    """Converts eligible values in a dictionary to LLVM constant objects."""
-    for k, v in symbols.iteritems():
-        try:
-            yield k, emit_constant(builder, v)
-        except TypeError:
-            # Not a constant, something else will handle this.
-            yield k, v
 
 
 def emit_nonzero(builder, v):
