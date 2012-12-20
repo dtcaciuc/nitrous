@@ -11,6 +11,10 @@ except:
 
 from .v31 import *
 
+class _Mock(object):
+    def __init__(self, *args, **kwargs):
+        pass
+
 try:
     _llvm = ctypes.cdll.LoadLibrary(os.path.join(os.path.dirname(__file__), "_llvm.so"))
     _libc = ctypes.cdll.LoadLibrary(ctypes.util.find_library("c"))
@@ -31,9 +35,7 @@ except OSError:
     # Allows us to complete the module import when LLMV library
     # is not available; currently used for documentation building.
     def _func(func_name, restype, argtypes=[]):
-        def mock(*args, **kwargs):
-            pass
-        return mock
+        globals()[func_name] = _Mock
 
 
 class owned_c_char_p(ctypes.c_char_p):
@@ -163,7 +165,7 @@ _func("GetIntrinsicName__", owned_c_char_p, [ctypes.c_uint])
 
 
 # This is False if we're generating docs didn't build the LLVM interface
-if "GetIntrinsicCount__" in globals():
+if GetIntrinsicCount__ is not _Mock:
     INTRINSICS = dict((GetIntrinsicName__(i).value, i) for i in range(GetIntrinsicCount__()))
     """Intrinsic map; from name to intrinsic ID to use with GetIntrinsicDeclaration."""
 
