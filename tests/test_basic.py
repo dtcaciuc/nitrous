@@ -1,4 +1,4 @@
-import unittest2 as unittest
+import unittest
 
 from nitrous.exceptions import AnnotationError
 from nitrous.types import Bool, Long, Double

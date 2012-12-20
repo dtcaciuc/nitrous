@@ -69,7 +69,7 @@ setup(name="nitrous",
                    "Natural Language :: English",
                    "Programming Language :: Python :: 2.7",
                    "Topic :: Software Development :: Libraries"],
-      install_requires=["nose", "unittest2"],
+      install_requires=["nose", "coverage"],
       ext_modules=ext_modules,
       packages=find_packages(),
      )

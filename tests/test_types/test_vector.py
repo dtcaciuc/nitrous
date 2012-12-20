@@ -1,4 +1,4 @@
-import unittest2 as unittest
+import unittest
 
 from nitrous.module import module
 from nitrous.function import function

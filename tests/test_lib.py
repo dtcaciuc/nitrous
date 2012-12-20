@@ -4,7 +4,7 @@ from nitrous.function import function
 import nitrous.lib.math
 import math
 
-import unittest2 as unittest
+import unittest
 
 
 class MathTests(unittest.TestCase):
