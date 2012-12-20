@@ -193,9 +193,10 @@ expected::
 Calling Python Functions
 ------------------------
 
-Python functions can also be called. The limitation here is that the call chain
-has to end up with a Nitrous function or an *emitter* (more on those later).
-This, for example, can be used to implement simple templates. Given
+Any calls to regular Python functions are evaluated at compile time. The
+limitation here is that the call chain has to end up with a Nitrous function or
+an `emitter`_.  This, for example, can be used to
+implement simple templates. Given
 
 .. code-block:: python
 
@@ -484,6 +485,8 @@ previous example:
 
 Advanced Topics
 ===============
+
+.. _emitter:
 
 Emitters
 --------
