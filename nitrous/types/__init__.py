@@ -32,24 +32,31 @@ def _int_type(c_type, name):
 
 
 Double = Scalar(ctypes.c_double, llvm.DoubleType(), "Double", "f8")
+"""Double-precision floating point number."""
 
 Float = Scalar(ctypes.c_float, llvm.FloatType(), "Float", "f4")
-
+"""Single-precision floating point number."""
 
 Long = _int_type(ctypes.c_long, "Long")
+"""Long integer."""
 
 Int = _int_type(ctypes.c_int, "Int")
-
-Bool = _int_type(ctypes.c_bool, "Bool")
+"""Integer."""
 
 Byte = _int_type(ctypes.c_byte, "Byte")
+"""8-bit integer."""
 
 Char = _int_type(ctypes.c_char, "Char")
+"""Signed character."""
+
+Bool = _int_type(ctypes.c_bool, "Bool")
+"""Boolean value."""
 
 
 # Akin to size_t in C, this is used for all memory accessing operations.
 # TODO switch this to Int by default?
 Index = Long
+"""Type used for loop counters and to index array/slice elements."""
 
 
 def const_index(v):
@@ -60,9 +67,8 @@ def const_index(v):
 class Pointer(object):
     """Pointer to memory block, each element of type `element_type`."""
 
-    def __init__(self, element_type, shape=(None,)):
+    def __init__(self, element_type):
         self.element_type = element_type
-        self.shape = shape
 
     def __repr__(self):
         return "<Pointer to {0}>".format(self.element_type)
@@ -86,10 +92,6 @@ class Pointer(object):
 
     def convert(self, p):
         import array
-
-        # TODO it would be nice to just see if the object
-        # supports buffer access interface, however it seems that
-        # neither array.array nor ctypes byref() results support that.
 
         pointer_type = ctypes.POINTER(self.element_type.c_type)
 
