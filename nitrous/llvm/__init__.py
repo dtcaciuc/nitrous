@@ -386,14 +386,9 @@ if os.environ.get("NITROUS_LLVM_OPTS"):
     ParseEnvironmentOptions("nitrous", "NITROUS_LLVM_OPTS", None)
 
 
-def type_key(ty):
-    """Returns unique key for type *ty*.
-
-    In LLVM, getting the same type (eg. IntType(32)) yields
-    same unique pointer value each time its invoked.
-
-    """
-    return ctypes.cast(ty, ctypes.c_void_p).value
+def address_of(r):
+    """Returns LLVM reference (eg. ValueRef) pointer value."""
+    return ctypes.cast(r, ctypes.c_void_p).value
 
 
 def types_equal(tx, ty):
@@ -402,7 +397,9 @@ def types_equal(tx, ty):
     To check equality, retrieve and compare raw pointer values.
 
     """
-    return type_key(tx) == type_key(ty)
+    # In LLVM, getting the same type (eg. IntType(32)) yields
+    # same unique pointer value each time its invoked.
+    return address_of(tx) == address_of(ty)
 
 
 def get_intrinsic(builder, name, spec):

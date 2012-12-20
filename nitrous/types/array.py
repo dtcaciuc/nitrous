@@ -147,7 +147,7 @@ class Slice(_ItemAccessor):
         # time one declares them. This is a problem in places like
         # templates where only the data types being passed in and slice
         # type gets derived from it. Key types on their data type and shape.
-        k = (llvm.type_key(element_type.llvm_type), shape)
+        k = (llvm.address_of(element_type.llvm_type), shape)
         try:
             self._struct = _slice_types[k]
         except KeyError:
