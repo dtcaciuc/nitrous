@@ -55,7 +55,7 @@ class Vector(object):
                 cast_e, _ = cast(e, self.element_type)(builder)
                 v = llvm.BuildInsertElement(builder, v, cast_e, llvm_i, "v.init")
 
-            return llvm.ensure_name(builder, v, self, "v.init"), self
+            return v, self
 
         return emit
 

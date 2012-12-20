@@ -107,8 +107,7 @@ class Array(_ItemAccessor):
                 llvm.SetGlobalConstant(shape, llvm.TRUE)
 
             cast_shape = llvm.BuildPointerCast(builder, shape, Pointer(Index).llvm_type, "")
-            return (llvm.ensure_name(builder, cast_shape, Pointer(Index), "shape"),
-                    Array(Index, (self.ndim,)))
+            return cast_shape, Array(Index, (self.ndim,))
 
         else:
             raise AttributeError(attr)

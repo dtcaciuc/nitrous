@@ -444,18 +444,6 @@ def build_pow(builder, a, b, name):
     return v
 
 
-def ensure_name(builder, v, ty, name):
-    # XXX even though results of some operations (eg.
-    # BuildPointerCast, InsertElement), have names, the resulting
-    # value doensn't? Returning a temporary instead fixes that.
-    from ..function import entry_alloca
-    func = GetBasicBlockParent(GetInsertBlock(builder))
-    a = entry_alloca(func, ty.llvm_type, "v.tmp")
-    BuildStore(builder, v, a)
-
-    return BuildLoad(builder, a, name)
-
-
 def link_modules(dst, src):
     """Link source module into destination one.
 

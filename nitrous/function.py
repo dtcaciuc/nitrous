@@ -326,10 +326,10 @@ class FunctionBuilder(ast.NodeVisitor):
         """
         self.stack.append(value)
         if type_ is not None:
-            name = llvm.GetValueName(value)
-            assert isinstance(value, llvm.ValueRef)
-            assert name not in self.types
-            self.types[name] = type_
+            k = llvm.address_of(value)
+            if k in self.types and type_.tag != self.types[k].tag:
+                raise RuntimeError("Value is already registered with a different type.")
+            self.types[k] = type_
 
     def pop(self):
         """Pops top value from expression value stack."""
@@ -342,7 +342,10 @@ class FunctionBuilder(ast.NodeVisitor):
         either an LLVM value or value name.
 
         """
-        name = llvm.GetValueName(v) if isinstance(v, llvm.ValueRef) else v
+        # Global constants and values pushed on stack and
+        # keyed by their address; everything else (eg. stores
+        # and python objects) is keyed by their name.
+        name = llvm.address_of(v) if isinstance(v, llvm.ValueRef) else v
         return self.types.get(name, None)
 
     def visit(self, node):
@@ -990,8 +993,7 @@ def emit_constant_string(builder, value):
     llvm.SetGlobalConstant(s, llvm.TRUE)
     llvm.SetLinkage(s, llvm.PrivateLinkage)
 
-    sp = llvm.BuildPointerCast(builder, s, String.llvm_type, "")
-    return llvm.ensure_name(builder, sp, String, "str")
+    return llvm.BuildPointerCast(builder, s, String.llvm_type, "")
 
 
 def resolve_constants(builder, symbols):
