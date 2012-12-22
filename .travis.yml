@@ -4,17 +4,14 @@ python:
     - 2.7
 
 before_install:
-    - sudo apt-get install python-numpy
+    - sudo apt-get install python-numpy libc6-dev build-essential
     - wget http://llvm.org/releases/3.2/clang+llvm-3.2-x86-linux-ubuntu-12.04.tar.gz
     - tar xf clang+llvm-3.2-x86-linux-ubuntu-12.04.tar.gz
     - export PATH=$(pwd)/clang+llvm-3.2-x86-linux-ubuntu-12.04/bin:$PATH
 
 install:
-    - pip install nose
     - pip install coverage
     - pip install .
 
 script:
-    - LIBRARY_PATH=/usr/lib/i386-linux-gnu:$LIBRARY_PATH
-    - export LIBRARY_PATH
-    - python setup.py nosetests -s -x
+    - python setup.py nosetests -s
