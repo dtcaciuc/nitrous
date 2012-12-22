@@ -15,4 +15,6 @@ install:
     - pip install .
 
 script:
+    - LIBRARY_PATH=/usr/lib/i386-linux-gnu:$LIBRARY_PATH
+    - export LIBRARY_PATH
     - python setup.py nosetests -s -x
