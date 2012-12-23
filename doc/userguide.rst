@@ -161,7 +161,7 @@ compiled code. Strings and primitive scalar types are all valid arguments.
     print "A string", x, ", an long int", y, ", and a double", z
 
 It is also possible to print to externally declared file objects, including
-``stdio`` and ``stderr``::
+``stdout`` and ``stderr`` (``stdout`` is used by default)::
 
     print >>sys.stderr, "hello\n"
 
