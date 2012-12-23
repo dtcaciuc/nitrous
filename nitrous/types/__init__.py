@@ -27,8 +27,8 @@ class Scalar(object):
 
 def _int_type(c_type, name):
     """Creates a new integral type"""
-    width = ctypes.sizeof(c_type)
-    return Scalar(c_type, llvm.IntType(width * 8), name, "i{0}".format(width))
+    bits = ctypes.sizeof(c_type) * 8
+    return Scalar(c_type, llvm.IntType(bits), name, "i{0}".format(bits))
 
 
 Double = Scalar(ctypes.c_double, llvm.DoubleType(), "Double", "f8")
