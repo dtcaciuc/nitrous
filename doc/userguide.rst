@@ -131,7 +131,6 @@ type::
 
     x = Double(y)        # OK, assignment through explicit cast
 
-
 Variable Scope
 --------------
 
@@ -146,6 +145,27 @@ conditional/loop block rather than the function::
 
     x = z               # OK, z is in the current scope
     x = y               # Error, y scope is limited to `if` block
+
+Printing
+--------
+
+Print statement is supported and provides a way to do simple output from your
+compiled code. Strings and primitive scalar types are all valid arguments.
+
+.. code-block:: python
+
+    x = "foo"
+    y = 0
+    z = 0.0
+
+    print "A string", x, ", an long int", y, ", and a double", z
+
+It is also possible to print to externally declared file objects, including
+``stdio`` and ``stderr``::
+
+    print >>sys.stderr, "hello\n"
+
+The only currently unsupported feature is optional custom separator.
 
 Functions
 =========
@@ -267,6 +287,9 @@ Strings arguments are passed around using the dedicated
 associated with a ``ctypes.c_char_p`` type. Just as with scalar types that
 differ only by their ctype, ``String`` exists for convenience of conversion
 from/to Python data.
+
+Any string occurances in Nitrous functions are automatically stored as
+constants of ``String`` type.
 
 
 Pointers
