@@ -233,7 +233,7 @@ Scalars
 -------
 
 The following table summarizes the available scalar types and their
-counterparts. You'll notice the type names are mostly following their C/Python
+counterparts. You'll notice the type names are mostly following their C
 equivalents.
 
 +---------+--------------+-------------+
@@ -257,6 +257,16 @@ equivalents.
 .. note:: Unsigned integer types are currently not supported.
 
 Different types can have the same size but are backed with different ctypes.
+
+
+Strings
+-------
+
+Strings arguments are passed around using the dedicated
+:attr:`~nitrous.types.String` type, which is really a ``Pointer(Char)``
+associated with a ``ctypes.c_char_p`` type. Just as with scalar types that
+differ only by their ctype, ``String`` exists for convenience of conversion
+from/to Python data.
 
 
 Pointers
