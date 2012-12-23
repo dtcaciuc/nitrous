@@ -228,7 +228,7 @@ _func("BuildCondBr", ValueRef, [BuilderRef, ValueRef,
 
 
 # Float Expressions
-for name in ("BuildFAdd", "BuildFSub", "BuildFMul", "BuildFDiv"):
+for name in ("BuildFAdd", "BuildFSub", "BuildFMul", "BuildFDiv", "BuildFRem"):
     _func(name, ValueRef, [BuilderRef, ValueRef, ValueRef, ctypes.c_char_p])
 
 _func("BuildFNeg", ValueRef, [BuilderRef, ValueRef, ctypes.c_char_p])
@@ -236,7 +236,7 @@ _func("BuildFCmp", ValueRef, [BuilderRef, ctypes.c_int, ValueRef, ValueRef, ctyp
 
 
 # Int expressions
-for name in ("BuildAdd", "BuildSub", "BuildMul", "BuildUDiv", "BuildSDiv"):
+for name in ("BuildAdd", "BuildSub", "BuildMul", "BuildUDiv", "BuildSDiv", "BuildSRem", "BuildLShr"):
     _func(name, ValueRef, [BuilderRef, ValueRef, ValueRef, ctypes.c_char_p])
 
 _func("BuildNeg", ValueRef, [BuilderRef, ValueRef, ctypes.c_char_p])
@@ -272,6 +272,7 @@ FPToSI = 34
 SIToFP = 36
 FPTrunc = 37
 FPExt = 38
+BitCast = 41
 
 
 _func("BuildCast", ValueRef, [BuilderRef, Opcode, ValueRef, TypeRef, ctypes.c_char_p])
@@ -282,6 +283,7 @@ _func("BuildPhi", ValueRef, [BuilderRef, TypeRef, ctypes.c_char_p])
 _func("BuildCall", ValueRef, [BuilderRef, ValueRef,
                               ctypes.POINTER(ValueRef), ctypes.c_uint,
                               ctypes.c_char_p])
+_func("BuildSelect", ValueRef, [BuilderRef, ValueRef, ValueRef, ValueRef, ctypes.c_char_p])
 
 _func("BuildExtractElement", ValueRef, [BuilderRef, ValueRef, ValueRef, ctypes.c_char_p])
 _func("BuildInsertElement", ValueRef, [BuilderRef, ValueRef, ValueRef, ValueRef, ctypes.c_char_p])
@@ -443,9 +445,71 @@ def build_py_idiv(builder, a, b, name):
 
 
 def build_pow(builder, a, b, name):
+    """Builds an expression for a ** b."""
     pow = get_intrinsic(builder, "pow", (TypeRef * 1)(TypeOf(a)))
     v = BuildCall(builder, pow, (ValueRef * 2)(a, b), 2, "call")
     return v
+
+
+# Modulo (%) implementation for integers and floats
+#
+#   r = a (s|f)rem b
+#   if (a >> (sizeof(a) * 8)) ^ (b >> (sizeof(b) * 8)) == 1:
+#       return -r
+#   else
+#       return r
+
+
+def _mod_scale(builder, int_a, int_b):
+    """When building `mod`, returns True if the result of `rem` should
+    be scaled by -1, False otherwise.
+
+    Assume *int_a* and *int_b* are integers of equal size.
+
+    """
+    ty = TypeOf(int_a)
+    size = GetIntTypeWidth(ty)
+
+    one = ConstInt(ty, 1, True)
+    sign_shift = ConstInt(ty, size - 1, True)
+
+    sign_a = BuildLShr(builder, int_a, sign_shift, "")
+    cond_a = BuildICmp(builder, IntEQ, sign_a, one, "")
+
+    sign_b = BuildLShr(builder, int_b, sign_shift, "")
+    cond_b = BuildICmp(builder, IntEQ, sign_b, one, "")
+
+    return BuildXor(builder, cond_a, cond_b, "")
+
+
+def build_smod(builder, a, b, name):
+    """Builds expression for signed int modulo."""
+
+    rem = BuildSRem(builder, a, b, "")
+    neg_rem = BuildMul(builder, rem, ConstInt(TypeOf(rem), -1, True), "")
+
+    return BuildSelect(builder, _mod_scale(builder, a, b), neg_rem, rem, name)
+
+
+def build_fmod(builder, a, b, name):
+    """Builds expression for floating point modulo."""
+
+    kind = GetTypeKind(TypeOf(a))
+    if kind == FloatTypeKind:
+        size = 32
+    elif kind == DoubleTypeKind:
+        size = 64
+    else:
+        raise TypeError("Cannot build %: unknown float type kind")
+
+    int_ty = IntType(size)
+    int_a = BuildCast(builder, BitCast, a, int_ty, "")
+    int_b = BuildCast(builder, BitCast, b, int_ty, "")
+
+    rem = BuildFRem(builder, a, b, "")
+    neg_rem = BuildFMul(builder, rem, ConstReal(TypeOf(rem), -1), "")
+
+    return BuildSelect(builder, _mod_scale(builder, int_a, int_b), neg_rem, rem, name)
 
 
 def link_modules(dst, src):

@@ -260,7 +260,10 @@ def binary_funcs():
     def div(a, b):
         return a / b
 
-    return [add, sub, mul, div]
+    def mod(a, b):
+        return a % b
+
+    return [add, sub, mul, div, mod]
 
 
 def floating_binary_funcs():
