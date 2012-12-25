@@ -115,7 +115,7 @@ class LongTests(unittest.TestCase):
     def test_binary(self):
 
         annotate = function(Long, a=Long, b=Long)
-        funcs = binary_funcs()
+        funcs = binary_funcs() + integer_binary_funcs()
         m = module(map(annotate, funcs))
 
         values = [(0, 1), (3, 2), (2, 3), (-3, 2), (3, -2)]
@@ -129,7 +129,7 @@ class LongTests(unittest.TestCase):
     def test_unary(self):
 
         annotate = function(Long, a=Long)
-        funcs = unary_funcs()
+        funcs = unary_funcs() + integer_unary_funcs()
         m = module(map(annotate, funcs))
 
         values = [-5, 0, 5]
@@ -246,6 +246,14 @@ def unary_funcs():
     return [negate]
 
 
+def integer_unary_funcs():
+
+    def invert(a):
+        return ~a
+
+    return [invert]
+
+
 def binary_funcs():
 
     def add(a, b):
@@ -264,6 +272,20 @@ def binary_funcs():
         return a % b
 
     return [add, sub, mul, div, mod]
+
+
+def integer_binary_funcs():
+
+    def bor(a, b):
+        return a | b
+
+    def band(a, b):
+        return a | b
+
+    def bxor(a, b):
+        return a ^ b
+
+    return [bor, band, bxor]
 
 
 def floating_binary_funcs():

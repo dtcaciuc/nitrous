@@ -242,8 +242,6 @@ for name in ("BuildAdd", "BuildSub", "BuildMul", "BuildUDiv", "BuildSDiv", "Buil
 _func("BuildNeg", ValueRef, [BuilderRef, ValueRef, ctypes.c_char_p])
 _func("BuildICmp", ValueRef, [BuilderRef, ctypes.c_int, ValueRef, ValueRef, ctypes.c_char_p])
 
-
-# Boolean expressions
 _func("BuildNot", ValueRef, [BuilderRef, ValueRef, ctypes.c_char_p])
 for name in ("BuildAnd", "BuildOr", "BuildXor"):
     _func(name, ValueRef, [BuilderRef, ValueRef, ValueRef, ctypes.c_char_p])

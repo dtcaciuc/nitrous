@@ -32,6 +32,9 @@ _INTEGER_BINARY_INST = {
     ast.Add: llvm.BuildAdd,
     ast.Sub: llvm.BuildSub,
     ast.Mult: llvm.BuildMul,
+    ast.BitAnd: llvm.BuildAnd,
+    ast.BitOr: llvm.BuildOr,
+    ast.BitXor: llvm.BuildXor,
     ast.Mod: llvm.build_smod,
     ast.Pow: llvm.build_pow,
     # Integer division is consciously left out and
@@ -52,7 +55,8 @@ _FLOATING_UNARY_INST = {
 }
 
 _INTEGRAL_UNARY_INST = {
-    ast.USub: llvm.BuildNeg
+    ast.USub: llvm.BuildNeg,
+    ast.Invert: llvm.BuildNot
 }
 
 
