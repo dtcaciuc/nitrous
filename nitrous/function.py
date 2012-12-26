@@ -274,37 +274,33 @@ class FunctionBuilder(ast.NodeVisitor):
         # but were not yet declared.
         self.new_funcs = []
 
-    def store(self, addr, value, type_=None):
-        """Stores *value* on the stack under *addr*.
+    def store(self, name, value, type_=None):
+        """Stores *value* on the stack under *name*.
 
-        *addr* can be either a variable name or a GEP value.
-
-        Allocates stack space if *addr* is not an existing variable. Returns
+        Allocates stack space if *name* is not an existing variable. Returns
         the pointer to allocated space.
 
         """
-        dest_type_ = self.typeof(addr)
-
-        if isinstance(addr, basestring):
-            name = addr
-            try:
-                addr = self.locals[name]
-            except KeyError:
-                # First time storing the variable; allocate stack space
-                # and register with most nested scope.
-                func = llvm.GetBasicBlockParent(llvm.GetInsertBlock(self.builder))
-                addr = entry_alloca(func, llvm.TypeOf(value), "v")
-                self.locals[name] = addr
-                # Register value type, if supplied;
-                # also see if value has a registered type already.
-                type_ = type_ or self.typeof(value)
-                if type_ is not None:
-                    self.types[name] = type_
+        try:
+            addr = self.locals[name]
+        except KeyError:
+            # First time storing the variable; allocate stack space
+            # and register with most nested scope.
+            func = llvm.GetBasicBlockParent(llvm.GetInsertBlock(self.builder))
+            addr = entry_alloca(func, llvm.TypeOf(value), "v")
+            self.locals[name] = addr
+            # Register value type, if supplied;
+            # also see if value has a registered type already.
+            type_ = type_ or self.typeof(value)
+            if type_ is not None:
+                self.types[name] = type_
 
         # Make sure storage and value LLVM types match.
         addr_ty = llvm.GetElementType(llvm.TypeOf(addr))
         if not llvm.types_equal(addr_ty, llvm.TypeOf(value)):
-            raise TypeError("Cannot assign {0} to a {1}".format(self.typeof(value), dest_type_))
+            raise TypeError("Cannot assign {0} to a {1}".format(
+                self.typeof(value), self.typeof(name)
+            ))
 
         llvm.BuildStore(self.builder, value, addr)
         return addr
