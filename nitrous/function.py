@@ -288,11 +288,8 @@ class FunctionBuilder(ast.NodeVisitor):
             # and register with most nested scope.
             addr = entry_alloca(self.builder, llvm.TypeOf(value), "v")
             self.locals[name] = addr
-            # Register value type, if supplied;
-            # also see if value has a registered type already.
-            type_ = type_ or self.typeof(value)
-            if type_ is not None:
-                self.types[name] = type_
+            # Register explicitly stated type or propagate existing value type.
+            self.types[name] = type_ or self.typeof(value)
 
         # Make sure storage and value LLVM types match.
         addr_ty = llvm.GetElementType(llvm.TypeOf(addr))
