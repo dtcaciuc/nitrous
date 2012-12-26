@@ -950,7 +950,11 @@ def emit_body(builder, func):
 
 
 def entry_alloca(builder, type_, name):
-    """Reserves stack space for a variable at function entry point."""
+    """Reserves stack space for a variable at function entry point.
+
+    Existing *builder* must point somewhere within the function.
+
+    """
     b = _entry_builder(builder)
     a = llvm.BuildAlloca(b, type_, name)
     llvm.DisposeBuilder(b)
@@ -958,7 +962,11 @@ def entry_alloca(builder, type_, name):
 
 
 def entry_array_alloca(builder, element_type, n, name):
-    """Reserves stack space for an array of size *n* at function entry point."""
+    """Reserves stack space for an array of size *n* at function entry point.
+
+    Existing *builder* must point somewhere within the function.
+
+    """
     b = _entry_builder(builder)
     a = llvm.BuildArrayAlloca(b, element_type, n, name)
     llvm.DisposeBuilder(b)
