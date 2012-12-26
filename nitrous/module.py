@@ -223,9 +223,12 @@ def _create_module(decls, name):
 
         # Emit new defined functions.
         if func.decl.pyfunc is not None:
-
             new_funcs = emit_body(ir_builder, func)
             funcs.extend(new_funcs)
+
+            if func.decl not in decls:
+                # Any compiled function that does not appear in module arguments can be hidden.
+                llvm.SetLinkage(func.llvm_func, llvm.PrivateLinkage)
 
             if llvm.VerifyFunction(func.llvm_func, llvm.PrintMessageAction):
                 raise RuntimeError("Could not compile {0}()".format(func.__name__))
