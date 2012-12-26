@@ -286,8 +286,7 @@ class FunctionBuilder(ast.NodeVisitor):
         except KeyError:
             # First time storing the variable; allocate stack space
             # and register with most nested scope.
-            func = llvm.GetBasicBlockParent(llvm.GetInsertBlock(self.builder))
-            addr = entry_alloca(func, llvm.TypeOf(value), "v")
+            addr = entry_alloca(self.builder, llvm.TypeOf(value), "v")
             self.locals[name] = addr
             # Register value type, if supplied;
             # also see if value has a registered type already.
@@ -950,28 +949,28 @@ def emit_body(builder, func):
     return b.new_funcs
 
 
-def entry_alloca(func, type_, name):
+def entry_alloca(builder, type_, name):
     """Reserves stack space for a variable at function entry point."""
-    entry = llvm.GetEntryBasicBlock(func)
-    builder = llvm.CreateBuilder()
-
-    llvm.PositionBuilder(builder, entry, llvm.GetFirstInstruction(entry))
-    a = llvm.BuildAlloca(builder, type_, name)
-
-    llvm.DisposeBuilder(builder)
+    b = _entry_builder(builder)
+    a = llvm.BuildAlloca(b, type_, name)
+    llvm.DisposeBuilder(b)
     return a
 
 
-def entry_array_alloca(func, element_type, n, name):
+def entry_array_alloca(builder, element_type, n, name):
     """Reserves stack space for an array of size *n* at function entry point."""
-    entry = llvm.GetEntryBasicBlock(func)
-    builder = llvm.CreateBuilder()
-
-    llvm.PositionBuilder(builder, entry, llvm.GetFirstInstruction(entry))
-    a = llvm.BuildArrayAlloca(builder, element_type, n, name)
-
-    llvm.DisposeBuilder(builder)
+    b = _entry_builder(builder)
+    a = llvm.BuildArrayAlloca(b, element_type, n, name)
+    llvm.DisposeBuilder(b)
     return a
+
+
+def _entry_builder(builder):
+    """Returns new entry point builder based on another builder currently working on the function."""
+    b = llvm.CreateBuilder()
+    entry = llvm.GetEntryBasicBlock(llvm.GetBasicBlockParent(llvm.GetInsertBlock(builder)))
+    llvm.PositionBuilder(b, entry, llvm.GetFirstInstruction(entry))
+    return b
 
 
 def try_emit_constant(builder, value):
