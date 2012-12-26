@@ -161,6 +161,16 @@ class AssignTests(unittest.TestCase):
         m = module([f])
         self.assertEqual(m.f(10), 15)
 
+    def test_reassign_bad_type(self):
+
+        @function(Long, a=Long)
+        def f(a):
+            a = 5.0
+
+        message = ">>>     a = 5.0"
+        with self.assertRaisesRegexp(TypeError, message):
+            m = module([f])
+
     def test_assign_global_const(self):
         """Externally declared values are resolved at compile."""
 

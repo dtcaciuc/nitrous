@@ -283,6 +283,8 @@ class FunctionBuilder(ast.NodeVisitor):
         the pointer to allocated space.
 
         """
+        dest_type_ = self.typeof(addr)
+
         if isinstance(addr, basestring):
             name = addr
             try:
@@ -298,6 +300,11 @@ class FunctionBuilder(ast.NodeVisitor):
                 type_ = type_ or self.typeof(value)
                 if type_ is not None:
                     self.types[name] = type_
+
+        # Make sure storage and value LLVM types match.
+        addr_ty = llvm.GetElementType(llvm.TypeOf(addr))
+        if not llvm.types_equal(addr_ty, llvm.TypeOf(value)):
+            raise TypeError("Cannot assign {0} to a {1}".format(self.typeof(value), dest_type_))
 
         llvm.BuildStore(self.builder, value, addr)
         return addr
