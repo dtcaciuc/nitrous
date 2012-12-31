@@ -32,6 +32,10 @@ class _ItemAccessor(object):
             return llvm.BuildLoad(builder, gep, "getitem"), self.element_type
 
     def emit_setitem(self, builder, v, i, e):
+        if not llvm.types_equal(self.element_type.llvm_type, llvm.TypeOf(e)):
+            # FIXME because we don't have e's nitrous type, for now just state
+            # what the type *should* be for assignment to succeed.
+            raise TypeError("Element value must be a(n) {0}".format(self.element_type))
         gep = self._item_gep(builder, v, i)
         llvm.BuildStore(builder, e, gep)
 

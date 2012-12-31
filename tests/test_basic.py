@@ -201,6 +201,16 @@ class AssignTests(unittest.TestCase):
 
 class SubscriptTests(unittest.TestCase):
 
+    def test_assign_wrong_type(self):
+
+        @function(x=Array(Long), y=Double)
+        def f(x, y):
+            x[0] = y
+
+        message = ">>>     x\[0\] = y"
+        with self.assertRaisesRegexp(TypeError, message):
+            module([f])
+
     def test_unsupported_slice(self):
         """Raise error on unsupported context (eg. `del x`)."""
 
