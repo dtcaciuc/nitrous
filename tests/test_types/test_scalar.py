@@ -21,6 +21,21 @@ class CastTests(unittest.TestCase):
 
 class BoolTests(unittest.TestCase):
 
+    def test_literal(self):
+
+        @function(Bool)
+        def true_():
+            return True
+
+        @function(Bool)
+        def false_():
+            return False
+
+        m = module([true_, false_])
+
+        self.assertTrue(m.true_())
+        self.assertFalse(m.false_())
+
     def test_not(self):
 
         @function(Bool, a=Bool)

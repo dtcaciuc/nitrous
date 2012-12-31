@@ -165,6 +165,8 @@ def function(restype=None, **kwargs):
         # Immutable global symbols.
         # - Built-ins
         decl.globals["range"] = range_
+        decl.globals["True"] = True
+        decl.globals["False"] = False
         # - Other symbols available at the point of function
         #   definition; try to resolve as many constants as possible.
         parent_frame = inspect.currentframe().f_back
