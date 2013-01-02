@@ -557,10 +557,10 @@ class FunctionBuilder(ast.NodeVisitor):
     def visit_BoolOp(self, node):
         from .types import Bool
 
-        rhs = self._is_true(self.r_visit(node.values[0]))
+        rhs = self._truncate_bool(self.r_visit(node.values[0]))
         # Expressions like `a > 1 or b > 1 or c > 1` collapse into one `or` with 3 .values
         for v in node.values[1:]:
-            lhs = self._is_true(self.r_visit(v))
+            lhs = self._truncate_bool(self.r_visit(v))
             rhs = _BOOL_INST[type(node.op)](self.builder, lhs, rhs, "cmp")
 
         self.push(_extend_bool(self.builder, rhs), Bool)
@@ -706,7 +706,7 @@ class FunctionBuilder(ast.NodeVisitor):
         llvm.BuildBr(self.builder, test_bb)
         llvm.PositionBuilderAtEnd(self.builder, test_bb)
 
-        test = self._is_true(self.r_visit(node.test))
+        test = self._truncate_bool(self.r_visit(node.test))
         llvm.BuildCondBr(self.builder, test, body_bb, exit_bb)
 
         llvm.PositionBuilderAtEnd(self.builder, body_bb)
@@ -872,19 +872,10 @@ class FunctionBuilder(ast.NodeVisitor):
 
         return llvm.BuildCast(self.builder, llvm.Trunc, v, llvm.IntType(1), "b")
 
-    def _is_true(self, v):
-        from .types import Bool
-
-        if self.typeof(v).tag != Bool.tag:
-            raise TypeError("Must be a boolean expression")
-
-        zero = llvm.ConstNull(Bool.llvm_type)
-        return llvm.BuildICmp(self.builder, llvm.IntNE, v, zero, "nz")
-
     def _emit_bool_not(self, _, v, name):
         """Emits "not" operation for 8-bit boolean value."""
         # FIXME empty argument is for builder, but we have that through `self` already.
-        nv = llvm.BuildNot(self.builder, self._is_true(v), name)
+        nv = llvm.BuildNot(self.builder, self._truncate_bool(v), name)
         return _extend_bool(self.builder, nv)
 
 
