@@ -25,10 +25,11 @@ class Scalar(object):
         return "<Scalar '{0.name}'>".format(self)
 
 
-def _int_type(c_type, name):
-    """Creates a new integral type"""
+def integer_type(c_type, name, tag=None):
+    """Creates a new integer type"""
     bytes = ctypes.sizeof(c_type)
-    return Scalar(c_type, llvm.IntType(bytes * 8), name, "i{0}".format(bytes))
+    tag = tag or "i{0}".format(bytes)
+    return Scalar(c_type, llvm.IntType(bytes * 8), name, tag)
 
 
 Double = Scalar(ctypes.c_double, llvm.DoubleType(), "Double", "f8")
@@ -37,19 +38,19 @@ Double = Scalar(ctypes.c_double, llvm.DoubleType(), "Double", "f8")
 Float = Scalar(ctypes.c_float, llvm.FloatType(), "Float", "f4")
 """Single-precision floating point number."""
 
-Long = _int_type(ctypes.c_long, "Long")
+Long = integer_type(ctypes.c_long, "Long")
 """Long integer."""
 
-Int = _int_type(ctypes.c_int, "Int")
+Int = integer_type(ctypes.c_int, "Int")
 """Integer."""
 
-Byte = _int_type(ctypes.c_byte, "Byte")
+Byte = integer_type(ctypes.c_byte, "Byte")
 """8-bit integer."""
 
-Char = _int_type(ctypes.c_char, "Char")
+Char = integer_type(ctypes.c_char, "Char")
 """Signed character."""
 
-Bool = _int_type(ctypes.c_bool, "Bool")
+Bool = integer_type(ctypes.c_bool, "Bool", "b")
 """Boolean value."""
 
 
