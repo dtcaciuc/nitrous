@@ -47,6 +47,17 @@ class BoolTests(unittest.TestCase):
         self.assertTrue(m.not_(False))
         self.assertFalse(m.not_(True))
 
+    def test_not_wrong_type(self):
+
+        @function(Bool, a=Long)
+        def not_(a):
+            na = not a
+            return na
+
+        message = "  >>>     na = not a"
+        with self.assertRaisesRegexp(TypeError, message):
+            module([not_])
+
     def test_and(self):
 
         @function(Bool, a=Bool, b=Bool)

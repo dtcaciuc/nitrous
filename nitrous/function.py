@@ -490,8 +490,6 @@ class FunctionBuilder(ast.NodeVisitor):
         raise RuntimeError("Encountered unexpected augmented assignment")
 
     def visit_Return(self, node):
-        from .types import Bool
-
         func = llvm.GetBasicBlockParent(llvm.GetInsertBlock(self.builder))
         return_type = llvm.function_return_type(func)
 
@@ -503,12 +501,6 @@ class FunctionBuilder(ast.NodeVisitor):
 
         else:
             v = self.r_visit(node.value)
-            t = llvm.TypeOf(v)
-            # Special case; if we're returning boolean, cast to i8
-            # FIXME Move this to Bool.emit_cast_to or similar?
-            if (llvm.GetTypeKind(t) == llvm.IntegerTypeKind and llvm.GetIntTypeWidth(t) == 1):
-                v = llvm.BuildCast(self.builder, llvm.ZExt, v, Bool.llvm_type, "tmp")
-
             if not llvm.types_equal(llvm.TypeOf(v), return_type):
                 raise TypeError("Unexpected return value type")
 
@@ -521,9 +513,7 @@ class FunctionBuilder(ast.NodeVisitor):
         op_type = type(node.op)
 
         if op_type == ast.Not:
-            # Boolean `not`
-            rhs = emit_nonzero(self.builder, rhs)
-            inst = llvm.BuildNot
+            inst = self._emit_bool_not
         elif kind == llvm.IntegerTypeKind:
             inst = _INTEGRAL_UNARY_INST[op_type]
         elif kind in (llvm.FloatTypeKind, llvm.DoubleTypeKind):
@@ -533,7 +523,7 @@ class FunctionBuilder(ast.NodeVisitor):
                             .format(node.op, self.typeof(rhs)))
 
         v = inst(self.builder, rhs, op_type.__name__.lower())
-        self.push(v)
+        self.push(v, self.typeof(rhs))
 
     def visit_BinOp(self, node):
         lhs = self.r_visit(node.left)
@@ -565,15 +555,19 @@ class FunctionBuilder(ast.NodeVisitor):
         self.push(v, self.typeof(lhs))
 
     def visit_BoolOp(self, node):
-        rhs = emit_nonzero(self.builder, self.r_visit(node.values[0]))
+        from .types import Bool
+
+        rhs = self._is_true(self.r_visit(node.values[0]))
         # Expressions like `a > 1 or b > 1 or c > 1` collapse into one `or` with 3 .values
         for v in node.values[1:]:
-            lhs = emit_nonzero(self.builder, self.r_visit(v))
+            lhs = self._is_true(self.r_visit(v))
             rhs = _BOOL_INST[type(node.op)](self.builder, lhs, rhs, "cmp")
 
-        self.push(rhs)
+        self.push(_extend_bool(self.builder, rhs), Bool)
 
     def visit_Compare(self, node):
+        from .types import Bool
+
         if len(node.ops) > 1 or len(node.comparators) > 1:
             raise NotImplementedError("Only simple `if` expressions are supported")
 
@@ -600,10 +594,10 @@ class FunctionBuilder(ast.NodeVisitor):
                             .format(self.typeof(lhs), self.typeof(rhs)))
 
         v = inst(self.builder, ops[type(op)], lhs, rhs, "cmp")
-        self.push(v)
+        self.push(_extend_bool(self.builder, v), Bool)
 
     def visit_IfExp(self, node):
-        test_expr = truncate_bool(self.builder, self.r_visit(node.test))
+        test_expr = self._truncate_bool(self.r_visit(node.test))
 
         func = llvm.GetBasicBlockParent(llvm.GetInsertBlock(self.builder))
         if_branch_bb = llvm.AppendBasicBlock(func, "if")
@@ -638,7 +632,7 @@ class FunctionBuilder(ast.NodeVisitor):
         self.push(phi)
 
     def visit_If(self, node):
-        test_expr = truncate_bool(self.builder, self.r_visit(node.test))
+        test_expr = self._truncate_bool(self.r_visit(node.test))
 
         func = llvm.GetBasicBlockParent(llvm.GetInsertBlock(self.builder))
         if_branch_bb = llvm.AppendBasicBlock(func, "if")
@@ -712,11 +706,8 @@ class FunctionBuilder(ast.NodeVisitor):
         llvm.BuildBr(self.builder, test_bb)
         llvm.PositionBuilderAtEnd(self.builder, test_bb)
 
-        test = self.r_visit(node.test)
-
-        true_ = llvm.ConstInt(llvm.IntType(1), 1, True)
-        t = llvm.BuildICmp(self.builder, llvm.IntEQ, test, true_, "t")
-        llvm.BuildCondBr(self.builder, t, body_bb, exit_bb)
+        test = self._is_true(self.r_visit(node.test))
+        llvm.BuildCondBr(self.builder, test, body_bb, exit_bb)
 
         llvm.PositionBuilderAtEnd(self.builder, body_bb)
 
@@ -872,6 +863,30 @@ class FunctionBuilder(ast.NodeVisitor):
 
         return llvm_func
 
+    def _truncate_bool(self, v):
+        """Truncates boolean carrying byte to 1-bit integer for use in conditionals."""
+        from .types import Bool
+
+        if self.typeof(v).tag != Bool.tag:
+            raise TypeError("Must be a boolean expression")
+
+        return llvm.BuildCast(self.builder, llvm.Trunc, v, llvm.IntType(1), "b")
+
+    def _is_true(self, v):
+        from .types import Bool
+
+        if self.typeof(v).tag != Bool.tag:
+            raise TypeError("Must be a boolean expression")
+
+        zero = llvm.ConstNull(Bool.llvm_type)
+        return llvm.BuildICmp(self.builder, llvm.IntNE, v, zero, "nz")
+
+    def _emit_bool_not(self, _, v, name):
+        """Emits "not" operation for 8-bit boolean value."""
+        # FIXME empty argument is for builder, but we have that through `self` already.
+        nv = llvm.BuildNot(self.builder, self._is_true(v), name)
+        return _extend_bool(self.builder, nv)
+
 
 class UnpackAugAssign(ast.NodeTransformer):
     """Replaces augmented assignments with non-augmented ones.
@@ -980,6 +995,13 @@ def _entry_builder(builder):
     return b
 
 
+def _extend_bool(builder, v):
+    """Extends 1-bit boolean to conventional one."""
+    from .types import Bool
+
+    return llvm.BuildCast(builder, llvm.ZExt, v, Bool.llvm_type, "b")
+
+
 def try_emit_constant(builder, value):
     """Same as emit_constant but does not raise TypeError."""
     try:
@@ -1017,31 +1039,6 @@ def emit_constant_string(builder, value):
     llvm.SetLinkage(s, llvm.PrivateLinkage)
 
     return llvm.BuildPointerCast(builder, s, String.llvm_type, "")
-
-
-def emit_nonzero(builder, v):
-    """Emits check to see whether the value of *v* is non-zero."""
-    ty = llvm.TypeOf(v)
-    kind = llvm.GetTypeKind(ty)
-    if kind in (llvm.IntegerTypeKind, llvm.PointerTypeKind):
-        v = llvm.BuildICmp(builder, llvm.IntNE, v, llvm.ConstNull(ty), "nz")
-    else:
-        raise TypeError("Incompatible type for boolean expressions")
-        # TODO say which type exactly
-    return v
-
-
-def truncate_bool(builder, v):
-    """Truncate Bool value for use in conditional comparison"""
-    t = llvm.TypeOf(v)
-    if llvm.GetTypeKind(t) == llvm.IntegerTypeKind:
-        width = llvm.GetIntTypeWidth(t)
-        if width == 8:
-            return llvm.BuildCast(builder, llvm.Trunc, v, llvm.IntType(1), "v")
-        elif width == 1:
-            return v
-
-    raise TypeError("Not a boolean variable")
 
 
 def _qualified_name(module, decl):
