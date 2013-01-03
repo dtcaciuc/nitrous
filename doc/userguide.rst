@@ -337,6 +337,27 @@ compiled functions through familiar ``shape`` and ``ndim`` attibutes::
         x = coords[i, 0]
 
 
+Partial Slices
+**************
+
+Given N-dimensional slice, a partial slice points to a M dimensional block of
+elements where M < N. Partial slices are obtained by supplying M-dimensional
+index to N-dimensional slice or array. The resulting object is a regular Slice.
+
+.. code-block:: python
+
+    # x = Slice(Double, (Any, 5, 3))
+
+    x1 = x[1]        # x1 = Slice(Double, (5, 3)), pointing at second "row" of x
+    x11 = x[1, 1]    # simiarly, x11 = Slice(Double, (3,))
+
+    x11[2] == x1[1, 2] == x[1, 1, 2]  # These expressions are equivalent
+
+This is convenient when working on a portion of elements having one or more
+dimensions fixed. As with complete slices, first index always selects along the
+major dimension and so on.
+
+
 Memory Aliasing
 ***************
 
