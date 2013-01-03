@@ -200,3 +200,96 @@ class IndexTests(unittest.TestCase):
         # Should have run-time multiplications during index flattening.
         self.assertRegexpMatches(dump(m), "mul")
         self.assertEqual(m.f(self.data), 14)
+
+
+class SubsliceTests(unittest.TestCase):
+
+    def setUp(self):
+        self.DataSlice = Slice(Long, (5, 2, 3))
+        self.data = (((Long.c_type * 3) * 2) * 5)(
+            ((0, 1, 2), (3, 4, 5)),
+            ((6, 7, 8), (18, 19, 20)),
+            ((21, 22, 23), (24, 25, 26)),
+            ((9, 10, 11), (12, 13, 14)),
+            ((15, 16, 17), (33, 34, 35)),
+        )
+        self.addCleanup(delattr, self, "DataSlice")
+        self.addCleanup(delattr, self, "data")
+
+    def test_subslice_shape_i(self):
+        """Subslice shape reduced by one dimension (two remain)"""
+
+        ND, S0, S1 = range(3)
+
+        @function(x=self.DataSlice, i=Long, v=Slice(Long))
+        def get_i(x, i, v):
+            s = x[i]
+            v[ND] = s.ndim
+            v[S0] = s.shape[0]
+            v[S1] = s.shape[1]
+
+        m = module([get_i])
+        v = (Long.c_type * 3)()
+
+        # Shape and dimensions should not depend on indices.
+        for i in range(5):
+            m.get_i(self.data, i, v)
+            self.assertEqual(v[ND], 2)
+            self.assertEqual(v[S0], 2)
+            self.assertEqual(v[S1], 3)
+
+    def test_subslice_shape_ij(self):
+        """Subslice shape reduced by two dimensions (one remains)"""
+
+        ND, S0 = range(2)
+
+        @function(x=self.DataSlice, i=Long, j=Long, v=Slice(Long))
+        def get_ij(x, i, j, v):
+            s = x[i, j]
+            v[ND] = s.ndim
+            v[S0] = s.shape[0]
+
+        m = module([get_ij])
+        v = (Long.c_type * 2)()
+
+        # Shape and dimensions should not depend on indices.
+        for i in range(5):
+            for j in range(2):
+                m.get_ij(self.data, i, j, v)
+                self.assertEqual(v[ND], 1)
+                self.assertEqual(v[S0], 3)
+
+    def test_subslice_data_i(self):
+        """Subslice data reduced by one dimension (two remain)"""
+
+        @function(x=self.DataSlice, i=Long, v=Slice(Long, (2, 3)))
+        def get_i(x, i, v):
+            s = x[i]
+            for j in range(2):
+                for k in range(3):
+                    v[j, k] = s[j, k]
+
+        m = module([get_i])
+        v = ((Long.c_type * 3) * 2)()
+
+        for i in range(5):
+            m.get_i(self.data, i, v)
+            ref_v = list(list(row) for row in self.data[i])
+            self.assertEqual(list(list(row) for row in v), ref_v)
+
+    def test_subslice_data_ij(self):
+        """Subslice data reduced by one dimension (two remain)"""
+
+        @function(x=self.DataSlice, i=Long, j=Long, v=Slice(Long, (3,)))
+        def get_ij(x, i, j, v):
+            s = x[i, j]
+            for k in range(3):
+                v[k] = s[k]
+
+        m = module([get_ij])
+        v = (Long.c_type * 3)()
+
+        for i in range(5):
+            for j in range(2):
+                m.get_ij(self.data, i, j, v)
+                self.assertEqual(list(v), list(self.data[i][j]))

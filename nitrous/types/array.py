@@ -25,11 +25,14 @@ class _ItemAccessor(object):
     """Mixin for common Array/Slice item accessing routines."""
 
     def emit_getitem(self, builder, v, i):
-        gep = self._item_gep(builder, v, i)
-        if is_aggregate(self.element_type):
-            return gep, Reference(self.element_type)
+        if len(i) < len(self.shape):
+            return self._emit_subslice(builder, v, i)
         else:
-            return llvm.BuildLoad(builder, gep, "getitem"), self.element_type
+            gep = self._item_gep(builder, v, i)
+            if is_aggregate(self.element_type):
+                return gep, Reference(self.element_type)
+            else:
+                return llvm.BuildLoad(builder, gep, "getitem"), self.element_type
 
     def emit_setitem(self, builder, v, i, e):
         if not llvm.types_equal(self.element_type.llvm_type, llvm.TypeOf(e)):
@@ -38,6 +41,34 @@ class _ItemAccessor(object):
             raise TypeError("Element value must be a(n) {0}".format(self.element_type))
         gep = self._item_gep(builder, v, i)
         llvm.BuildStore(builder, e, gep)
+
+    def _emit_subslice(self, builder, v, i):
+        """Emits a sub-slice based on partial index *i*"""
+        from ..function import entry_alloca, entry_array_alloca
+
+        SSTy = Slice(self.element_type, self.shape[len(i):])
+        Shape = Array(Index)
+
+        ss = entry_alloca(builder, SSTy.llvm_type, "subslice")
+
+        # Setting ndim
+        n_subdims = const_index(len(self.shape) - len(i))
+        SSTy._struct.emit_setattr(builder, ss, "ndim", n_subdims)
+
+        # Allocating and setting shape dimensions
+        subshape = entry_array_alloca(builder, Index.llvm_type, n_subdims, "subshape")
+        SSTy._struct.emit_setattr(builder, ss, "shape", subshape)
+
+        shape, shape_ty = self.emit_getattr(builder, v, "shape")
+        for j in range(len(self.shape) - len(i)):
+            dim, _ = Shape.emit_getitem(builder, shape, (const_index(j + len(i)),))
+            Shape.emit_setitem(builder, subshape, (const_index(j),), dim)
+
+        # Setting pointer to data sub-block.
+        data_idx = i + (const_index(0),) * (len(self.shape) - len(i))
+        SSTy._struct.emit_setattr(builder, ss, "data", self._item_gep(builder, v, data_idx))
+
+        return ss, SSTy
 
 
 class Array(_ItemAccessor):
@@ -117,7 +148,7 @@ class Array(_ItemAccessor):
 
     def _item_gep(self, builder, v, i):
         if len(i) != len(self.shape):
-            raise TypeError("Index and pointer shapes don't match ({0} != {1})"
+            raise TypeError("Index and array shapes don't match ({0} != {1})"
                             .format(len(i), len(self.shape)))
 
         # TODO check const shape dimension values?
@@ -200,6 +231,10 @@ class Slice(_ItemAccessor):
         raise TypeError("Slice is immutable")
 
     def _item_gep(self, builder, v, i):
+        if len(i) != len(self.shape):
+            raise TypeError("Index and slice shapes don't match ({0} != {1})"
+                            .format(len(i), len(self.shape)))
+
         # Get array shape from struct value
         shape_value, shape_type = self.emit_getattr(builder, v, "shape")
         data_value, data_type = self.emit_getattr(builder, v, "data")

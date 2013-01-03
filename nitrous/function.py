@@ -464,6 +464,8 @@ class FunctionBuilder(ast.NodeVisitor):
         # Index is a nd tuple
         i = self.r_visit(node.slice)
 
+        # TODO catch attribute error; raise type error
+        # indicating that this type does not support indexing.
         if isinstance(node.ctx, ast.Load):
             self.push(*vt.emit_getitem(self.builder, v, i))
         elif isinstance(node.ctx, ast.Store):
