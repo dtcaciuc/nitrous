@@ -124,6 +124,56 @@ class BoolTests(unittest.TestCase):
         self.assertTrue(m.or_(1, 0, 1))
         self.assertTrue(m.or_(1, 0, 3))
 
+    def test_and_eval(self):
+        """Don't evaluate `and`ed expressions if not necessary."""
+        from nitrous.types.array import Array
+
+        @function(Bool, b=Array(Bool))
+        def side_effect(b):
+            b[0] = True
+            return True
+
+        @function(Bool, a=Bool, b=Array(Bool))
+        def and_(a, b):
+            return a and side_effect(b)
+
+        m = module([and_])
+
+        # First value is true; b should evaluate as well
+        x = (Bool.c_type * 1)(False)
+        m.and_(True, x)
+        self.assertTrue(x[0])
+
+        # First value is false; should skip next term.
+        x = (Bool.c_type * 1)(False)
+        m.and_(False, x)
+        self.assertFalse(x[0])
+
+    def test_or_eval(self):
+        """Don't evaluate `or`ed expressions if not necessary."""
+        from nitrous.types.array import Array
+
+        @function(Bool, b=Array(Bool))
+        def side_effect(b):
+            b[0] = True
+            return True
+
+        @function(Bool, a=Bool, b=Array(Bool))
+        def or_(a, b):
+            return a or side_effect(b)
+
+        m = module([or_])
+
+        # First value is true; should skip b
+        x = (Bool.c_type * 1)(False)
+        m.or_(True, x)
+        self.assertFalse(x[0])
+
+        # First value is false; should evaluate b
+        x = (Bool.c_type * 1)(False)
+        m.or_(False, x)
+        self.assertTrue(x[0])
+
 
 class LongTests(unittest.TestCase):
 

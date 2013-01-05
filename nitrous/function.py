@@ -5,11 +5,6 @@ from contextlib import contextmanager
 from . import llvm
 
 
-_BOOL_INST = {
-    ast.And: llvm.BuildAnd,
-    ast.Or: llvm.BuildOr
-}
-
 _INTEGER_COMPARE_INST = llvm.BuildICmp, {
     ast.Eq: llvm.IntEQ,
     ast.Gt: llvm.IntSGT,
@@ -559,13 +554,12 @@ class FunctionBuilder(ast.NodeVisitor):
     def visit_BoolOp(self, node):
         from .types import Bool
 
-        rhs = self._truncate_bool(self.r_visit(node.values[0]))
-        # Expressions like `a > 1 or b > 1 or c > 1` collapse into one `or` with 3 .values
-        for v in node.values[1:]:
-            lhs = self._truncate_bool(self.r_visit(v))
-            rhs = _BOOL_INST[type(node.op)](self.builder, lhs, rhs, "cmp")
-
-        self.push(_extend_bool(self.builder, rhs), Bool)
+        if isinstance(node.op, ast.And):
+            self.push(self._emit_bool_and(node), Bool)
+        elif isinstance(node.op, ast.Or):
+            self.push(self._emit_bool_or(node), Bool)
+        else:
+            raise RuntimeError("Unknown boolean op {0}".format(node.op))
 
     def visit_Compare(self, node):
         from .types import Bool
@@ -879,6 +873,78 @@ class FunctionBuilder(ast.NodeVisitor):
         # FIXME empty argument is for builder, but we have that through `self` already.
         nv = llvm.BuildNot(self.builder, self._truncate_bool(v), name)
         return _extend_bool(self.builder, nv)
+
+    def _emit_bool_and(self, node):
+        """Emits "and" operation for 8-bit boolean values."""
+        func = llvm.GetBasicBlockParent(llvm.GetInsertBlock(self.builder))
+        exit_bb = llvm.AppendBasicBlock(func, "and.exit")
+
+        # Given expression `v.0 and v.1 and ... v.n`, produce the following IR:
+        #  result = False
+        #  v.0 = ...
+        #  goto cond.1 if v.0 else cond.exit
+        # cond.1:
+        #  v.1 = ...
+        #  goto cond.2 if v.1 else cond.exit
+        # ...
+        # cond.n:
+        #  result = True
+        #  goto exit
+        # exit:
+        #  ...
+
+        Bool1Ty = llvm.IntType(1)
+        r = entry_alloca(self.builder, Bool1Ty, "")
+        llvm.BuildStore(self.builder, llvm.ConstNull(Bool1Ty), r)
+
+        for v in node.values[:-1]:
+            next_bb = llvm.AppendBasicBlock(func, "and.next")
+            llvm.MoveBasicBlockBefore(next_bb, exit_bb)
+            cond = self._truncate_bool(self.r_visit(v))
+            llvm.BuildCondBr(self.builder, cond, next_bb, exit_bb)
+            llvm.PositionBuilderAtEnd(self.builder, next_bb)
+
+        llvm.BuildStore(self.builder, self._truncate_bool(self.r_visit(node.values[-1])), r)
+        llvm.BuildBr(self.builder, exit_bb)
+        llvm.PositionBuilderAtEnd(self.builder, exit_bb)
+
+        return _extend_bool(self.builder, llvm.BuildLoad(self.builder, r, "and.result"))
+
+    def _emit_bool_or(self, node):
+        """Emits "or" operation for 8-bit boolean values."""
+        func = llvm.GetBasicBlockParent(llvm.GetInsertBlock(self.builder))
+        exit_bb = llvm.AppendBasicBlock(func, "or.exit")
+
+        # Given expression `v.0 or v.1 or ... v.n`, produce the following IR:
+        #  result = v.0 = ...
+        #  goto cond.exit if v.0 else cond.1
+        # cond.1:
+        #  result = v.1 = ...
+        #  goto cond.exit if v.1 else cond.2
+        # ...
+        # cond.n:
+        #  result = v.n = ...
+        #  goto exit
+        # exit:
+        #  ...
+
+        Bool1Ty = llvm.IntType(1)
+        r = entry_alloca(self.builder, Bool1Ty, "")
+        llvm.BuildStore(self.builder, llvm.ConstNull(Bool1Ty), r)
+
+        for v in node.values[:-1]:
+            next_bb = llvm.AppendBasicBlock(func, "or.next")
+            llvm.MoveBasicBlockBefore(next_bb, exit_bb)
+            cond = self._truncate_bool(self.r_visit(v))
+            llvm.BuildStore(self.builder, cond, r)
+            llvm.BuildCondBr(self.builder, cond, exit_bb, next_bb)
+            llvm.PositionBuilderAtEnd(self.builder, next_bb)
+
+        llvm.BuildStore(self.builder, self._truncate_bool(self.r_visit(node.values[-1])), r)
+        llvm.BuildBr(self.builder, exit_bb)
+        llvm.PositionBuilderAtEnd(self.builder, exit_bb)
+
+        return _extend_bool(self.builder, llvm.BuildLoad(self.builder, r, "or.result"))
 
 
 class UnpackAugAssign(ast.NodeTransformer):
