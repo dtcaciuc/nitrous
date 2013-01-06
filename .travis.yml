@@ -4,13 +4,15 @@ python:
     - 2.7
 
 virtualenv:
-  system_site_packages: true
+    system_site_packages: true
 
 before_install:
     - sudo apt-get install python-numpy
-    - wget http://llvm.org/releases/3.1/clang+llvm-3.1-x86-linux-ubuntu-11.10.tar.bz2
-    - tar xf clang+llvm-3.1-x86-linux-ubuntu-11.10.tar.bz2
-    - export PATH=$(pwd)/clang+llvm-3.1-x86-linux-ubuntu-11.10/bin:$PATH
+    - wget -O – http://llvm.org/releases/3.2/clang+llvm-3.2-x86-linux-ubuntu-12.04.tar.gz | tar xf
+    - export PATH=$(pwd)/clang+llvm-3.2-x86-linux-ubuntu-12.04/bin:$PATH
+#   - wget http://llvm.org/releases/3.1/clang+llvm-3.1-x86-linux-ubuntu-11.10.tar.bz2
+#   - tar xf clang+llvm-3.1-x86-linux-ubuntu-11.10.tar.bz2
+#   - export PATH=$(pwd)/clang+llvm-3.1-x86-linux-ubuntu-11.10/bin:$PATH
 
 install:
     - pip install coverage
