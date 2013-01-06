@@ -11,7 +11,7 @@ Requirements
 ------------
 
 * Python 2.7
-* LLVM + clang 3.1 (can be acquired from the official [download page](http://llvm.org/releases/download.html))
+* LLVM + clang 3.2 (can be acquired from the official [download page](http://llvm.org/releases/download.html))
 * `nose` and `coverage` for running tests
 * `faulthandler` if you want to get meaningful tracebacks from low-level crashes.
 
