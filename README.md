@@ -1,7 +1,7 @@
 Nitrous
 =======
 
-[![Build Status](https://secure.travis-ci.org/dtcaciuc/nitrous.png)](http://travis-ci.org/dtcaciuc/nitrous)
+[![Build Status](https://travis-ci.org/dtcaciuc/nitrous.png?branch=master)](http://travis-ci.org/dtcaciuc/nitrous)
 
 Nitrous provides a run-time LLVM-based compiler for CPython functions.
 
