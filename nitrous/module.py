@@ -62,8 +62,7 @@ def so_module(decls, libs=[], libdirs=[], name=None):
     libs = tuple("-l{0}".format(lib) for lib in libs if isinstance(lib, basestring))
     libdirs = tuple("-L{0}".format(d) for d in libdirs)
 
-    # TODO get target data from TargetMachine?
-    _optimize(module, None)
+    _optimize(module, llvm.GetTargetMachineData(machine))
 
     with tempfile.NamedTemporaryFile(suffix=".s") as tmp_s:
         message = ctypes.c_char_p()
