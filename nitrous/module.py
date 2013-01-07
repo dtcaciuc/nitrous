@@ -79,9 +79,7 @@ def so_module(decls, libs=[], libdirs=[], name=None):
             raise RuntimeError("Could not build target extension")
 
         # Debug
-        # if call(("otool", "-tv", so_path)):
-        #     raise RuntimeError("Could not disassemble target extension")
-        # if call(("objdump", "-S", so_path)):
+        # if call(("llvm-objdump", "-disassemble", so_path)):
         #     raise RuntimeError("Could not disassemble target extension")
 
     llvm.DisposeTargetMachine(machine)
