@@ -47,19 +47,17 @@ def cast(value, target_type):
 
     @value_emitter
     def emit(builder):
-        # TODO support
-        # * unsigned integers
 
-        # No-op if type is the same
+        # No-op if LLVM type is the same
         value_type = llvm.TypeOf(value)
         if llvm.types_equal(target_type.llvm_type, value_type):
-            return value, None
+            return value, target_type
 
         value_kind = llvm.GetTypeKind(value_type)
         target_kind = llvm.GetTypeKind(target_type.llvm_type)
 
         def build_cast(op):
-            return llvm.BuildCast(builder, op, value, target_type.llvm_type, "cast"), None
+            return llvm.BuildCast(builder, op, value, target_type.llvm_type, "cast"), target_type
 
         if len(set((value_kind, target_kind))) == 2:
             try:
@@ -78,7 +76,7 @@ def cast(value, target_type):
             elif target_width < value_width:
                 return build_cast(llvm.Trunc)
             else:
-                return value, None
+                return value, target_type
 
         else:
             raise TypeError("Cannot cast {0} to {1}".format(value, target_type))
