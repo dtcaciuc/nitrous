@@ -271,7 +271,7 @@ class FunctionBuilder(ast.NodeVisitor):
         # but were not yet declared.
         self.new_funcs = []
 
-    def store(self, name, value, type_=None):
+    def store(self, name, value, type_):
         """Stores *value* on the stack under *name*.
 
         Allocates stack space if *name* is not an existing variable. Returns
@@ -286,7 +286,7 @@ class FunctionBuilder(ast.NodeVisitor):
             addr = entry_alloca(self.builder, llvm.TypeOf(value), "v")
             self.locals[name] = addr
             # Register explicitly stated type or propagate existing value type.
-            self.types[name] = type_ or self.typeof(value)
+            self.types[name] = type_
 
         # Make sure storage and value LLVM types match.
         addr_ty = llvm.GetElementType(llvm.TypeOf(addr))
@@ -381,7 +381,8 @@ class FunctionBuilder(ast.NodeVisitor):
         if isinstance(node.ctx, ast.Load):
             self.push(self.load(node.id), self.typeof(node.id))
         elif isinstance(node.ctx, ast.Store):
-            self.store(node.id, self.pop())
+            v = self.pop()
+            self.store(node.id, v, self.typeof(v))
         else:
             raise NotImplementedError("Unknown Name context {0!s}".format(type(node.ctx)))
 
