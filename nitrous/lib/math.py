@@ -14,7 +14,7 @@ def exp(T):
 
     """
     def exp_(x):
-        return IntrinsicEmitter("exp", (x,), (T,))
+        return IntrinsicEmitter("exp", (x,), (T,), T)
     return exp_
 
 
@@ -25,7 +25,7 @@ def pow(T):
 
     """
     def pow_(x, y):
-        return IntrinsicEmitter("pow", (x, y), (T,))
+        return IntrinsicEmitter("pow", (x, y), (T,), T)
     return pow_
 
 
@@ -36,7 +36,7 @@ def log(T):
 
     """
     def log_(x):
-        return IntrinsicEmitter("log", (x,), (T,))
+        return IntrinsicEmitter("log", (x,), (T,), T)
     return log_
 
 
@@ -47,5 +47,5 @@ def sqrt(T):
 
     """
     def sqrt_(x):
-        return IntrinsicEmitter("sqrt", (x,), (T,))
+        return IntrinsicEmitter("sqrt", (x,), (T,), T)
     return sqrt_

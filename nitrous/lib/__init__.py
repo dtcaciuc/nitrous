@@ -28,18 +28,20 @@ class IntrinsicEmitter(object):
     """Convenicnce emitter for wrapping ``llvm.{name}`` intrinsic functions.
 
     The *spec* lists types that are used to select particular
-    overloaded variant.
+    overloaded variant. *rtype* is the declared Nitrous type of
+    the result value.
 
     """
 
-    def __init__(self, name, args, spec):
+    def __init__(self, name, args, spec, rtype):
         self.name = name
         self.args = (llvm.ValueRef * len(args))(*args)
         self.spec = (llvm.TypeRef * len(spec))(*(t.llvm_type for t in spec))
+        self.rtype = rtype
 
     def __call__(self, builder):
         func = llvm.get_intrinsic(builder, self.name, self.spec)
-        return llvm.BuildCall(builder, func, self.args, len(self.args), "call"), None
+        return llvm.BuildCall(builder, func, self.args, len(self.args), "call"), self.rtype
 
 
 def cast(value, target_type):
