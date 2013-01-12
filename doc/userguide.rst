@@ -146,6 +146,13 @@ conditional/loop block rather than the function::
     x = z               # OK, z is in the current scope
     x = y               # Error, y scope is limited to `if` block
 
+Loops
+-----
+
+Both ``while`` and ``for`` loops are supported. At the moment, the only
+acceptable loop variable expression is ``range`` built-in call. Loop variable
+itself is always of type :data:`~nitrous.types.Index` (see `indices`_).
+
 Printing
 --------
 
@@ -277,6 +284,15 @@ equivalents.
 .. note:: Unsigned integer types are currently not supported.
 
 Different types can have the same size but are backed with different ctypes.
+
+.. _indices:
+
+Indices
+-------
+
+For simplicity, several variable contexts such as `for` loop counters and
+indices used in array/slice access are currently restricted to an integer of a
+single width, aliased as :data:`~nitrous.types.Index`.
 
 
 Strings
