@@ -743,7 +743,7 @@ class FunctionBuilder(ast.NodeVisitor):
         so that nested blocks can resolve break/continue statements.
 
         """
-        from .types import const_index
+        from .types import Index, const_index
 
         if len(node.orelse) != 0:
             raise NotImplementedError("`else` in a `for` statement is not supported")
@@ -778,7 +778,7 @@ class FunctionBuilder(ast.NodeVisitor):
 
         target = node.target.id
 
-        i_ptr = self.store(target, start)
+        i_ptr = self.store(target, start, Index)
         llvm.BuildBr(self.builder, test_bb)
 
         # Loop test
