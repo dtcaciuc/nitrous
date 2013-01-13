@@ -1192,9 +1192,9 @@ def _unpack_translation_error(func_lines, args, before=2, after=5):
     :param after: number of lines to show after the offending one.
 
     """
-    from itertools import chain
+    from itertools import chain, islice
 
-    def draw_arrow(snippet, line_index):
+    def draw_gutter(snippet, line_index):
         for i, line in enumerate(snippet):
             prefix = "  >>> " if i == line_index else "      "
             yield prefix + line
@@ -1202,7 +1202,7 @@ def _unpack_translation_error(func_lines, args, before=2, after=5):
     error_type, line_number, message = args
     line_i = line_number - 1
 
-    snippet = func_lines.split("\n")[min(0, line_i - before): line_i + after]
-    tb = draw_arrow(snippet, line_i)
+    padded = draw_gutter(func_lines.split("\n"), line_i)
+    snippet = islice(padded, max(0, line_i - before), line_i + after)
 
-    return error_type("\n".join(chain((message, "  Traceback:"), tb)))
+    return error_type("\n".join(chain((message, "  Traceback:"), snippet)))
