@@ -211,12 +211,8 @@ def _create_module(decls, name):
     while i < len(funcs):
         func = funcs[i]
 
-        # Update globals with local function objects, including
-        # ourselves; this allows for declaration order-independent
-        # visibility and recursive calls.
-        # TODO this is broken for the new module() arrangement; needs rewrite.
-        for other_func in funcs:
-            func.globals[other_func.__name__] = other_func.decl
+        # Making current function declaration available to itself for recursive calls.
+        func.globals[func.__name__] = func.decl
 
         # Emit new defined functions.
         if func.decl.pyfunc is not None:
