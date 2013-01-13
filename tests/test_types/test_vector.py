@@ -4,7 +4,7 @@ from nitrous.module import module
 from nitrous.function import function
 from nitrous.types import Float
 from nitrous.types.array import Slice
-from nitrous.types.vector import Vector, load, store, get_element, set_element, fill
+from nitrous.exp.vector import Vector, load, store, get_element, set_element, fill
 
 FloatP = Slice(Float, (4,))
 Float4 = Vector(Float, 4)

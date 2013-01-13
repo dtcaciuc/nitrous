@@ -9,9 +9,3 @@ Arrays and Slices
 
 .. automodule:: nitrous.types.array
     :members:
-
-Vectors
--------
-
-.. automodule:: nitrous.types.vector
-    :members:

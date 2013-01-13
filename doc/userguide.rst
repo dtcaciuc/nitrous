@@ -430,6 +430,69 @@ accessed.  Similarly,
         n = x.ndim
         ...
 
+Interfacing C Libraries
+=======================
+
+The :func:`~nitrous.function.c_function` can be used to call functions defined
+in static or shared libraries::
+
+
+    _atol = c_function("atol", Long, [Pointer(Char)])
+
+    @function(Long, s=Pointer(Char))
+    def atol(s):
+        return _atol(s)
+
+    m = module([atol], libs=["c"])
+    assert m.atol("42") == 42
+
+
+The optional ``libs`` argument is similar to ``-l`` argument to GCC or Clang
+and instructs Nitrous to look for symbols in specified libraries.
+
+.. note::
+
+    Using already built libraries is currently limited to shared object-backed modules.
+
+Building From Source
+--------------------
+
+If you're working with source files rather than already built libraries, the
+``libs`` argument can accept an instance of
+:class:`~nitrous.module.CppLibrary`. Source files are transparently compiled
+into objects and are linked together with the target module. Extending the
+previous example:
+
+.. code-block:: cpp
+
+    // write_long.c
+
+    #include <stdio.h>
+
+    void write_long(long x) {
+        printf(" value of x: %li\n", x);
+    }
+
+.. code-block:: python
+
+    # print_atol.py
+
+    _atol = c_function("atol", Long, [Pointer(Char)])
+    _write_long = c_function("write_long", None, [Long])
+
+    @function(s=Pointer(Char))
+    def print_atol(s):
+        _write_long(_atol(s))
+
+    m = module([print_atol], libs=[CppLibrary(["write_long.c"]), "c"])
+
+    # Prints out `value of x: 42`
+    m.print_atol("42")
+
+
+Experimental Features
+=====================
+
 Vectors
 -------
 
@@ -491,66 +554,6 @@ Note that some operations, like ``sqrt``, are translated into optimized
 hardware instructions and are very fast. Some, on the other hand, like ``log``
 do not have such mappings and are translated into equivalent number of scalar
 opeartions on individual vector elements.
-
-
-Interfacing C Libraries
-=======================
-
-The :func:`~nitrous.function.c_function` can be used to call functions defined
-in static or shared libraries::
-
-
-    _atol = c_function("atol", Long, [Pointer(Char)])
-
-    @function(Long, s=Pointer(Char))
-    def atol(s):
-        return _atol(s)
-
-    m = module([atol], libs=["c"])
-    assert m.atol("42") == 42
-
-
-The optional ``libs`` argument is similar to ``-l`` argument to GCC or Clang
-and instructs Nitrous to look for symbols in specified libraries.
-
-.. note::
-
-    Using already built libraries is currently limited to shared object-backed modules.
-
-Building From Source
---------------------
-
-If you're working with source files rather than already built libraries, the
-``libs`` argument can accept an instance of
-:class:`~nitrous.module.CppLibrary`. Source files are transparently compiled
-into objects and are linked together with the target module. Extending the
-previous example:
-
-.. code-block:: cpp
-
-    // write_long.c
-
-    #include <stdio.h>
-
-    void write_long(long x) {
-        printf(" value of x: %li\n", x);
-    }
-
-.. code-block:: python
-
-    # print_atol.py
-
-    _atol = c_function("atol", Long, [Pointer(Char)])
-    _write_long = c_function("write_long", None, [Long])
-
-    @function(s=Pointer(Char))
-    def print_atol(s):
-        _write_long(_atol(s))
-
-    m = module([print_atol], libs=[CppLibrary(["write_long.c"]), "c"])
-
-    # Prints out `value of x: 42`
-    m.print_atol("42")
 
 
 Advanced Topics
