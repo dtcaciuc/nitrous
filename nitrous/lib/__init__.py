@@ -17,13 +17,27 @@ _KIND_CASTS = {
 }
 
 
-def value_emitter(func):
-    """Marks a function as one which emits LLVM value as its result."""
-    func.__n2o_emitter__ = True
-    return func
+class ValueEmitter(object):
+    """Turns a function into an emitter.
+
+    Optionally, accepts a fallback *call* function for executing in
+    interpreted regular mode.
+
+    """
+
+    __n2o_emitter__ = True
+
+    def __init__(self, emit, call=None):
+        self.__emit = emit
+        self.__call = call
+
+    def emit(self, builder):
+        return self.__emit(builder)
+
+    def __call__(self, *args, **kwargs):
+        return self.__call(*args, **kwargs)
 
 
-@value_emitter
 class IntrinsicEmitter(object):
     """Convenicnce emitter for wrapping ``llvm.{name}`` intrinsic functions.
 
@@ -33,13 +47,15 @@ class IntrinsicEmitter(object):
 
     """
 
+    __n2o_emitter__ = True
+
     def __init__(self, name, args, spec, rtype):
         self.name = name
         self.args = (llvm.ValueRef * len(args))(*args)
         self.spec = (llvm.TypeRef * len(spec))(*(t.llvm_type for t in spec))
         self.rtype = rtype
 
-    def __call__(self, builder):
+    def emit(self, builder):
         func = llvm.get_intrinsic(builder, self.name, self.spec)
         return llvm.BuildCall(builder, func, self.args, len(self.args), "call"), self.rtype
 
@@ -47,7 +63,6 @@ class IntrinsicEmitter(object):
 def cast(value, target_type):
     """Casts *value* to a specified *target_type*."""
 
-    @value_emitter
     def emit(builder):
 
         # No-op if LLVM type is the same
@@ -83,7 +98,7 @@ def cast(value, target_type):
         else:
             raise TypeError("Cannot cast {0} to {1}".format(value, target_type))
 
-    return emit
+    return ValueEmitter(emit)
 
 
 def range_(*args):
@@ -94,7 +109,6 @@ def range_(*args):
 
     """
 
-    @value_emitter
     def emit(builder):
         from ..types import const_index
 
@@ -120,7 +134,7 @@ def range_(*args):
 
         return data, None
 
-    return emit
+    return ValueEmitter(emit)
 
 
 def print_(*args, **kwargs):
@@ -143,7 +157,6 @@ def print_(*args, **kwargs):
     # Move this somewhere, maybe `nitrous.lib.c`?
     dprintf = c_function("dprintf", Int, [Int, String])
 
-    @value_emitter
     def emit(builder):
 
         module = llvm.GetParentModule__(builder)
@@ -163,7 +176,7 @@ def print_(*args, **kwargs):
                 formats.append("%s")
             elif llvm.GetTypeKind(ty) == llvm.IntegerTypeKind:
                 formats.append("%ld")
-                a, _ = cast(a, Long)(builder)
+                a, _ = cast(a, Long).emit(builder)
             elif llvm.GetTypeKind(ty) == llvm.DoubleTypeKind:
                 formats.append("%lf")
             elif llvm.GetTypeKind(ty) == llvm.FloatTypeKind:
@@ -171,7 +184,7 @@ def print_(*args, **kwargs):
                 # XXX for some reason floats are not printing. Looking
                 # at Clang disassembly of printf("%f", (float)2.0), the
                 # resulting constant type is double... Why?
-                a, _ = cast(a, Double)(builder)
+                a, _ = cast(a, Double).emit(builder)
             else:
                 raise TypeError("Unknown argument type")
 
@@ -192,4 +205,4 @@ def print_(*args, **kwargs):
 
         return None, None
 
-    return emit
+    return ValueEmitter(emit)

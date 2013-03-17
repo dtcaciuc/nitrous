@@ -85,18 +85,17 @@ class Array(_ItemAccessor):
         return "<Array {0}>".format(shape_str(self.element_type, self.shape))
 
     def __call__(self):
-        from nitrous.lib import value_emitter
+        from nitrous.lib import ValueEmitter
         from nitrous.function import entry_array_alloca
         from operator import mul
 
-        @value_emitter
         def emit(builder):
             # Total number of elements across all dimensions.
             n = const_index(reduce(mul, self.shape, 1))
             a = entry_array_alloca(builder, self.element_type.llvm_type, n, "v")
             return a, self
 
-        return emit
+        return ValueEmitter(emit)
 
     @property
     def llvm_type(self):

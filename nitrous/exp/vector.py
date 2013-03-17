@@ -1,6 +1,6 @@
 from nitrous import llvm
 from nitrous.function import function
-from nitrous.lib import value_emitter
+from nitrous.lib import ValueEmitter
 from nitrous.types.array import Slice
 
 
@@ -47,17 +47,16 @@ class Vector(object):
             raise TypeError("Cannot initialize vector of {0} elements with {1} values"
                             .format(self.n, len(elements)))
 
-        @value_emitter
         def emit(builder):
             v = llvm.ConstNull(self.llvm_type)
             for i, e in enumerate(elements):
                 llvm_i = _index(builder, const_index(i))
-                cast_e, _ = cast(e, self.element_type)(builder)
+                cast_e, _ = cast(e, self.element_type).emit(builder)
                 v = llvm.BuildInsertElement(builder, v, cast_e, llvm_i, "v.init")
 
             return v, self
 
-        return emit
+        return ValueEmitter(emit)
 
 
 def get_element(T):
@@ -69,13 +68,12 @@ def get_element(T):
 
     def get_element_(v, i):
 
-        @value_emitter
         def emit(builder):
             ii = _index(builder, i)
             e = llvm.BuildExtractElement(builder, v, ii, "v.get")
             return e, T.element_type
 
-        return emit
+        return ValueEmitter(emit)
 
     return get_element_
 
@@ -89,13 +87,12 @@ def set_element(T):
 
     def set_element_(v, i, e):
 
-        @value_emitter
         def emit(builder):
             ii = _index(builder, i)
             w = llvm.BuildInsertElement(builder, v, e, ii, "v.set")
             return w, T
 
-        return emit
+        return ValueEmitter(emit)
 
     return set_element_
 

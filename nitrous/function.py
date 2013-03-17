@@ -837,7 +837,7 @@ class FunctionBuilder(ast.NodeVisitor):
             # Function is either CPython one or an LLVM emitter.
             result = func(*args)
             if getattr(result, "__n2o_emitter__", False):
-                result, result_type = result(self.builder)
+                result, result_type = result.emit(self.builder)
 
         self.push(result, result_type)
 
@@ -845,7 +845,8 @@ class FunctionBuilder(ast.NodeVisitor):
         from .lib import print_
         dest = self.r_visit(node.dest)
         end = emit_constant_string(self.builder, "\n" if node.nl else "")
-        print_(*map(self.r_visit, node.values), end=end, file=dest)(self.builder)
+        p = print_(*map(self.r_visit, node.values), end=end, file=dest)
+        p.emit(self.builder)
 
     def _get_or_create_function(self, decl):
         """Returns LLVM function value for given declaration;
