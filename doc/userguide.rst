@@ -502,7 +502,7 @@ hardware is optimized to handle multiples of 4 the best.
 
 .. code-block:: python
 
-    from nitrous.types.vector import Vector
+    from nitrous.exp.vector import Vector
     from nitrous.types import Float
 
     Float16 = Vector(Float, 16)
@@ -530,7 +530,7 @@ square bracket accessors are good for.
 Another peculiarity with vectors is that they are *immutable*. For example,
 setting an element does not modify the existing vector, but returns a new one::
 
-    from nitrous.types.vector import set_element
+    from nitrous.exp.vector import set_element
 
     v = Float16()  # Declare new vector.
     for i in range(16):

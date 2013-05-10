@@ -23,6 +23,6 @@ Type Conversions
 Emitter Utilities
 -----------------
 
-.. autofunction:: value_emitter
+.. autoclass:: ValueEmitter
 
 .. autoclass:: IntrinsicEmitter
