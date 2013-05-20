@@ -131,6 +131,20 @@ class Structure(object):
     def __repr__(self):
         return "<Structure '{0}', {1} fields>".format(self.name, len(self.fields))
 
+    def __call__(self, *args):
+        from nitrous.lib import ValueEmitter
+        from nitrous.function import entry_alloca
+
+        def emit(builder):
+            s = entry_alloca(builder, self.llvm_type, "s")
+            # TODO support kwargs
+            for i, v in enumerate(args):
+                field = self.fields[i][0]
+                self.emit_setattr(builder, s, field, v)
+            return s, Reference(self)
+
+        return ValueEmitter(emit)
+
     @property
     def tag(self):
         # Reacquire name from created structure; it will get uniqued
@@ -193,6 +207,8 @@ that it provides a better Python interop by mapping to
 
 def is_aggregate(ty):
     """Returns True if type is an aggregate."""
+    from .array import Array
+
     kind = llvm.GetTypeKind(ty.llvm_type)
     # For now the only aggregates we have are Structs
     return kind == llvm.StructTypeKind
