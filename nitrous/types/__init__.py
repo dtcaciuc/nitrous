@@ -207,8 +207,5 @@ that it provides a better Python interop by mapping to
 
 def is_aggregate(ty):
     """Returns True if type is an aggregate."""
-    from .array import Array
-
     kind = llvm.GetTypeKind(ty.llvm_type)
-    # For now the only aggregates we have are Structs
-    return kind == llvm.StructTypeKind
+    return kind in (llvm.StructTypeKind, llvm.ArrayTypeKind)

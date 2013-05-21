@@ -71,6 +71,73 @@ class _ItemAccessor(object):
         return ss, SSTy
 
 
+class Array2(_ItemAccessor):
+    """Array backed by llvm.ArrayType rather than pointer to memory.
+
+    This enables us to declare it as an aggregate type which can be returned by value.
+
+    TODO describe constructor initialization etc.
+
+    """
+
+    def __init__(self, element_type, shape):
+        self.element_type = element_type
+        self.shape = shape
+        self.ndim = len(shape)
+
+    def __repr__(self):
+        return "Array({0}, shape={1})".format(self.element_type, repr(self.shape))
+
+    def __str__(self):
+        return "<Array {0}>".format(shape_str(self.element_type, self.shape))
+
+    def __call__(self, values=None):
+        from nitrous.lib import ValueEmitter
+        from nitrous.function import entry_alloca
+        from itertools import product
+
+        def emit(builder):
+            v = entry_alloca(builder, self.llvm_type, "v.array")
+            if values is not None:
+                for i in product(*(range(d) for d in self.shape)):
+                    ii = tuple(const_index(j) for j in i)
+                    vi = values
+                    for k in i:
+                        vi = vi[k]
+                    self.emit_setitem(builder, v, ii, vi)
+
+            return v, Reference(self)
+
+        return ValueEmitter(emit)
+
+    @property
+    def llvm_type(self):
+        from operator import mul
+        n = reduce(mul, self.shape, 1)
+        return llvm.ArrayType(self.element_type.llvm_type, n)
+
+    @property
+    def c_type(self):
+        from operator import mul
+        return reduce(mul, self.shape[::-1], self.element_type.c_type)
+
+    def _item_gep(self, builder, v, i):
+        if len(i) != len(self.shape):
+            raise TypeError("Index and array shapes don't match ({0} != {1})"
+                            .format(len(i), len(self.shape)))
+
+        # TODO check const shape dimension values?
+
+        # Build conversion from ND-index to flat memory offset
+        # FIXME currently assumes row-major memory alignment, first dimension can vary
+        const_shape = map(const_index, self.shape[1:])
+        ii = flatten_index(builder, i, const_shape)
+        # Cast so that we can get GEP to a particular element.
+        p_type = llvm.PointerType(self.element_type.llvm_type, 0)
+        p = llvm.BuildPointerCast(builder, v, p_type, "array.ptr")
+        return llvm.BuildGEP(builder, p, ctypes.byref(ii), 1, "addr")
+
+
 class Array(_ItemAccessor):
 
     def __init__(self, element_type, shape=(Any,)):

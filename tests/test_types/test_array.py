@@ -88,6 +88,47 @@ class ArrayTests(ArrayTests, unittest.TestCase):
         self.assertEqual(str(self.A), "<Array [2 x [3 x [2 x Long]]]>")
         self.assertEqual(str(self.B), "<Array [12 x Long]>")
 
+class Array2Tests(unittest.TestCase):
+
+    def test_alloc_return(self):
+        from nitrous.types.array import Array2
+        from nitrous.types import Double
+        from nitrous.module import dump
+
+        Coord = Array2(Double, (3,))
+
+        @function(Coord, x=Double, y=Double, z=Double)
+        def make_coord(x, y, z):
+            return Coord((x, y, z))
+
+        @function(Coord, x=Double, y=Double, z=Double)
+        def make_coord_2(x, y, z):
+            return make_coord(x, y, z)
+
+        m = module([make_coord, make_coord_2])
+        c = m.make_coord_2(1.0, 2.0, 3.0)
+
+        self.assertEqual(tuple(c), (1.0, 2.0, 3.0))
+
+    def test_init_2d(self):
+        """Tests multi-dimensional initialization."""
+        from nitrous.types.array import Array2
+        from nitrous.types import Double
+        from nitrous.module import dump
+
+        Double2x2 = Array2(Double, (2, 2))
+
+        @function(Double2x2, x=Double, y=Double, z=Double, w=Double)
+        def make_2x2(x, y, z, w):
+            return Double2x2(((x, y), (z, w)))
+
+        m = module([make_2x2])
+        c = m.make_2x2(1.0, 2.0, 3.0, 4.0)
+
+        self.assertEqual(c[0][0], 1.0)
+        self.assertEqual(c[0][1], 2.0)
+        self.assertEqual(c[1][0], 3.0)
+        self.assertEqual(c[1][1], 4.0)
 
 class AllocTests(unittest.TestCase):
 
