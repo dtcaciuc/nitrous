@@ -124,6 +124,34 @@ class Array2(_ItemAccessor):
         shape_tag = "".join("d{0}".format(d) for d in self.shape)
         return "AX{0}{1}".format(shape_tag, self.element_type.tag)
 
+    def convert(self, p):
+        if np and isinstance(p, np.ndarray):
+            p = np.ctypeslib.as_ctypes(p)
+        return p
+
+    def emit_getattr(self, builder, ref, attr):
+        if attr == "ndim":
+            return const_index(self.ndim), None
+
+        elif attr == "shape":
+            # First time, initialize a global constant array
+            # and then use it on every access.
+            module = llvm.GetParentModule__(builder)
+            shape_name = "StaticArray{0}".format(id(self))
+            shape = llvm.GetNamedGlobal(module, shape_name)
+
+            if not shape:
+                dims = (llvm.ValueRef * self.ndim)(*(const_index(d) for d in self.shape))
+                shape_init = llvm.ConstArray(Index.llvm_type, dims, self.ndim)
+                shape = llvm.AddGlobal(module, llvm.TypeOf(shape_init), shape_name)
+                llvm.SetInitializer(shape, shape_init)
+                llvm.SetGlobalConstant(shape, llvm.TRUE)
+
+            return shape, Array2(Index, (self.ndim,))
+
+        else:
+            raise AttributeError(attr)
+
     def _item_gep(self, builder, v, i):
         if len(i) != len(self.shape):
             raise TypeError("Index and array shapes don't match ({0} != {1})"

@@ -4,7 +4,7 @@ import ctypes
 from nitrous.module import module
 from nitrous.function import function
 from nitrous.types import Long
-from nitrous.types.array import Array, Slice, Any
+from nitrous.types.array import Array, Array2, Slice, Any
 
 try:
     import numpy as np
@@ -12,7 +12,7 @@ except ImportError:
     np = None
 
 
-class ArrayTests(object):
+class ArrayTestsBase(object):
 
     def setUp(self):
 
@@ -61,7 +61,7 @@ class ArrayTests(object):
         self.assertEqual(list(b), range(1, 13))
 
 
-class SliceTests(ArrayTests, unittest.TestCase):
+class SliceTests(ArrayTestsBase, unittest.TestCase):
 
     A = Slice(Long, (Any,) * 3)
     B = Slice(Long)
@@ -75,7 +75,7 @@ class SliceTests(ArrayTests, unittest.TestCase):
         self.assertEqual(str(self.B), "<Slice [? x Long]>")
 
 
-class ArrayTests(ArrayTests, unittest.TestCase):
+class ArrayTests(ArrayTestsBase, unittest.TestCase):
 
     A = Array(Long, (2, 3, 2))
     B = Array(Long, (12,))
@@ -87,6 +87,22 @@ class ArrayTests(ArrayTests, unittest.TestCase):
     def test_str(self):
         self.assertEqual(str(self.A), "<Array [2 x [3 x [2 x Long]]]>")
         self.assertEqual(str(self.B), "<Array [12 x Long]>")
+
+
+class Array2Tests2(ArrayTestsBase, unittest.TestCase):
+    # TODO fix name
+
+    A = Array2(Long, (2, 3, 2))
+    B = Array2(Long, (12,))
+
+    def test_repr(self):
+        self.assertEqual(repr(self.A), "Array(Long, shape=(2, 3, 2))")
+        self.assertEqual(repr(self.B), "Array(Long, shape=(12,))")
+
+    def test_str(self):
+        self.assertEqual(str(self.A), "<Array [2 x [3 x [2 x Long]]]>")
+        self.assertEqual(str(self.B), "<Array [12 x Long]>")
+
 
 class Array2Tests(unittest.TestCase):
 
@@ -129,6 +145,7 @@ class Array2Tests(unittest.TestCase):
         self.assertEqual(c[0][1], 2.0)
         self.assertEqual(c[1][0], 3.0)
         self.assertEqual(c[1][1], 4.0)
+
 
 class AllocTests(unittest.TestCase):
 
