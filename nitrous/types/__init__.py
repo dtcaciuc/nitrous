@@ -154,7 +154,10 @@ class Structure(object):
     def emit_getattr(self, builder, ref, attr):
         """IR: Emits attribute value load from structure reference."""
         gep, t = self._field_gep(builder, ref, attr)
-        return llvm.BuildLoad(builder, gep, "v"), t
+        if is_aggregate(t):
+            return gep, Reference(t)
+        else:
+            return llvm.BuildLoad(builder, gep, "v"), t
 
     def emit_setattr(self, builder, ref, attr, v):
         """IR: Emits GEP used to set the attribute value."""

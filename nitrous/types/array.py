@@ -47,22 +47,20 @@ class _ItemAccessor(object):
         from ..function import entry_alloca, entry_array_alloca
 
         SSTy = Slice(self.element_type, self.shape[len(i):])
-        Shape = Array(Index)
-
         ss = entry_alloca(builder, SSTy.llvm_type, "subslice")
 
         # Setting ndim
         n_subdims = const_index(len(self.shape) - len(i))
         SSTy._struct.emit_setattr(builder, ss, "ndim", n_subdims)
 
-        # Allocating and setting shape dimensions
-        subshape = entry_array_alloca(builder, Index.llvm_type, n_subdims, "subshape")
-        SSTy._struct.emit_setattr(builder, ss, "shape", subshape)
+        # Setting shape dimensions
+        subshape, subshape_ty = SSTy._struct.emit_getattr(builder, ss, "shape")
 
+        # shape is a reference
         shape, shape_ty = self.emit_getattr(builder, v, "shape")
         for j in range(len(self.shape) - len(i)):
-            dim, _ = Shape.emit_getitem(builder, shape, (const_index(j + len(i)),))
-            Shape.emit_setitem(builder, subshape, (const_index(j),), dim)
+            dim, _ = shape_ty.value_type.emit_getitem(builder, shape, (const_index(j + len(i)),))
+            subshape_ty.value_type.emit_setitem(builder, subshape, (const_index(j),), dim)
 
         # Setting pointer to data sub-block.
         data_idx = i + (const_index(0),) * (len(self.shape) - len(i))
@@ -120,6 +118,11 @@ class Array2(_ItemAccessor):
     def c_type(self):
         from operator import mul
         return reduce(mul, self.shape[::-1], self.element_type.c_type)
+
+    @property
+    def tag(self):
+        shape_tag = "".join("d{0}".format(d) for d in self.shape)
+        return "AX{0}{1}".format(shape_tag, self.element_type.tag)
 
     def _item_gep(self, builder, v, i):
         if len(i) != len(self.shape):
@@ -201,13 +204,11 @@ class Array(_ItemAccessor):
             if not shape:
                 dims = (llvm.ValueRef * self.ndim)(*(const_index(d) for d in self.shape))
                 shape_init = llvm.ConstArray(Index.llvm_type, dims, self.ndim)
-
                 shape = llvm.AddGlobal(module, llvm.TypeOf(shape_init), shape_name)
                 llvm.SetInitializer(shape, shape_init)
                 llvm.SetGlobalConstant(shape, llvm.TRUE)
 
-            cast_shape = llvm.BuildPointerCast(builder, shape, Pointer(Index).llvm_type, "")
-            return cast_shape, Array(Index, (self.ndim,))
+            return shape, Array2(Index, (self.ndim,))
 
         else:
             raise AttributeError(attr)
@@ -253,7 +254,7 @@ class Slice(_ItemAccessor):
             self._struct = _slice_types.setdefault(
                 k, Structure("Slice",
                              ("data", Pointer(element_type)),
-                             ("shape", Array(Index, (len(shape),))),
+                             ("shape", Array2(Index, (len(shape),))),
                              ("ndim", Index))
             )
 
@@ -308,7 +309,8 @@ class Slice(_ItemAccessor):
         def emit_dimension(i):
             # Use direct constants, if possible; otherwise load from actual shape array.
             if self.shape[i] == Any:
-                dim, _ = shape_type.emit_getitem(builder, shape_value, (const_index(i),))
+                # Shape type is a reference to array, use the actual type
+                dim, _ = shape_type.value_type.emit_getitem(builder, shape_value, (const_index(i),))
             else:
                 dim = const_index(self.shape[i])
             return dim
