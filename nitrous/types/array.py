@@ -8,7 +8,7 @@ except ImportError:
     np = None
 
 
-__all__ = ["Any", "Array", "Slice"]
+__all__ = ["Any", "Array", "FastSlice", "Slice"]
 
 
 class _AnyClass(object):
@@ -69,7 +69,7 @@ class _ItemAccessor(object):
         return ss, SSTy
 
 
-class Array2(_ItemAccessor):
+class Array(_ItemAccessor):
     """Array backed by llvm.ArrayType rather than pointer to memory.
 
     This enables us to declare it as an aggregate type which can be returned by value.
@@ -147,7 +147,7 @@ class Array2(_ItemAccessor):
                 llvm.SetInitializer(shape, shape_init)
                 llvm.SetGlobalConstant(shape, llvm.TRUE)
 
-            return shape, Array2(Index, (self.ndim,))
+            return shape, Array(Index, (self.ndim,))
 
         else:
             raise AttributeError(attr)
@@ -169,7 +169,7 @@ class Array2(_ItemAccessor):
         return llvm.BuildGEP(builder, p, ctypes.byref(ii), 1, "addr")
 
 
-class Array(_ItemAccessor):
+class FastSlice(_ItemAccessor):
 
     def __init__(self, element_type, shape=(Any,)):
         self.element_type = element_type
@@ -177,10 +177,10 @@ class Array(_ItemAccessor):
         self.ndim = len(shape)
 
     def __repr__(self):
-        return "Array({0}, shape={1})".format(self.element_type, repr(self.shape))
+        return "FastSlice({0}, shape={1})".format(self.element_type, repr(self.shape))
 
     def __str__(self):
-        return "<Array {0}>".format(shape_str(self.element_type, self.shape))
+        return "<FastSlice {0}>".format(shape_str(self.element_type, self.shape))
 
     def __call__(self):
         from nitrous.lib import ValueEmitter
@@ -236,7 +236,7 @@ class Array(_ItemAccessor):
                 llvm.SetInitializer(shape, shape_init)
                 llvm.SetGlobalConstant(shape, llvm.TRUE)
 
-            return shape, Array2(Index, (self.ndim,))
+            return shape, Array(Index, (self.ndim,))
 
         else:
             raise AttributeError(attr)
@@ -282,7 +282,7 @@ class Slice(_ItemAccessor):
             self._struct = _slice_types.setdefault(
                 k, Structure("Slice",
                              ("data", Pointer(element_type)),
-                             ("shape", Array2(Index, (len(shape),))),
+                             ("shape", Array(Index, (len(shape),))),
                              ("ndim", Index))
             )
 

@@ -128,12 +128,14 @@ class BoolTests(unittest.TestCase):
         """Don't evaluate `and`ed expressions if not necessary."""
         from nitrous.types.array import Array
 
-        @function(Bool, b=Array(Bool))
+        Bool1 = Array(Bool, (1,))
+
+        @function(Bool, b=Bool1)
         def side_effect(b):
             b[0] = True
             return True
 
-        @function(Bool, a=Bool, b=Array(Bool))
+        @function(Bool, a=Bool, b=Bool1)
         def and_(a, b):
             return a and side_effect(b)
 
@@ -153,12 +155,14 @@ class BoolTests(unittest.TestCase):
         """Don't evaluate `or`ed expressions if not necessary."""
         from nitrous.types.array import Array
 
-        @function(Bool, b=Array(Bool))
+        Bool1 = Array(Bool, (1,))
+
+        @function(Bool, b=Bool1)
         def side_effect(b):
             b[0] = True
             return True
 
-        @function(Bool, a=Bool, b=Array(Bool))
+        @function(Bool, a=Bool, b=Bool1)
         def or_(a, b):
             return a or side_effect(b)
 

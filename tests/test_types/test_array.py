@@ -4,7 +4,7 @@ import ctypes
 from nitrous.module import module
 from nitrous.function import function
 from nitrous.types import Long
-from nitrous.types.array import Array, Array2, Slice, Any
+from nitrous.types.array import Array, FastSlice, Slice, Any
 
 try:
     import numpy as np
@@ -75,6 +75,20 @@ class SliceTests(ArrayTestsBase, unittest.TestCase):
         self.assertEqual(str(self.B), "<Slice [? x Long]>")
 
 
+class FastSliceTests(ArrayTestsBase, unittest.TestCase):
+
+    A = FastSlice(Long, (2, 3, 2))
+    B = FastSlice(Long, (12,))
+
+    def test_repr(self):
+        self.assertEqual(repr(self.A), "FastSlice(Long, shape=(2, 3, 2))")
+        self.assertEqual(repr(self.B), "FastSlice(Long, shape=(12,))")
+
+    def test_str(self):
+        self.assertEqual(str(self.A), "<FastSlice [2 x [3 x [2 x Long]]]>")
+        self.assertEqual(str(self.B), "<FastSlice [12 x Long]>")
+
+
 class ArrayTests(ArrayTestsBase, unittest.TestCase):
 
     A = Array(Long, (2, 3, 2))
@@ -89,29 +103,12 @@ class ArrayTests(ArrayTestsBase, unittest.TestCase):
         self.assertEqual(str(self.B), "<Array [12 x Long]>")
 
 
-class Array2Tests2(ArrayTestsBase, unittest.TestCase):
-    # TODO fix name
-
-    A = Array2(Long, (2, 3, 2))
-    B = Array2(Long, (12,))
-
-    def test_repr(self):
-        self.assertEqual(repr(self.A), "Array(Long, shape=(2, 3, 2))")
-        self.assertEqual(repr(self.B), "Array(Long, shape=(12,))")
-
-    def test_str(self):
-        self.assertEqual(str(self.A), "<Array [2 x [3 x [2 x Long]]]>")
-        self.assertEqual(str(self.B), "<Array [12 x Long]>")
-
-
-class Array2Tests(unittest.TestCase):
+class ArrayTests2(unittest.TestCase):
 
     def test_alloc_return(self):
-        from nitrous.types.array import Array2
         from nitrous.types import Double
-        from nitrous.module import dump
 
-        Coord = Array2(Double, (3,))
+        Coord = Array(Double, (3,))
 
         @function(Coord, x=Double, y=Double, z=Double)
         def make_coord(x, y, z):
@@ -128,11 +125,9 @@ class Array2Tests(unittest.TestCase):
 
     def test_init_2d(self):
         """Tests multi-dimensional initialization."""
-        from nitrous.types.array import Array2
         from nitrous.types import Double
-        from nitrous.module import dump
 
-        Double2x2 = Array2(Double, (2, 2))
+        Double2x2 = Array(Double, (2, 2))
 
         @function(Double2x2, x=Double, y=Double, z=Double, w=Double)
         def make_2x2(x, y, z, w):
@@ -185,6 +180,12 @@ class SliceReferenceTests(unittest.TestCase):
         # Since slices don't directly inherit structs,
         # make sure that they are returned by reference
         # in array item access.
+
+        # FIXME Rewrite this, since this doesn't work as
+        # advertised at all. Whether x0 is a reference or
+        # a copy, it will contain the same information either
+        # way and the test will pass.
+        self.assertTrue(False)
 
         @function(x=Array(Slice(Long), (1,)), i=Long, v=Long)
         def set_i(x, i, v):

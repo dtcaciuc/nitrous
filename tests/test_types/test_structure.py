@@ -4,11 +4,11 @@ import unittest
 from nitrous.module import module
 from nitrous.function import function
 from nitrous.types import Double, Long, Structure
-from nitrous.types.array import Array
+from nitrous.types.array import Slice, Any
 
 
 Coord = Structure("Coord", ("x", Double), ("y", Double), ("z", Double))
-Coords = Array(Coord, (2,))
+Coords = Slice(Coord)
 
 
 class StructureTests(unittest.TestCase):
@@ -31,19 +31,14 @@ class StructureTests(unittest.TestCase):
             return ai.x + ai.y + ai.z
 
         m = module([sum_1, sum_2])
-
-        a1 = Coord.c_type(1, 2, 3)
-        a2 = (Coord.c_type * 2)(
+        a = (Coord.c_type * 2)(
             (1, 2, 3),
             (4, 5, 6)
         )
 
         for f in (m.sum_1, m.sum_2):
-            self.assertAlmostEqual(f(ctypes.byref(a1), 0), 6)
-            self.assertAlmostEqual(f(a2, 0), 6)
-            self.assertAlmostEqual(f(ctypes.byref(a2[0]), 0), 6)
-            self.assertAlmostEqual(f(a2, 1), 15)
-            self.assertAlmostEqual(f(ctypes.byref(a2[1]), 0), 15)
+            self.assertAlmostEqual(f(a, 0), 6)
+            self.assertAlmostEqual(f(a, 1), 15)
 
     def test_store_fields(self):
 
