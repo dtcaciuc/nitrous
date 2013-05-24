@@ -103,9 +103,10 @@ class ArrayTests(ArrayTestsBase, unittest.TestCase):
         self.assertEqual(str(self.B), "<Array [12 x Long]>")
 
 
-class ArrayTests2(unittest.TestCase):
+class ArrayAllocTests(unittest.TestCase):
 
     def test_alloc_return(self):
+        """Allocate array and pass back through return value."""
         from nitrous.types import Double
 
         Coord = Array(Double, (3,))
@@ -124,7 +125,7 @@ class ArrayTests2(unittest.TestCase):
         self.assertEqual(tuple(c), (1.0, 2.0, 3.0))
 
     def test_init_2d(self):
-        """Tests multi-dimensional initialization."""
+        """Multi-dimensional array initialization."""
         from nitrous.types import Double
 
         Double2x2 = Array(Double, (2, 2))
@@ -140,37 +141,6 @@ class ArrayTests2(unittest.TestCase):
         self.assertEqual(c[0][1], 2.0)
         self.assertEqual(c[1][0], 3.0)
         self.assertEqual(c[1][1], 4.0)
-
-
-class AllocTests(unittest.TestCase):
-
-    def test_alloc(self):
-        """Stack allocation of a fixed size array by calling its type"""
-        from nitrous.types import Double
-
-        Mat2d = Array(Double, shape=(2, 2))
-
-        @function(Double)
-        def f():
-
-            m = Mat2d()
-            a = 0.0
-
-            m[0, 0] = 2.0
-            m[0, 1] = 11.0
-            m[1, 0] = 13.0
-            m[1, 1] = 17.0
-
-            for i in range(2):
-                for j in range(2):
-                    a += m[i, j]
-
-            return a
-
-        m = module([f])
-
-        x = (Double.c_type * 4)()
-        self.assertEqual(m.f(x), 43.0)
 
 
 class SliceReferenceTests(unittest.TestCase):
