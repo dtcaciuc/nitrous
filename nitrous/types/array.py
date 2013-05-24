@@ -122,7 +122,7 @@ class Array(_ItemAccessor):
     @property
     def tag(self):
         shape_tag = "".join("d{0}".format(d) for d in self.shape)
-        return "AX{0}{1}".format(shape_tag, self.element_type.tag)
+        return "A{0}{1}".format(shape_tag, self.element_type.tag)
 
     def convert(self, p):
         if np and isinstance(p, np.ndarray):
@@ -137,7 +137,7 @@ class Array(_ItemAccessor):
             # First time, initialize a global constant array
             # and then use it on every access.
             module = llvm.GetParentModule__(builder)
-            shape_name = "StaticArray{0}".format(id(self))
+            shape_name = "__n2o_array_shape_{0}".format(id(self))
             shape = llvm.GetNamedGlobal(module, shape_name)
 
             if not shape:
@@ -206,7 +206,7 @@ class FastSlice(_ItemAccessor):
     @property
     def tag(self):
         shape_tag = "".join("d{0}".format(d) for d in self.shape)
-        return "A{0}{1}".format(shape_tag, self.element_type.tag)
+        return "F{0}{1}".format(shape_tag, self.element_type.tag)
 
     def convert(self, p):
         pointer_type = ctypes.POINTER(self.element_type.c_type)
@@ -226,7 +226,7 @@ class FastSlice(_ItemAccessor):
             # First time, initialize a global constant array
             # and then use it on every access.
             module = llvm.GetParentModule__(builder)
-            shape_name = "StaticArray{0}".format(id(self))
+            shape_name = "__n2o_slice_shape_{0}".format(id(self))
             shape = llvm.GetNamedGlobal(module, shape_name)
 
             if not shape:
