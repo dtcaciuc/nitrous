@@ -22,12 +22,14 @@ else:
 
 
 def llvm_config(*args):
+    from distutils.errors import DistutilsFileError
     try:
-        print "Running `{0}`".format("".join([LLVM_CONFIG] + list(args)))
+        print "Running `{0}`".format(" ".join([LLVM_CONFIG] + list(args)))
         p = Popen([LLVM_CONFIG] + list(args), stdout=PIPE)
         return p.communicate()[0].strip().split()
     except OSError, e:
-        print >>sys.stderr, "llvm-config failed: {0}".format(e)
+        raise DistutilsFileError("llvm-config failed: {0}".format(e))
+        
 
 
 def link_args():
