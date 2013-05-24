@@ -9,7 +9,7 @@ on_rtd = os.environ.get('READTHEDOCS', None) == 'True'
 
 
 # Determine the name for LLVM config binary
-for path in ["llvm-config-3.1", "llvm-config"]:
+for path in ["llvm-config-3.2", "llvm-config"]:
     proc = Popen(["which", path], stdout=PIPE, stderr=PIPE)
     if not proc.wait():
         LLVM_CONFIG = proc.stdout.read().strip()
