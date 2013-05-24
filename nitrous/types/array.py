@@ -44,7 +44,7 @@ class _ItemAccessor(object):
 
     def _emit_subslice(self, builder, v, i):
         """Emits a sub-slice based on partial index *i*"""
-        from ..function import entry_alloca, entry_array_alloca
+        from ..function import entry_alloca
 
         SSTy = Slice(self.element_type, self.shape[len(i):])
         ss = entry_alloca(builder, SSTy.llvm_type, "subslice")

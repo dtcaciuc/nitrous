@@ -147,29 +147,9 @@ class SliceReferenceTests(unittest.TestCase):
 
     def test_reference_arg(self):
         """Slice is treated as reference type."""
-        # Since slices don't directly inherit structs,
-        # make sure that they are returned by reference
-        # in array item access.
+        from nitrous.types import is_aggregate
 
-        # FIXME Rewrite this, since this doesn't work as
-        # advertised at all. Whether x0 is a reference or
-        # a copy, it will contain the same information either
-        # way and the test will pass.
-        self.assertTrue(False)
-
-        @function(x=Array(Slice(Long), (1,)), i=Long, v=Long)
-        def set_i(x, i, v):
-            x0 = x[0]
-            x0[i] = v
-
-        m = module([set_i])
-
-        x = (Long.c_type * 3)(3, 11, 13)
-        px = (ctypes.POINTER(Long.c_type) * 1)(x)
-
-        m.set_i(px, 1, 12)
-
-        self.assertEqual(list(x), [3, 12, 13])
+        self.assertTrue(is_aggregate(Slice(Long)))
 
 
 class IndexTests(unittest.TestCase):
