@@ -49,10 +49,6 @@ class _ItemAccessor(object):
         SSTy = Slice(self.element_type, self.shape[len(i):])
         ss = entry_alloca(builder, SSTy.llvm_type, "subslice")
 
-        # Setting ndim
-        n_subdims = const_index(len(self.shape) - len(i))
-        SSTy._struct.emit_setattr(builder, ss, "ndim", n_subdims)
-
         # Setting shape dimensions
         subshape, subshape_ty = SSTy._struct.emit_getattr(builder, ss, "shape")
 
@@ -81,7 +77,6 @@ class Array(_ItemAccessor):
     def __init__(self, element_type, shape):
         self.element_type = element_type
         self.shape = shape
-        self.ndim = len(shape)
 
     def __repr__(self):
         return "Array({0}, shape={1})".format(self.element_type, repr(self.shape))
@@ -130,8 +125,10 @@ class Array(_ItemAccessor):
         return p
 
     def emit_getattr(self, builder, ref, attr):
+        ndim = len(self.shape)
+
         if attr == "ndim":
-            return const_index(self.ndim), None
+            return const_index(ndim), None
 
         elif attr == "shape":
             # First time, initialize a global constant array
@@ -141,13 +138,13 @@ class Array(_ItemAccessor):
             shape = llvm.GetNamedGlobal(module, shape_name)
 
             if not shape:
-                dims = (llvm.ValueRef * self.ndim)(*(const_index(d) for d in self.shape))
-                shape_init = llvm.ConstArray(Index.llvm_type, dims, self.ndim)
+                dims = (llvm.ValueRef * ndim)(*(const_index(d) for d in self.shape))
+                shape_init = llvm.ConstArray(Index.llvm_type, dims, ndim)
                 shape = llvm.AddGlobal(module, llvm.TypeOf(shape_init), shape_name)
                 llvm.SetInitializer(shape, shape_init)
                 llvm.SetGlobalConstant(shape, llvm.TRUE)
 
-            return shape, Array(Index, (self.ndim,))
+            return shape, Array(Index, (ndim,))
 
         else:
             raise AttributeError(attr)
@@ -206,8 +203,10 @@ class FastSlice(_ItemAccessor):
         return ctypes.cast(p, pointer_type)
 
     def emit_getattr(self, builder, ref, attr):
+        ndim = len(self.shape)
+
         if attr == "ndim":
-            return const_index(self.ndim), None
+            return const_index(ndim), None
 
         elif attr == "shape":
             # First time, initialize a global constant array
@@ -217,13 +216,13 @@ class FastSlice(_ItemAccessor):
             shape = llvm.GetNamedGlobal(module, shape_name)
 
             if not shape:
-                dims = (llvm.ValueRef * self.ndim)(*(const_index(d) for d in self.shape))
-                shape_init = llvm.ConstArray(Index.llvm_type, dims, self.ndim)
+                dims = (llvm.ValueRef * ndim)(*(const_index(d) for d in self.shape))
+                shape_init = llvm.ConstArray(Index.llvm_type, dims, ndim)
                 shape = llvm.AddGlobal(module, llvm.TypeOf(shape_init), shape_name)
                 llvm.SetInitializer(shape, shape_init)
                 llvm.SetGlobalConstant(shape, llvm.TRUE)
 
-            return shape, Array(Index, (self.ndim,))
+            return shape, Array(Index, (ndim,))
 
         else:
             raise AttributeError(attr)
@@ -256,7 +255,6 @@ class Slice(_ItemAccessor):
     def __init__(self, element_type, shape=(Any,)):
         self.element_type = element_type
         self.shape = shape
-        self.ndim = len(shape)
 
         # Prevent distinct slice LLVM types being allocated every single
         # time one declares them. This is a problem in places like
@@ -269,8 +267,7 @@ class Slice(_ItemAccessor):
             self._struct = _slice_types.setdefault(
                 k, Structure("Slice",
                              ("data", Pointer(element_type)),
-                             ("shape", Array(Index, (len(shape),))),
-                             ("ndim", Index))
+                             ("shape", Array(Index, (len(shape),))))
             )
 
     def __repr__(self):
@@ -299,15 +296,19 @@ class Slice(_ItemAccessor):
 
         if np and isinstance(p, np.ndarray):
             return self._struct.c_type(p.ctypes.data_as(pointer_type),
-                                       (Index.c_type * len(p.shape))(*p.shape),
-                                       p.ndim)
+                                       (Index.c_type * len(p.shape))(*p.shape))
 
         shape = ctypes_shape(p)
         conv_p = ctypes.cast(p, pointer_type)
-        return self._struct.c_type(conv_p, (Index.c_type * len(shape))(*shape), self.ndim)
+        return self._struct.c_type(conv_p, (Index.c_type * len(shape))(*shape))
 
     def emit_getattr(self, builder, ref, attr):
-        return self._struct.emit_getattr(builder, ref, attr)
+        if attr == "ndim":
+            return const_index(len(self.shape)), None
+        elif attr in ("shape", "data"):
+            return self._struct.emit_getattr(builder, ref, attr)
+        else:
+            raise AttributeError(attr)
 
     def emit_setattr(self, builder, ref, attr, v):
         raise TypeError("Slice is immutable")
@@ -332,7 +333,7 @@ class Slice(_ItemAccessor):
 
         # Build conversion from ND-index to flat memory offset
         # FIXME currently assumes row-major memory alignment, first dimension can vary
-        const_shape = [emit_dimension(d) for d in range(1, self.ndim)]
+        const_shape = [emit_dimension(d) for d in range(1, len(self.shape))]
         ii = flatten_index(builder, i, const_shape)
         return llvm.BuildGEP(builder, data_value, ctypes.byref(ii), 1, "addr")
 
