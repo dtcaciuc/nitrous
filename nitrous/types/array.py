@@ -128,7 +128,7 @@ class Array(_ItemAccessor):
         ndim = len(self.shape)
 
         if attr == "ndim":
-            return const_index(ndim), None
+            return const_index(ndim), Index
 
         elif attr == "shape":
             # First time, initialize a global constant array
@@ -206,7 +206,7 @@ class FastSlice(_ItemAccessor):
         ndim = len(self.shape)
 
         if attr == "ndim":
-            return const_index(ndim), None
+            return const_index(ndim), Index
 
         elif attr == "shape":
             # First time, initialize a global constant array
