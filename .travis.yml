@@ -12,4 +12,5 @@ before_install:
     - export PATH=$(pwd)/clang+llvm-3.2-x86-linux-ubuntu-12.04/bin:$PATH
 
 script:
+    - `which llvm-config` --version
     - python setup.py nosetests -s -x
