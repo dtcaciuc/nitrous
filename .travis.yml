@@ -8,8 +8,8 @@ virtualenv:
 
 before_install:
     - sudo apt-get install python-numpy python-coverage
-    - wget -O - http://llvm.org/releases/3.2/clang+llvm-3.2-x86-linux-ubuntu-12.04.tar.gz | tar xz
-    - export PATH=$(pwd)/clang+llvm-3.2-x86-linux-ubuntu-12.04/bin:$PATH
+    - wget -O - http://llvm.org/releases/3.2/clang+llvm-3.2-x86_64-linux-ubuntu-12.04.tar.gz | tar xz
+    - export PATH=$(pwd)/clang+llvm-3.2-x86_64-linux-ubuntu-12.04/bin:$PATH
 
 script:
     - python setup.py nosetests -s -x
