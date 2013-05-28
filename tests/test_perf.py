@@ -3,12 +3,12 @@ import numpy as np
 
 from nitrous.function import function
 from nitrous.types import Double, Index
-from nitrous.types.array import Array, Slice, Any
+from nitrous.types.array import Array, FastSlice, Slice, Any
 
 
 DoubleNx3 = Slice(Double, shape=(Any, 3))
 DoubleN = Slice(Double)
-DoubleNArray = Array(Double)
+DoubleNArray = FastSlice(Double)
 
 Double3 = Array(Double, (3,))
 

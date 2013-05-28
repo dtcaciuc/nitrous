@@ -101,6 +101,7 @@ _func("GetIntTypeWidth", ctypes.c_uint, [TypeRef])
 # Sequential types
 _func("PointerType", TypeRef, [TypeRef, ctypes.c_uint])
 _func("VectorType", TypeRef, [TypeRef, ctypes.c_uint])
+_func("ArrayType", TypeRef, [TypeRef, ctypes.c_uint])
 
 _func("GetElementType", TypeRef, [TypeRef])
 

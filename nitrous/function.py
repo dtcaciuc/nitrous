@@ -54,6 +54,7 @@ _INTEGRAL_UNARY_INST = {
     ast.Invert: llvm.BuildNot
 }
 
+_RESULT_ARG = "__result"
 
 class FunctionDecl(object):
     """Result of annotating a function with ``function()`` decorator.
@@ -77,6 +78,13 @@ class FunctionDecl(object):
 
         # Gets populated by functools.wraps
         self.__name__ = None
+
+
+    @property
+    def aggregate_result(self):
+        """Returns True if the result value is an aggregate."""
+        from .types import Reference, is_aggregate
+        return isinstance(self.restype, Reference) and is_aggregate(self.restype.value_type)
 
 
 class Function(object):
@@ -109,7 +117,11 @@ class Function(object):
 
     @property
     def _c_argtypes(self):
-        return [self.decl.argtypes[arg].c_type for arg in self.decl.args]
+        c_argtypes = [self.decl.argtypes[arg].c_type for arg in self.decl.args]
+        if self.decl.aggregate_result:
+            c_argtypes = [self.decl.restype.c_type] + c_argtypes
+
+        return c_argtypes
 
     def wrap_so(self, so):
         """Populates ctypes function object from a loaded SO file."""
@@ -123,7 +135,13 @@ class Function(object):
         self.cfunc = proto(llvm.GetPointerToGlobal(engine, self.llvm_func))
 
     def __call__(self, *args):
-        return self.cfunc(*(c(a) for c, a in zip(self.converters, args)))
+        c_args = [c(a) for c, a in zip(self.converters, args)]
+        if self.decl.aggregate_result:
+            result = self.decl.restype.value_type.c_type()
+            self.cfunc(*([self.decl.restype.convert(result)] + c_args))
+            return result
+        else:
+            return self.cfunc(*c_args)
 
 
 def function(restype=None, **kwargs):
@@ -140,13 +158,15 @@ def function(restype=None, **kwargs):
         import functools
         import inspect
 
-        # Types can provide a susbtitution if they're used directly
-        # as an argument type (eg. Structure needs to be implicitly
-        # passed as Reference() to said structure.
+        # All aggregates are passed and returned by reference
         argtypes = dict(
             (k, Reference(t) if is_aggregate(t) else t)
             for k, t in kwargs.items()
         )
+
+        restype_ = restype
+        if restype_ is not None and is_aggregate(restype):
+            restype_ = Reference(restype)
 
         # - Ordered argument name sequence
         spec = inspect.getargspec(pyfunc)
@@ -155,7 +175,7 @@ def function(restype=None, **kwargs):
         if set(spec.args) != set(argtypes):
             raise AnnotationError("Argument type annotations don't match function arguments.")
 
-        decl = functools.wraps(pyfunc)(FunctionDecl(restype, argtypes, spec.args, pyfunc))
+        decl = functools.wraps(pyfunc)(FunctionDecl(restype_, argtypes, spec.args, pyfunc))
 
         # Immutable global symbols.
         # - Built-ins
@@ -241,8 +261,9 @@ class ScopedVars(object):
 
 class FunctionBuilder(ast.NodeVisitor):
 
-    def __init__(self, builder, opts):
+    def __init__(self, builder, decl, opts):
         self.builder = builder
+        self.decl = decl
         self.opts = opts
 
         # Map of value names to their nitrous types. Currently,
@@ -496,6 +517,13 @@ class FunctionBuilder(ast.NodeVisitor):
                 raise ValueError("No return value expected")
 
             llvm.BuildRetVoid(self.builder)
+
+        elif self.decl.aggregate_result:
+            # Copy return value into provided storage.
+            v = self.r_visit(node.value)
+            result = self.load(_RESULT_ARG)
+            llvm.BuildStore(self.builder, llvm.BuildLoad(self.builder, v, "v"), result)
+            llvm.BuildRet(self.builder, result)
 
         else:
             v = self.r_visit(node.value)
@@ -827,19 +855,33 @@ class FunctionBuilder(ast.NodeVisitor):
         if isinstance(func, FunctionDecl):
             _validate_function_args(func, args)
             llvm_func = self._get_or_create_function(func)
-            result = llvm.BuildCall(self.builder, llvm_func,
-                                    (llvm.ValueRef * len(args))(*args),
-                                    len(args), "")
-            if func.restype is not None:
-                result_type = func.restype
+
+            if func.restype is None:
+                args_type = llvm.ValueRef * len(args)
+                llvm.BuildCall(self.builder, llvm_func, args_type(*args), len(args), "")
+
+            elif func.aggregate_result:
+                # Allocate empt aggregate value and pass it as first argument.
+                result, _ = func.restype.value_type().emit(self.builder)
+                args = [result] + args
+                args_type = llvm.ValueRef * len(args)
+                llvm.BuildCall(self.builder, llvm_func, args_type(*args), len(args), "")
                 llvm.SetValueName(result, "v")
+                self.push(result, func.restype)
+
+            else:
+                args_type = llvm.ValueRef * len(args)
+                result = llvm.BuildCall(self.builder, llvm_func, args_type(*args), len(args), "")
+                llvm.SetValueName(result, "v")
+                self.push(result, func.restype)
+
         else:
             # Function is either CPython one or an LLVM emitter.
             result = func(*args)
             if getattr(result, "__n2o_emitter__", False):
                 result, result_type = result.emit(self.builder)
 
-        self.push(result, result_type)
+            self.push(result, result_type)
 
     def visit_Print(self, node):
         from .lib import print_
@@ -985,7 +1027,7 @@ def emit_body(builder, func):
     func_body = ast.parse(func_source).body[0].body
 
     # Emit function body IR
-    b = FunctionBuilder(builder, func.decl.options)
+    b = FunctionBuilder(builder, func.decl, func.decl.options)
 
     entry_bb = llvm.AppendBasicBlock(func.llvm_func, "entry")
     llvm.PositionBuilderAtEnd(builder, entry_bb)
@@ -997,7 +1039,16 @@ def emit_body(builder, func):
         b.types[k] = t
 
     # Store function parameters as locals
-    for i, name in enumerate(func.decl.args):
+    arg_start = 0
+    if func.decl.aggregate_result:
+        # Storage for aggregate return values is passed from caller
+        # through special zeroth argument.
+        param = llvm.GetParam(func.llvm_func, 0)
+        llvm.SetValueName(param, _RESULT_ARG)
+        b.store(_RESULT_ARG, param, func.decl.restype)
+        arg_start = 1
+
+    for i, name in enumerate(func.decl.args, arg_start):
         param = llvm.GetParam(func.llvm_func, i)
         llvm.SetValueName(param, name)
         b.store(name, param, func.decl.argtypes[name])
@@ -1140,6 +1191,9 @@ def _get_or_create_function(module, decl, vargs=False):
 
         argtypes = [decl.argtypes[arg] for arg in decl.args]
         restype = decl.restype
+
+        if decl.aggregate_result:
+            argtypes = [restype] + argtypes
 
         llvm_restype = restype.llvm_type if restype is not None else llvm.VoidType()
 

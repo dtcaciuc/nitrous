@@ -26,3 +26,28 @@ class NameTest(unittest.TestCase):
 
         self.assertIn("get0_RBdAnyf4", ir)
         self.assertIn("get0_RBdAnyf8", ir)
+
+
+class AggregateReturnTests(unittest.TestCase):
+
+    def test_struct(self):
+        from nitrous.types import Structure
+        from nitrous.types import Double
+
+        Coord = Structure("Coord", ("x", Double), ("y", Double), ("z", Double))
+
+        @function(Coord, x=Double, y=Double, z=Double)
+        def make_coord(x, y, z):
+            return Coord(x, y, z)
+
+        @function(Coord, x=Double, y=Double, z=Double)
+        def make_coord_2(x, y, z):
+            return make_coord(x, y, z)
+
+        m = module([make_coord, make_coord_2])
+
+        c = m.make_coord_2(1.0, 2.0, 3.0)
+
+        self.assertEqual(c.x, 1.0)
+        self.assertEqual(c.y, 2.0)
+        self.assertEqual(c.z, 3.0)

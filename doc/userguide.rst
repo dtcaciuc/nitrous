@@ -254,8 +254,6 @@ we can write
 Types
 =====
 
-TODO
-
 Scalars
 -------
 
@@ -318,8 +316,8 @@ standard library).
 Slices
 ------
 
-Slice is the main way to access a typed block of memory. They are constructed
-with two pieces of information: element type and shape.
+Slices provide an interface to a contiguous block of elements of a single type.
+They are defined with two pieces of information: element type and shape.
 
 .. code-block:: python
 
@@ -384,23 +382,42 @@ Memory Aliasing
 Arrays
 ------
 
-Arrays can be used when all of the dimensions of the memory block (with an
-exception of the major dimension, see note below) are known. This allows
-compiler to reduce the amount of data passed around through function arguments,
-which in turn results in performance gains.
+Array is the second type of indexable construct that is used to access a block
+of elements. The main differences from Slices are that
 
-Major Dimension
-***************
+1. Array shape must be fully known (ie. dimensions cannot be ``Any``),
+2. Arrays can be allocated inside of Nitrous functions, and
+3. Arrays own their memory and can be returned from functions.
 
-The major Array dimension is the only one that can be declared as ``Any``,
-because it is not used in index calculations. There, however, two incurred
-limitations:
 
-1. Since the total memory size is not known at compile time, you cannot
-   allocate arrays inside Nitrous functions.
+.. code-block:: python
 
-2. It is impossible to guard against row index overflows and, thus, caution has
-   to be exercised.
+    from nitrous.types.array import Array
+    from nitrous.types import Double
+
+    Coord = Array(Double, (3,))
+
+    def create_coord(Coord):
+        return Coord()  # Return empty coordinate
+
+
+Arrays can also be given initial values through constructor argument. It
+accepts nested tuples which should match array shape.
+
+
+.. code-block:: python
+
+    from nitrous.types.array import Array
+    from nitrous.types import Double
+
+    Mat2d = Array(Double, (2, 2))
+
+    def create_mat(Mat2d, a=Double, b=Double, c=Double, d=Double):
+        return Mat2d(((a, b), (c, d)))
+
+
+Arrays are aggregate values and are passed around by reference.
+
 
 Structures
 ----------

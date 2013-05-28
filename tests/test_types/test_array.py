@@ -4,7 +4,7 @@ import ctypes
 from nitrous.module import module
 from nitrous.function import function
 from nitrous.types import Long
-from nitrous.types.array import Array, Slice, Any
+from nitrous.types.array import Array, FastSlice, Slice, Any
 
 try:
     import numpy as np
@@ -12,7 +12,7 @@ except ImportError:
     np = None
 
 
-class ArrayTests(object):
+class ArrayTestsBase(object):
 
     def setUp(self):
 
@@ -61,7 +61,7 @@ class ArrayTests(object):
         self.assertEqual(list(b), range(1, 13))
 
 
-class SliceTests(ArrayTests, unittest.TestCase):
+class SliceTests(ArrayTestsBase, unittest.TestCase):
 
     A = Slice(Long, (Any,) * 3)
     B = Slice(Long)
@@ -75,7 +75,21 @@ class SliceTests(ArrayTests, unittest.TestCase):
         self.assertEqual(str(self.B), "<Slice [? x Long]>")
 
 
-class ArrayTests(ArrayTests, unittest.TestCase):
+class FastSliceTests(ArrayTestsBase, unittest.TestCase):
+
+    A = FastSlice(Long, (2, 3, 2))
+    B = FastSlice(Long, (12,))
+
+    def test_repr(self):
+        self.assertEqual(repr(self.A), "FastSlice(Long, shape=(2, 3, 2))")
+        self.assertEqual(repr(self.B), "FastSlice(Long, shape=(12,))")
+
+    def test_str(self):
+        self.assertEqual(str(self.A), "<FastSlice [2 x [3 x [2 x Long]]]>")
+        self.assertEqual(str(self.B), "<FastSlice [12 x Long]>")
+
+
+class ArrayTests(ArrayTestsBase, unittest.TestCase):
 
     A = Array(Long, (2, 3, 2))
     B = Array(Long, (12,))
@@ -89,58 +103,53 @@ class ArrayTests(ArrayTests, unittest.TestCase):
         self.assertEqual(str(self.B), "<Array [12 x Long]>")
 
 
-class AllocTests(unittest.TestCase):
+class ArrayAllocTests(unittest.TestCase):
 
-    def test_alloc(self):
-        """Stack allocation of a fixed size array by calling its type"""
+    def test_alloc_return(self):
+        """Allocate array and pass back through return value."""
         from nitrous.types import Double
 
-        Mat2d = Array(Double, shape=(2, 2))
+        Coord = Array(Double, (3,))
 
-        @function(Double)
-        def f():
+        @function(Coord, x=Double, y=Double, z=Double)
+        def make_coord(x, y, z):
+            return Coord((x, y, z))
 
-            m = Mat2d()
-            a = 0.0
+        @function(Coord, x=Double, y=Double, z=Double)
+        def make_coord_2(x, y, z):
+            return make_coord(x, y, z)
 
-            m[0, 0] = 2.0
-            m[0, 1] = 11.0
-            m[1, 0] = 13.0
-            m[1, 1] = 17.0
+        m = module([make_coord, make_coord_2])
+        c = m.make_coord_2(1.0, 2.0, 3.0)
 
-            for i in range(2):
-                for j in range(2):
-                    a += m[i, j]
+        self.assertEqual(tuple(c), (1.0, 2.0, 3.0))
 
-            return a
+    def test_init_2d(self):
+        """Multi-dimensional array initialization."""
+        from nitrous.types import Double
 
-        m = module([f])
+        Double2x2 = Array(Double, (2, 2))
 
-        x = (Double.c_type * 4)()
-        self.assertEqual(m.f(x), 43.0)
+        @function(Double2x2, x=Double, y=Double, z=Double, w=Double)
+        def make_2x2(x, y, z, w):
+            return Double2x2(((x, y), (z, w)))
+
+        m = module([make_2x2])
+        c = m.make_2x2(1.0, 2.0, 3.0, 4.0)
+
+        self.assertEqual(c[0][0], 1.0)
+        self.assertEqual(c[0][1], 2.0)
+        self.assertEqual(c[1][0], 3.0)
+        self.assertEqual(c[1][1], 4.0)
 
 
 class SliceReferenceTests(unittest.TestCase):
 
     def test_reference_arg(self):
         """Slice is treated as reference type."""
-        # Since slices don't directly inherit structs,
-        # make sure that they are returned by reference
-        # in array item access.
+        from nitrous.types import is_aggregate
 
-        @function(x=Array(Slice(Long), (1,)), i=Long, v=Long)
-        def set_i(x, i, v):
-            x0 = x[0]
-            x0[i] = v
-
-        m = module([set_i])
-
-        x = (Long.c_type * 3)(3, 11, 13)
-        px = (ctypes.POINTER(Long.c_type) * 1)(x)
-
-        m.set_i(px, 1, 12)
-
-        self.assertEqual(list(x), [3, 12, 13])
+        self.assertTrue(is_aggregate(Slice(Long)))
 
 
 class IndexTests(unittest.TestCase):

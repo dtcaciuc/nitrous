@@ -1,6 +1,7 @@
 from setuptools import setup, find_packages, Extension
 from subprocess import Popen, PIPE
 import platform
+import sys
 import os
 
 
@@ -9,10 +10,11 @@ on_rtd = os.environ.get('READTHEDOCS', None) == 'True'
 
 
 # Determine the name for LLVM config binary
-for path in ["llvm-config-3.1", "llvm-config"]:
+for path in ["llvm-config-3.2", "llvm-config"]:
     proc = Popen(["which", path], stdout=PIPE, stderr=PIPE)
     if not proc.wait():
         LLVM_CONFIG = proc.stdout.read().strip()
+        print "Found LLVM config at '{0}'".format(LLVM_CONFIG)
         break
 else:
     if not on_rtd:
@@ -20,8 +22,14 @@ else:
 
 
 def llvm_config(*args):
-    p = Popen([LLVM_CONFIG] + list(args), stdout=PIPE)
-    return p.communicate()[0].strip().split()
+    from distutils.errors import DistutilsFileError
+    try:
+        print "Running `{0}`".format(" ".join([LLVM_CONFIG] + list(args)))
+        p = Popen([LLVM_CONFIG] + list(args), stdout=PIPE)
+        return p.communicate()[0].strip().split()
+    except OSError, e:
+        raise DistutilsFileError("llvm-config failed: {0}".format(e))
+        
 
 
 def link_args():
