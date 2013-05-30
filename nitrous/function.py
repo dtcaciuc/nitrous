@@ -1205,10 +1205,6 @@ def _get_or_create_function(module, decl, vargs=False):
         llvm_func = llvm.AddFunction(module, name, llvm_func_type)
         llvm.SetLinkage(llvm_func, llvm.ExternalLinkage)
 
-        for i, ty in enumerate(argtypes):
-            if llvm.GetTypeKind(ty.llvm_type) == llvm.PointerTypeKind:
-                llvm.AddAttribute(llvm.GetParam(llvm_func, i), llvm.NoAliasAttribute)
-
         if decl.options["inline"]:
             llvm.AddFunctionAttr(llvm_func, llvm.AlwaysInlineAttribute)
 

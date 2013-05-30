@@ -110,6 +110,25 @@ extern "C" {
         return llvm::wrap(target);
     }
 
+    /* Metadata */
+
+    void
+    LLVMSetNamedMetadata__(LLVMValueRef Inst, const char * Kind, LLVMValueRef MD) {
+        llvm::Instruction *__Inst = reinterpret_cast<llvm::Instruction*>(Inst);
+        llvm::MDNode * __MD = MD ? reinterpret_cast<llvm::MDNode*>(MD) : NULL;
+        __Inst->setMetadata(llvm::StringRef(Kind), __MD);
+    }
+
+    LLVMValueRef
+    LLVMMDNode__(LLVMValueRef * Vals, unsigned Count) {
+        std::vector<llvm::Value*> Vals_;
+        for (LLVMValueRef *I = Vals, *E = Vals + Count; I != E; ++I) {
+            Vals_.push_back(reinterpret_cast<llvm::MDNode*>(*I));
+        }
+        llvm::MDNode * MD = llvm::MDNode::get(llvm::getGlobalContext(), llvm::ArrayRef<llvm::Value*>(Vals_));
+        return reinterpret_cast<LLVMValueRef>(MD);
+    }
+
 
     /* Copied from LLVM 3.2 trunk */
 

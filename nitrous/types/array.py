@@ -32,7 +32,9 @@ class _ItemAccessor(object):
             if is_aggregate(self.element_type):
                 return gep, Reference(self.element_type)
             else:
-                return llvm.BuildLoad(builder, gep, "getitem"), self.element_type
+                v = llvm.BuildLoad(builder, gep, "getitem")
+                set_tbaa(v, "n2o.{0}.element".format(self.tag))
+                return v, self.element_type
 
     def emit_setitem(self, builder, v, i, e):
         if not llvm.types_equal(self.element_type.llvm_type, llvm.TypeOf(e)):
@@ -40,7 +42,8 @@ class _ItemAccessor(object):
             # what the type *should* be for assignment to succeed.
             raise TypeError("Element value must be a(n) {0}".format(self.element_type))
         gep = self._item_gep(builder, v, i)
-        llvm.BuildStore(builder, e, gep)
+        v = llvm.BuildStore(builder, e, gep)
+        set_tbaa(v, "n2o.{0}.element".format(self.tag))
 
     def _emit_subslice(self, builder, v, i):
         """Emits a sub-slice based on partial index *i*"""
@@ -306,7 +309,9 @@ class Slice(_ItemAccessor):
         if attr == "ndim":
             return const_index(len(self.shape)), None
         elif attr in ("shape", "data"):
-            return self._struct.emit_getattr(builder, ref, attr)
+            v, t = self._struct.emit_getattr(builder, ref, attr)
+            set_tbaa(v, "n2o.{0}.data".format(self.tag))
+            return v, t
         else:
             raise AttributeError(attr)
 
@@ -379,3 +384,9 @@ def shape_str(element_type, shape):
     dim_0 = "?" if shape[0] in (Any, None) else shape[0]
     sub_shape = element_type if len(shape) == 1 else shape_str(element_type, shape[1:])
     return "[{0} x {1}]".format(dim_0, sub_shape)
+
+
+def set_tbaa(v, name):
+    root = llvm.MDNode__((llvm.ValueRef * 1)(llvm.MDString("n2o.tbaa", 4)), 1)
+    node = llvm.MDNode__((llvm.ValueRef * 2)(llvm.MDString(name, len(name)), root), 2)
+    llvm.SetNamedMetadata__(v, "tbaa", node)

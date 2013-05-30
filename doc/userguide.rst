@@ -372,13 +372,6 @@ dimensions fixed. As with complete slices, first index always selects along the
 major dimension and so on.
 
 
-Memory Aliasing
-***************
-
-.. warning:: Nitrous currently requires all arrays and slices to use unaliased
-    memory blocks. Ignoring this rule will result in undefined behaviour.
-
-
 Arrays
 ------
 

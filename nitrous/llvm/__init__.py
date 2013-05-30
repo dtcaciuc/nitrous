@@ -296,6 +296,12 @@ VerifierFailureAction = ctypes.c_int
 _func("VerifyFunction", Bool, [ValueRef, VerifierFailureAction])
 
 
+# Metadata
+_func("MDString", ValueRef, [ctypes.c_char_p, ctypes.c_uint])
+_func("MDNode__", ValueRef, [ctypes.POINTER(ValueRef), ctypes.c_uint])
+_func("SetNamedMetadata__", None, [ValueRef, ctypes.c_char_p, ValueRef])
+
+
 # Target
 class OpaqueTarget(ctypes.Structure):
     pass
