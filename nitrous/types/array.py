@@ -310,7 +310,7 @@ class Slice(_ItemAccessor):
             return const_index(len(self.shape)), None
         elif attr in ("shape", "data"):
             v, t = self._struct.emit_getattr(builder, ref, attr)
-            set_tbaa(v, "n2o.{0}.data".format(self.tag))
+            set_tbaa(v, "n2o.{0}.{1}".format(self.tag, attr))
             return v, t
         else:
             raise AttributeError(attr)
@@ -387,6 +387,6 @@ def shape_str(element_type, shape):
 
 
 def set_tbaa(v, name):
-    root = llvm.MDNode__((llvm.ValueRef * 1)(llvm.MDString("n2o.tbaa", 4)), 1)
+    root = llvm.MDNode__((llvm.ValueRef * 1)(llvm.MDString("n2o.tbaa", 8)), 1)
     node = llvm.MDNode__((llvm.ValueRef * 2)(llvm.MDString(name, len(name)), root), 2)
     llvm.SetNamedMetadata__(v, "tbaa", node)
